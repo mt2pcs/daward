@@ -63,5 +63,6 @@ Next.js 14 (App Router, TS)。詳細は README.md を参照。
   （リポジトリには一切書いていない）。client_email が無いため鍵単体では悪用困難だが、
   再設定時は**新しいキーを発行**（既存キーは削除）することを推奨。
 - 環境の egress 確認: oauth2.googleapis.com / cloudresourcemanager.googleapis.com への疎通はOK。
-  REST経由デプロイの手順・スクリプトは検証済みで、正しいキーJSONさえあれば実行可能
-  （scratchpadに deploy_cloud_run.js として作成済み。GCS→Cloud Build→Cloud Run v2→IAM→URL確認まで自動）。
+  REST経由デプロイのスクリプトは `scripts/deploy_cloud_run.js` としてコミット済み
+  （生JSON/base64どちらのキー形式にも対応。GCS→Cloud Build→Cloud Run v2→IAM付与→URL確認まで自動）。
+  キー再設定後は `node scripts/deploy_cloud_run.js` を実行するだけでよい。
