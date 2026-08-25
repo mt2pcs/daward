@@ -4,6 +4,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { execFileSync } = require('child_process');
 
 const REGION = 'asia-northeast1';
 const SERVICE = 'e-mooments';
@@ -79,15 +80,23 @@ async function enableApi(name) {
   console.log(`Enabling API ${name}...`);
   const r = await api('POST', `https://serviceusage.googleapis.com/v1/projects/${PROJECT}/services/${name}:enable`, {});
   console.log(`  enable ${name}: status=${r.status}`);
-  await sleep(10000);
+  if (r.status >= 300) {
+    throw new Error(`could not enable ${name} (status=${r.status}): ${JSON.stringify(r.json).slice(0, 400)}`);
+  }
 }
+
+const isDisabled = r => r.status === 403 && JSON.stringify(r.json).includes('SERVICE_DISABLED');
 
 async function withApiEnable(name, fn) {
   let r = await fn();
-  const msg = JSON.stringify(r.json);
-  if (r.status === 403 && msg.includes('SERVICE_DISABLED')) {
+  if (isDisabled(r)) {
     await enableApi(name);
-    r = await fn();
+    // enablement can take a while to propagate — retry with backoff
+    for (let i = 0; i < 8 && isDisabled(r); i++) {
+      await sleep(15000);
+      r = await fn();
+      console.log(`  retry after enable ${name} (${i}): status=${r.status}`);
+    }
   }
   return r;
 }
@@ -97,10 +106,23 @@ async function main() {
   TOKEN = await getToken();
   console.log('token acquired');
 
-  // 1. connectivity + permission check
-  const proj = await api('GET', `https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT}`);
-  console.log(`project check: status=${proj.status} name=${proj.json.name || ''} state=${proj.json.lifecycleState || ''}`);
-  if (proj.status !== 200) throw new Error(`project check failed: ${JSON.stringify(proj.json).slice(0, 500)}`);
+  // 0. source tarball (regenerated each run — containers start from a fresh clone)
+  const repoRoot = path.join(__dirname, '..');
+  console.log('creating source tarball...');
+  execFileSync('tar', ['czf', TARBALL, '-C', repoRoot,
+    '--exclude=./node_modules', '--exclude=./.git', '--exclude=./.next',
+    '--exclude=./scripts/source.tar.gz', '.']);
+  console.log(`tarball: ${(fs.statSync(TARBALL).size / 1024).toFixed(0)} KB`);
+
+  // 1. connectivity + permission check (informational — deploy itself doesn't need CRM)
+  try {
+    const proj = await withApiEnable('cloudresourcemanager.googleapis.com', () =>
+      api('GET', `https://cloudresourcemanager.googleapis.com/v1/projects/${PROJECT}`));
+    console.log(`project check: status=${proj.status} name=${proj.json.name || ''} state=${proj.json.lifecycleState || ''}`);
+    if (proj.status !== 200) console.log(`  warning: project check failed (continuing): ${JSON.stringify(proj.json).slice(0, 300)}`);
+  } catch (e) {
+    console.log(`  warning: project check skipped (continuing): ${e.message}`);
+  }
 
   // 2. bucket ensure + upload
   const bucket = `${PROJECT}_cloudbuild`;

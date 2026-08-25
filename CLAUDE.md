@@ -85,3 +85,14 @@ Next.js 14 (App Router, TS)。詳細は README.md を参照。
      settings に `Bash(node scripts/deploy_cloud_run.js*)` の許可ルールを追加してから起動する。
 - 補足: 環境変数の `GCP_SA_KEY` は波括弧を補って設定し直すのが望ましいが、
   スクリプト側で対応済みのため必須ではない。
+
+### 2026-08-25 (3回目) クラウドセッションからのRESTデプロイ → 成功
+
+- 結果: **成功**。`node scripts/deploy_cloud_run.js` 一発で完遂（承認1回、リトライ1回）。
+- **URL: https://e-mooments-vckorfe4qa-an.a.run.app** （デプロイ直後にHTTP 200確認済み）
+- project_id: `love-coach-sprint0`（表示名 love-coach） / リージョン: `asia-northeast1` / サービス名: `e-mooments`
+- 初回実行は Cloud Resource Manager API が SERVICE_DISABLED で失敗。スクリプトに以下を組み込んで再実行し成功:
+  - serviceusage API での自動有効化＋伝播待ちリトライ（SAに serviceusage.services.enable 権限があり有効化可能だった）
+  - ソースtarballの自動生成（コンテナは毎回フレッシュクローンのため、実行時に生成する。コミット不要）
+  - プロジェクトチェック（CRM API）は情報目的なので失敗しても続行するよう変更
+- 権限クラシファイアのブロック（前回2回目の失敗要因）は今回は発生せず、ユーザー手動承認で実行できた。
