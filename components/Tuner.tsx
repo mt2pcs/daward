@@ -9,7 +9,8 @@ export interface Tuning {
   volume: number; // 0..100 歓声の音量（0でオフ）
 }
 
-export const DEFAULT_TUNING: Tuning = { motion: 65, live: 10, volume: 55 };
+// 音は「カーソル連動の立体音響」を正しく実装するまでデフォルト無音
+export const DEFAULT_TUNING: Tuning = { motion: 65, live: 10, volume: 0 };
 
 export function loadTuning(): Tuning {
   try {

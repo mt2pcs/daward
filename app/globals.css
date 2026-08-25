@@ -55,13 +55,25 @@ textarea {
 
 .tile {
   position: absolute;
+  left: 0;
+  top: 0;
   overflow: hidden;
   border-radius: 6px;
   background: #101013;
-  /* 幾何(left/top/width/height)はJSが毎フレーム敷き詰め直して直接描画する。
-     CSSトランジションを掛けると二重補間で敷き詰めが崩れるため禁止 */
+  /* 幾何はJSが毎フレームtransform（GPU合成のみ）で変形する。
+     CSSトランジション・レイアウトプロパティのアニメーションは禁止 */
   transition: box-shadow 0.35s ease;
+  transform-origin: 0 0;
+  will-change: transform;
   cursor: pointer;
+}
+
+.tile-inner {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  /* 常にレイヤー化しておく: 毎フレームのレイヤー生成破棄の方が高くつく（実測済み） */
+  will-change: transform;
 }
 
 .tile::after {

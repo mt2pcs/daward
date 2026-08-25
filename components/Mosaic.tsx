@@ -38,6 +38,7 @@ export default function Mosaic({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tileEls = useRef<Map<string, HTMLDivElement>>(new Map());
+  const innerEls = useRef<Map<string, HTMLDivElement>>(new Map());
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const sizeRef = useRef({ w: 0, h: 0 });
@@ -67,6 +68,10 @@ export default function Mosaic({
   // アニメーションの内部状態（Reactを介さず毎フレーム更新）
   const curWeights = useRef<number[]>([]);
   const curRects = useRef<LayoutRect[]>([]);
+  // GPU描画の基準: タイルの実寸（width/height）は「アンカー配置」で一度だけ決め、
+  // 毎フレームはtransform（GPU合成のみ、再レイアウトなし）で目標矩形へ変形する
+  const anchorRects = useRef<LayoutRect[]>([]);
+  const anchorKey = useRef("");
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -129,20 +134,40 @@ export default function Mosaic({
         maxDelta = Math.max(maxDelta, Math.abs(next - cur) / cur);
       }
 
+      const ids = idsRef.current;
+
+      // アンカーの張り直し（画面サイズ・タイル数が変わった時だけ。通常は走らない）
+      const key = `${w}x${h}:${n}`;
+      if (anchorKey.current !== key) {
+        anchorKey.current = key;
+        anchorRects.current = baseRects;
+        for (let i = 0; i < n; i++) {
+          const el = tileEls.current.get(ids[i]);
+          if (!el) continue;
+          const a = baseRects[i];
+          el.style.width = `${Math.max(1, a.w - GAP)}px`;
+          el.style.height = `${Math.max(1, a.h - GAP)}px`;
+        }
+      }
+
       // 収束していてカーソルも無ければ描画を省略（完全静止）
       if (maxDelta < 0.0004 && curRects.current.length === n && !cursor) return;
 
       const rects = computeLayout(curWeights.current, w, h);
       curRects.current = rects;
-      const ids = idsRef.current;
+      const anchors = anchorRects.current;
       for (let i = 0; i < n; i++) {
         const el = tileEls.current.get(ids[i]);
-        if (!el) continue;
+        const inner = innerEls.current.get(ids[i]);
+        if (!el || !inner || !anchors[i]) continue;
         const r = rects[i];
-        el.style.left = `${r.x + GAP / 2}px`;
-        el.style.top = `${r.y + GAP / 2}px`;
-        el.style.width = `${Math.max(0, r.w - GAP)}px`;
-        el.style.height = `${Math.max(0, r.h - GAP)}px`;
+        const a = anchors[i];
+        const sx = Math.max(0.01, (r.w - GAP) / Math.max(1, a.w - GAP));
+        const sy = Math.max(0.01, (r.h - GAP) / Math.max(1, a.h - GAP));
+        // 外側: GPU合成のみの変形で目標矩形へ。内側: 逆変形で映像の歪みを打ち消す
+        el.style.transform = `translate3d(${r.x + GAP / 2}px, ${r.y + GAP / 2}px, 0) scale(${sx}, ${sy})`;
+        const m = Math.max(sx, sy);
+        inner.style.transform = `scale(${m / sx}, ${m / sy})`;
       }
     };
     raf = requestAnimationFrame(tick);
@@ -171,7 +196,7 @@ export default function Mosaic({
   return (
     <div
       className="mosaic"
-      data-rev="seamless1"
+      data-rev="gpu1"
       ref={containerRef}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
@@ -198,34 +223,42 @@ export default function Mosaic({
             }}
             onClick={() => onSelect(m)}
           >
-            <div className="tile-media">
-              <TileImage moment={m} seed={seed} />
-              {live && (
-                <iframe
-                  src={embedUrl(m.youtubeId, {
-                    autoplay: true,
-                    mute: true,
-                    loop: true,
-                    controls: false,
-                  })}
-                  title={m.title}
-                  tabIndex={-1}
-                  aria-hidden
-                />
+            <div
+              className="tile-inner"
+              ref={(el) => {
+                if (el) innerEls.current.set(m.id, el);
+                else innerEls.current.delete(m.id);
+              }}
+            >
+              <div className="tile-media">
+                <TileImage moment={m} seed={seed} />
+                {live && (
+                  <iframe
+                    src={embedUrl(m.youtubeId, {
+                      autoplay: true,
+                      mute: true,
+                      loop: true,
+                      controls: false,
+                    })}
+                    title={m.title}
+                    tabIndex={-1}
+                    aria-hidden
+                  />
+                )}
+              </div>
+              <div className="tile-shade" />
+              <div className="tile-votes">🔥 {m.votes.toLocaleString()}</div>
+              {pulse && (
+                <div className="vote-pop" key={pulse}>
+                  +1 🔥
+                </div>
               )}
-            </div>
-            <div className="tile-shade" />
-            <div className="tile-votes">🔥 {m.votes.toLocaleString()}</div>
-            {pulse && (
-              <div className="vote-pop" key={pulse}>
-                +1 🔥
+              <div className="tile-info">
+                <div className="tile-num">
+                  MOMENT <em>#{String(m.index).padStart(3, "0")}</em> / 100
+                </div>
+                <div className="tile-title">{m.title}</div>
               </div>
-            )}
-            <div className="tile-info">
-              <div className="tile-num">
-                MOMENT <em>#{String(m.index).padStart(3, "0")}</em> / 100
-              </div>
-              <div className="tile-title">{m.title}</div>
             </div>
           </div>
         );
