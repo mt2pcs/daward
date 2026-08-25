@@ -9,7 +9,7 @@ export interface Tuning {
   volume: number; // 0..100 歓声の音量（0でオフ）
 }
 
-export const DEFAULT_TUNING: Tuning = { motion: 55, live: 10, volume: 55 };
+export const DEFAULT_TUNING: Tuning = { motion: 65, live: 10, volume: 55 };
 
 export function loadTuning(): Tuning {
   try {
