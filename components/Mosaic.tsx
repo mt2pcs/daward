@@ -12,8 +12,8 @@ import type { MomentWithStats } from "@/lib/types";
 
 const GAP = 3;
 const LIVE_COUNT = 6; // 投票数上位のタイルだけミュート自動再生（100個のiframeはブラウザが持たないため）
-const HOVER_BOOST = 3.1;
-const JITTER = 0.09; // 常時ゆらぎの振幅（tapehead的な「生きている」動き）
+// レイアウトは静止が基本。動くのはタイルの「中身」（映像・Ken Burns）だけで、
+// 配置が変わるのは投票数が実際に変化したときのみ（そのときだけ滑らかに補間される）。
 
 function tileSeed(id: string): number {
   let h = 2166136261;
@@ -34,7 +34,6 @@ export default function Mosaic({
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -44,11 +43,6 @@ export default function Mosaic({
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
-
-  useEffect(() => {
-    const t = setInterval(() => setTick((v) => v + 1), 2600);
-    return () => clearInterval(t);
   }, []);
 
   const maxVotes = useMemo(
@@ -69,14 +63,10 @@ export default function Mosaic({
     if (size.w === 0 || size.h === 0) return [];
     const weights = moments.map((m) => {
       const norm = Math.pow(m.votes / maxVotes, 0.72);
-      let w = 0.38 + norm * 1.62;
-      const seed = tileSeed(m.id);
-      w *= 1 + Math.sin(tick * 0.9 + seed * Math.PI * 2 * 7) * JITTER;
-      if (m.id === hoveredId) w *= HOVER_BOOST;
-      return w;
+      return 0.38 + norm * 1.62;
     });
     return computeLayout(weights, size.w, size.h);
-  }, [moments, maxVotes, size, hoveredId, tick]);
+  }, [moments, maxVotes, size]);
 
   return (
     <div className="mosaic" ref={containerRef}>

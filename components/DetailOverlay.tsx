@@ -76,7 +76,7 @@ export default function DetailOverlay({
           <div className="detail-video">
             <div className="player">
               <iframe
-                src={embedUrl(moment.youtubeId, { autoplay: true, mute: true })}
+                src={embedUrl(moment.youtubeId, { autoplay: true, mute: false })}
                 title={moment.title}
                 allow="autoplay; encrypted-media; picture-in-picture"
                 allowFullScreen
@@ -124,7 +124,7 @@ export default function DetailOverlay({
                 placeholder="ニックネーム（任意）"
               />
               <button className="vote-btn" onClick={vote} disabled={sending}>
-                {sending ? "投票中…" : "🔥 この瞬間に投票する"}
+                {sending ? "投票中…" : "🔥 投票してスペシャル映像を見る"}
               </button>
               {error && <div className="vote-note">{error}</div>}
               <div className="vote-note">
