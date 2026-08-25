@@ -172,20 +172,29 @@ async function main() {
   const buildId = build.json.metadata && build.json.metadata.build && build.json.metadata.build.id;
   console.log(`build id=${buildId}`);
   let buildStatus = 'QUEUED';
+  let buildResult = null;
   for (let i = 0; i < 40; i++) {
     await sleep(20000);
     const st = await api('GET', `https://cloudbuild.googleapis.com/v1/projects/${PROJECT}/builds/${buildId}`);
     buildStatus = st.json.status;
+    buildResult = st.json;
     console.log(`build poll ${i}: ${buildStatus}`);
     if (['SUCCESS', 'FAILURE', 'INTERNAL_ERROR', 'TIMEOUT', 'CANCELLED', 'EXPIRED'].includes(buildStatus)) break;
   }
   if (buildStatus !== 'SUCCESS') throw new Error(`build ended with status=${buildStatus} (log: https://console.cloud.google.com/cloud-build/builds/${buildId}?project=${PROJECT})`);
+  // Deploy by digest, not tag: Cloud Run treats an unchanged image string as an
+  // unchanged template and silently keeps serving the old revision.
+  const builtImages = (buildResult.results && buildResult.results.images) || [];
+  const digest = builtImages.length ? builtImages[0].digest : null;
+  if (!digest) throw new Error('build result has no image digest — cannot pin revision');
+  const deployImage = `${image}@${digest}`;
+  console.log(`image digest=${digest}`);
 
   // 5. Cloud Run service create-or-update
   const runBase = `https://run.googleapis.com/v2/projects/${PROJECT}/locations/${REGION}/services`;
   const svcBody = {
     template: {
-      containers: [{ image, ports: [{ containerPort: 8080 }], resources: { limits: { memory: '512Mi', cpu: '1' } } }],
+      containers: [{ image: deployImage, ports: [{ containerPort: 8080 }], resources: { limits: { memory: '512Mi', cpu: '1' } } }],
     },
   };
   let existing = await withApiEnable('run.googleapis.com', () => api('GET', `${runBase}/${SERVICE}`));
