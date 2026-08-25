@@ -10,10 +10,17 @@ const SERVICE = 'e-mooments';
 const AR_REPO = 'cloud-run-source-deploy';
 const TARBALL = path.join(__dirname, 'source.tar.gz');
 
-// GCP_SA_KEY accepts either the raw service-account JSON or its base64 encoding.
+// GCP_SA_KEY accepts the raw service-account JSON, its base64 encoding, or the
+// JSON body with the outer braces stripped (env-var UIs sometimes eat them).
 function parseKey(raw) {
   if (!raw) throw new Error('GCP_SA_KEY is not set');
-  for (const candidate of [raw, (() => { try { return Buffer.from(raw.trim(), 'base64').toString('utf8'); } catch { return ''; } })()]) {
+  const trimmed = raw.trim();
+  const candidates = [
+    trimmed,
+    `{${trimmed}}`,
+    (() => { try { return Buffer.from(trimmed, 'base64').toString('utf8'); } catch { return ''; } })(),
+  ];
+  for (const candidate of candidates) {
     try {
       const j = JSON.parse(candidate);
       if (j.client_email && j.private_key && j.project_id) return j;

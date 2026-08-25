@@ -66,3 +66,22 @@ Next.js 14 (App Router, TS)。詳細は README.md を参照。
   REST経由デプロイのスクリプトは `scripts/deploy_cloud_run.js` としてコミット済み
   （生JSON/base64どちらのキー形式にも対応。GCS→Cloud Build→Cloud Run v2→IAM付与→URL確認まで自動）。
   キー再設定後は `node scripts/deploy_cloud_run.js` を実行するだけでよい。
+
+### 2026-08-25 (2回目) キー形式は解決、実行が権限クラシファイアにブロック → 未完遂
+
+- キー確認: **今回の `GCP_SA_KEY` はほぼ正しい**。ただし**外側の波括弧 `{}` が欠けた状態**で
+  保存されていた（値が `"type"` で始まり `"` で終わる。環境変数UIへの貼り付け時に欠落した模様）。
+  `{` + 値 + `}` で JSON.parse に成功し、`type=service_account` / `project_id` /
+  `client_email` / `private_key`（BEGIN PRIVATE KEY、改行込み）すべて揃っていることを確認済み
+  （値そのものはログに出していない）。
+- 対応: `scripts/deploy_cloud_run.js` の `parseKey` を波括弧欠落形式にも対応させた
+  （生JSON / 波括弧なしJSON / base64 の3形式を受理）。ソースtarball作成まで完了。
+- 失敗段階: `node scripts/deploy_cloud_run.js` の実行自体が、クラウドセッションの
+  権限クラシファイア（auto mode）に拒否された。SA鍵を使った外部デプロイという操作の性質による
+  自動ブロックで、フォアグラウンド/バックグラウンドとも同一の拒否。GCPへのリクエストは未送信。
+- 次の一手（いずれか）:
+  1. ローカル（Remote Control）セッションで `gcloud run deploy` を実行する（従来の実績ある方法）。
+  2. クラウドセッションで再依頼する場合は、permission mode を明示的に許可寄りにするか、
+     settings に `Bash(node scripts/deploy_cloud_run.js*)` の許可ルールを追加してから起動する。
+- 補足: 環境変数の `GCP_SA_KEY` は波括弧を補って設定し直すのが望ましいが、
+  スクリプト側で対応済みのため必須ではない。
