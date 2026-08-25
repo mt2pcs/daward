@@ -11,12 +11,12 @@ import { embedUrl, thumbUrl } from "@/lib/youtube";
 import type { MomentWithStats } from "@/lib/types";
 
 const GAP = 3;
-// モザイクの動きの文法（参照mp4の再現）:
-// - 配置そのものが常時なめらかに組み変わり続ける: 数秒ごとに並び順が
-//   入れ替わり（隣接スワップ + 時々1枚が画面を横断）、すべて数秒がかりの
-//   緩やかな補間で滑る。画面のどこかが常に流れている状態が標準
-// - タイルの「中身」も常に動く（ライブ映像 + Ken Burns）
-// - 投票が入った瞬間はそのタイルが脈打ち、育つ
+// モザイクの動きの文法（参照mp4のフレーム解析結果: 約1秒ごとに構図の再編成が
+// 起こり、0.7秒前後のなめらかな補間で全タイルが同時に滑走、ほぼ途切れない）:
+// - 毎サイクル、少数のタイルが大胆に「主役化」（重み×2〜3）し、他は徐々に戻る
+// - 並び順も入れ替わる（隣接スワップ + 時々1枚が別の場所へ流れる）
+// - 全タイルが1つのレイアウト変化として一斉に動くので、液体のような一体感が出る
+// - ホバー中は新しい再編成を止める（狙ったタイルをクリックできるように）
 
 function tileSeed(id: string): number {
   let h = 2166136261;
@@ -68,12 +68,14 @@ export default function Mosaic({
     );
   }, [moments, liveCount]);
 
-  // 振り付けサイクル: 並び順の組み替え（隣接スワップ + 横断移動）と
-  // 重みのゆらぎを同時に進める。補間はCSS側で数秒かけて滑る。
+  // 振り付けサイクル: 約1〜2秒ごとに構図を再編成し、CSS側の約0.8秒補間で
+  // 全タイルが一斉に滑る。前の補間が終わる頃に次が始まり、壁は止まらない。
   const [order, setOrder] = useState<number[]>([]);
-  const [drift, setDrift] = useState<number[]>([]);
+  const [feature, setFeature] = useState<number[]>([]); // 主役化の重み係数
   const countRef = useRef(moments.length);
   countRef.current = moments.length;
+  const hoveredRef = useRef<string | null>(null);
+  hoveredRef.current = hoveredId;
 
   useEffect(() => {
     setOrder(Array.from({ length: moments.length }, (_, i) => i));
@@ -81,19 +83,18 @@ export default function Mosaic({
 
   useEffect(() => {
     if (motion <= 0) return;
-    const interval = 12000 - (motion / 100) * 8000; // 100で4秒ごと、60で約7秒ごと
-    const amp = 0.05 + (motion / 100) * 0.08;
+    const interval = 3400 - (motion / 100) * 2200; // 100で1.2秒ごと、65で約2秒ごと
     const step = () => {
+      if (hoveredRef.current) return; // 狙っている最中は動かさない
       setOrder((prev) => {
         if (prev.length < 4) return prev;
         const next = [...prev];
-        const swaps = Math.max(1, Math.round((motion / 100) * 5));
+        const swaps = 2 + Math.floor(Math.random() * 3);
         for (let s = 0; s < swaps; s++) {
           const i = Math.floor(Math.random() * (next.length - 1));
           [next[i], next[i + 1]] = [next[i + 1], next[i]];
         }
-        // 時々1枚が別の場所へ流れていく（画面を横断する大きな動き）
-        if (Math.random() < 0.65) {
+        if (Math.random() < 0.5) {
           const from = Math.floor(Math.random() * next.length);
           const to = Math.floor(Math.random() * next.length);
           const [item] = next.splice(from, 1);
@@ -101,11 +102,14 @@ export default function Mosaic({
         }
         return next;
       });
-      setDrift((prev) =>
+      // 毎サイクル、全体の約12%が新しい主役度を引き直し、残りは1へ戻っていく
+      setFeature((prev) =>
         Array.from({ length: countRef.current }, (_, i) => {
           const cur = prev[i] ?? 1;
-          const next = cur * (1 + (Math.random() - 0.5) * 2 * amp);
-          return Math.min(1.15, Math.max(0.85, next));
+          if (Math.random() < 0.12) {
+            return 0.5 + Math.pow(Math.random(), 1.6) * 2.2; // 0.5〜2.7、たまに大きく
+          }
+          return cur * 0.8 + 0.2; // 1へ緩やかに回帰
         })
       );
     };
@@ -119,19 +123,18 @@ export default function Mosaic({
     const orderedWeights = order.map((idx) => {
       const m = moments[idx];
       const norm = Math.pow(m.votes / maxVotes, 0.72);
-      return (0.38 + norm * 1.62) * (drift[idx] ?? 1);
+      return (0.38 + norm * 1.62) * (feature[idx] ?? 1);
     });
     const laid = computeLayout(orderedWeights, size.w, size.h);
-    // 表示順（moments順）に並べ直す
     const byMoment: typeof laid = new Array(moments.length);
     order.forEach((momentIdx, pos) => {
       byMoment[momentIdx] = laid[pos];
     });
     return byMoment;
-  }, [moments, maxVotes, size, drift, order]);
+  }, [moments, maxVotes, size, feature, order]);
 
   return (
-    <div className="mosaic" data-rev="flow1" ref={containerRef}>
+    <div className="mosaic" data-rev="flow2" ref={containerRef}>
       {rects.length > 0 &&
         moments.map((m, i) => {
           const r = rects[i];
