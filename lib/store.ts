@@ -102,6 +102,31 @@ export function getComments(id: string): MomentComment[] {
   return [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+// ライブ投票シミュレーション: 人気に比例した重み付きランダム（2割は完全ランダム）で
+// 1票を追加し、対象と新しい票数を返す。
+export function simulateVote(): { momentId: string; votes: number } {
+  const store = getStore();
+  const moments = store.moments;
+  let target = moments[Math.floor(Math.random() * moments.length)];
+  if (Math.random() > 0.2) {
+    const total = moments.reduce(
+      (s, m) => s + (store.votes.get(m.id) ?? 0) + 5,
+      0
+    );
+    let r = Math.random() * total;
+    for (const m of moments) {
+      r -= (store.votes.get(m.id) ?? 0) + 5;
+      if (r <= 0) {
+        target = m;
+        break;
+      }
+    }
+  }
+  const votes = (store.votes.get(target.id) ?? 0) + 1;
+  store.votes.set(target.id, votes);
+  return { momentId: target.id, votes };
+}
+
 export function addVote(
   momentId: string,
   text: string,

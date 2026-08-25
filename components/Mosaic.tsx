@@ -26,9 +26,11 @@ function tileSeed(id: string): number {
 
 export default function Mosaic({
   moments,
+  pulses,
   onSelect,
 }: {
   moments: MomentWithStats[];
+  pulses: Record<string, number>;
   onSelect: (m: MomentWithStats) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -80,10 +82,11 @@ export default function Mosaic({
           const showVotes = hovered || (r.w > 108 && r.h > 72);
           const live = liveIds.has(m.id);
           const seed = tileSeed(m.id);
+          const pulse = pulses[m.id];
           return (
             <div
               key={m.id}
-              className={`tile${hovered ? " hovered" : ""}`}
+              className={`tile${hovered ? " hovered" : ""}${pulse ? " pulse" : ""}`}
               style={{
                 left: r.x + GAP / 2,
                 top: r.y + GAP / 2,
@@ -118,6 +121,11 @@ export default function Mosaic({
               <div className="tile-shade" />
               {showVotes && (
                 <div className="tile-votes">🔥 {m.votes.toLocaleString()}</div>
+              )}
+              {pulse && (
+                <div className="vote-pop" key={pulse}>
+                  +1 🔥
+                </div>
               )}
               <div className="tile-info">
                 {showNum && (

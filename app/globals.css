@@ -184,6 +184,68 @@ textarea {
   overflow: hidden;
 }
 
+/* 投票が入った瞬間の脈動 */
+.tile.pulse::after {
+  border-color: var(--yellow);
+  animation: pulse-ring 1.4s ease-out;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: inset 0 0 0 3px var(--yellow), 0 0 34px rgba(235, 255, 0, 0.5);
+  }
+  100% {
+    box-shadow: inset 0 0 0 0 rgba(235, 255, 0, 0), 0 0 0 rgba(235, 255, 0, 0);
+  }
+}
+
+.vote-pop {
+  position: absolute;
+  top: 34%;
+  right: 12px;
+  font-size: 13px;
+  font-weight: 900;
+  color: var(--yellow);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  animation: vote-pop 1.4s ease-out forwards;
+  z-index: 3;
+}
+
+@keyframes vote-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.8);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(0) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-26px) scale(1);
+  }
+}
+
+.sound-toggle {
+  margin-top: 8px;
+  pointer-events: auto;
+  border: 1px solid var(--line);
+  background: rgba(10, 10, 12, 0.6);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  backdrop-filter: blur(6px);
+  transition: border-color 0.2s;
+}
+
+.sound-toggle:hover {
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
+
 .tile-votes {
   position: absolute;
   top: 8px;
