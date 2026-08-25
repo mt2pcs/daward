@@ -98,16 +98,19 @@ export default function Mosaic({
       }
 
       const cursor = cursorRef.current;
-      const strength = 1.5 + (motionRef.current / 100) * 4.5;
+      // 参照ツールのTile Power(1.62)相当を既定に。スライダーで0〜3程度まで
+      const strength = (motionRef.current / 100) * 2.4;
       const sigma = Math.max(80, w * 0.065);
-      const prevRects = curRects.current;
+      // 判定は「投票数のみの基準レイアウト」上で行う（描画位置で判定すると
+      // 育ったタイルに判定が揺さぶられて発振するため、静的な基準に固定する）
+      const baseRects = computeLayout(base, w, h);
 
       const k = 1 - Math.exp(-dt / TAU);
       let maxDelta = 0;
       for (let i = 0; i < n; i++) {
         let target = base[i];
-        if (cursor && motionRef.current > 0 && prevRects.length === n) {
-          const r = prevRects[i];
+        if (cursor && motionRef.current > 0) {
+          const r = baseRects[i];
           const cx = r.x + r.w / 2;
           const cy = r.y + r.h / 2;
           const d2 = (cx - cursor.x) ** 2 + (cy - cursor.y) ** 2;
@@ -127,7 +130,7 @@ export default function Mosaic({
       }
 
       // 収束していてカーソルも無ければ描画を省略（完全静止）
-      if (maxDelta < 0.0004 && prevRects.length === n && !cursor) return;
+      if (maxDelta < 0.0004 && curRects.current.length === n && !cursor) return;
 
       const rects = computeLayout(curWeights.current, w, h);
       curRects.current = rects;

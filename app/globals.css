@@ -58,12 +58,9 @@ textarea {
   overflow: hidden;
   border-radius: 6px;
   background: #101013;
-  transition:
-    left 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
-    top 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
-    width 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
-    height 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
-    box-shadow 0.35s ease;
+  /* 幾何(left/top/width/height)はJSが毎フレーム敷き詰め直して直接描画する。
+     CSSトランジションを掛けると二重補間で敷き詰めが崩れるため禁止 */
+  transition: box-shadow 0.35s ease;
   cursor: pointer;
 }
 
