@@ -6,6 +6,12 @@ import { getCrowd } from "@/lib/crowd";
 import Mosaic from "./Mosaic";
 import DetailOverlay from "./DetailOverlay";
 import PresentSequence from "./PresentSequence";
+import Tuner, {
+  DEFAULT_TUNING,
+  loadTuning,
+  saveTuning,
+  type Tuning,
+} from "./Tuner";
 
 export default function MomentsApp({
   initialMoments,
@@ -16,8 +22,13 @@ export default function MomentsApp({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [present, setPresent] = useState<VoteResponse | null>(null);
   const [pulses, setPulses] = useState<Record<string, number>>({});
-  const [soundOn, setSoundOn] = useState(true);
+  const [tuning, setTuning] = useState<Tuning>(DEFAULT_TUNING);
+  const [tunerOpen, setTunerOpen] = useState(false);
   const activityRef = useRef(0);
+
+  useEffect(() => {
+    setTuning(loadTuning());
+  }, []);
 
   const totalVotes = useMemo(
     () => moments.reduce((s, m) => s + m.votes, 0),
@@ -26,10 +37,10 @@ export default function MomentsApp({
 
   const selected = moments.find((m) => m.id === selectedId) ?? null;
 
-  // 歓声エンジンは最初のユーザー操作で起動（ブラウザの自動再生制限）
+  // 歓声エンジンは最初のユーザー操作で起動（ブラウザの自動再生制限）。必ずフェードインする
   useEffect(() => {
     const kick = () => {
-      getCrowd().start();
+      if (tuning.volume > 0) getCrowd().start();
       window.removeEventListener("pointerdown", kick);
       window.removeEventListener("keydown", kick);
     };
@@ -39,11 +50,17 @@ export default function MomentsApp({
       window.removeEventListener("pointerdown", kick);
       window.removeEventListener("keydown", kick);
     };
-  }, []);
+  }, [tuning.volume]);
 
   useEffect(() => {
-    getCrowd().setMuted(!soundOn);
-  }, [soundOn]);
+    getCrowd().setVolume(tuning.volume / 100);
+  }, [tuning.volume]);
+
+  const updateTuning = useCallback((t: Tuning) => {
+    setTuning(t);
+    saveTuning(t);
+    if (t.volume > 0) getCrowd().start();
+  }, []);
 
   const registerPulse = useCallback((momentId: string) => {
     const now = Date.now();
@@ -56,12 +73,10 @@ export default function MomentsApp({
         return next;
       });
     }, 1500);
-    // 投票の熱量 → ざわめきの大きさ
     activityRef.current = Math.min(8, activityRef.current + 1);
     getCrowd().setIntensity(activityRef.current / 8);
   }, []);
 
-  // 熱量はゆっくり冷める
   useEffect(() => {
     const t = setInterval(() => {
       activityRef.current *= 0.85;
@@ -70,8 +85,7 @@ export default function MomentsApp({
     return () => clearInterval(t);
   }, []);
 
-  // ライブ投票シミュレーション: 他のファンの投票が流れ込み、
-  // タイルが脈打ち、歓声が湧き、風景（タイルサイズ）が育っていく
+  // ライブ投票シミュレーション（本番はリアルタイム配信に差し替え）
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
@@ -88,10 +102,10 @@ export default function MomentsApp({
               )
             );
             registerPulse(d.momentId);
-            getCrowd().swell(0.18 + Math.random() * 0.2);
+            getCrowd().swell(0.15 + Math.random() * 0.2);
           }
         } catch {
-          // ネットワーク断は無視して次のtickへ
+          /* ネットワーク断は次のtickへ */
         }
       }
       timer = setTimeout(tick, 1800 + Math.random() * 3200);
@@ -121,6 +135,8 @@ export default function MomentsApp({
       <Mosaic
         moments={moments}
         pulses={pulses}
+        motion={tuning.motion}
+        liveCount={tuning.live}
         onSelect={(m) => setSelectedId(m.id)}
       />
 
@@ -137,18 +153,15 @@ export default function MomentsApp({
         <div className="hud-right">
           <div className="hud-total">{totalVotes.toLocaleString()}</div>
           <div className="hud-total-label">TOTAL VOTES</div>
-          <button
-            className="sound-toggle"
-            onClick={() => {
-              getCrowd().start();
-              setSoundOn((v) => !v);
-            }}
-            aria-label="歓声のオン/オフ"
-          >
-            {soundOn ? "🔊 歓声 ON" : "🔇 歓声 OFF"}
-          </button>
         </div>
       </header>
+
+      <Tuner
+        tuning={tuning}
+        open={tunerOpen}
+        onToggle={() => setTunerOpen((v) => !v)}
+        onChange={updateTuning}
+      />
 
       {selected && (
         <DetailOverlay

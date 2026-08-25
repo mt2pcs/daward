@@ -11,9 +11,11 @@ import { embedUrl, thumbUrl } from "@/lib/youtube";
 import type { MomentWithStats } from "@/lib/types";
 
 const GAP = 3;
-const LIVE_COUNT = 6; // 投票数上位のタイルだけミュート自動再生（100個のiframeはブラウザが持たないため）
-// レイアウトは静止が基本。動くのはタイルの「中身」（映像・Ken Burns）だけで、
-// 配置が変わるのは投票数が実際に変化したときのみ（そのときだけ滑らかに補間される）。
+// モザイクの動きの文法:
+// - タイルの「中身」は常に動く（ライブ映像 + Ken Burns）
+// - 配置は「呼吸」する: motion設定に応じた間隔で重みがごくわずかに揺れ、
+//   数秒かけたゆっくりした補間で夢のように動く（毎秒バラバラ動く jitter とは別物）
+// - 投票が入った瞬間はそのタイルが脈打ち、少しだけ育つ
 
 function tileSeed(id: string): number {
   let h = 2166136261;
@@ -27,10 +29,14 @@ function tileSeed(id: string): number {
 export default function Mosaic({
   moments,
   pulses,
+  motion,
+  liveCount,
   onSelect,
 }: {
   moments: MomentWithStats[];
   pulses: Record<string, number>;
+  motion: number; // 0..100
+  liveCount: number;
   onSelect: (m: MomentWithStats) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -56,19 +62,43 @@ export default function Mosaic({
     return new Set(
       [...moments]
         .sort((a, b) => b.votes - a.votes)
-        .slice(0, LIVE_COUNT)
+        .slice(0, liveCount)
         .map((m) => m.id)
     );
-  }, [moments]);
+  }, [moments, liveCount]);
+
+  // 呼吸: motionに応じた間隔で、タイルごとの重み係数がランダムウォークする
+  const [drift, setDrift] = useState<number[]>([]);
+  const countRef = useRef(moments.length);
+  countRef.current = moments.length;
+  useEffect(() => {
+    if (motion <= 0) {
+      setDrift([]);
+      return;
+    }
+    const amp = (motion / 100) * 0.1;
+    const interval = 26000 - (motion / 100) * 16000; // 100で約10秒、55で約17秒ごと
+    const step = () =>
+      setDrift((prev) =>
+        Array.from({ length: countRef.current }, (_, i) => {
+          const cur = prev[i] ?? 1;
+          const next = cur * (1 + (Math.random() - 0.5) * 2 * amp);
+          return Math.min(1.14, Math.max(0.86, next));
+        })
+      );
+    step();
+    const t = setInterval(step, interval);
+    return () => clearInterval(t);
+  }, [motion]);
 
   const rects = useMemo(() => {
     if (size.w === 0 || size.h === 0) return [];
-    const weights = moments.map((m) => {
+    const weights = moments.map((m, i) => {
       const norm = Math.pow(m.votes / maxVotes, 0.72);
-      return 0.38 + norm * 1.62;
+      return (0.38 + norm * 1.62) * (drift[i] ?? 1);
     });
     return computeLayout(weights, size.w, size.h);
-  }, [moments, maxVotes, size]);
+  }, [moments, maxVotes, size, drift]);
 
   return (
     <div className="mosaic" ref={containerRef}>
