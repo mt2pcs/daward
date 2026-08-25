@@ -47,7 +47,7 @@ export default function Tuner({
         <div className="tuner-panel">
           <label>
             <span>
-              ゆらぎ（モザイクの呼吸） <em>{tuning.motion}</em>
+              カーソル反応の強さ <em>{tuning.motion}</em>
             </span>
             <input
               type="range"

@@ -11,12 +11,12 @@ import { embedUrl, thumbUrl } from "@/lib/youtube";
 import type { MomentWithStats } from "@/lib/types";
 
 const GAP = 3;
-// モザイクの動きの文法（参照mp4のフレーム解析結果: 約1秒ごとに構図の再編成が
-// 起こり、0.7秒前後のなめらかな補間で全タイルが同時に滑走、ほぼ途切れない）:
-// - 毎サイクル、少数のタイルが大胆に「主役化」（重み×2〜3）し、他は徐々に戻る
-// - 並び順も入れ替わる（隣接スワップ + 時々1枚が別の場所へ流れる）
-// - 全タイルが1つのレイアウト変化として一斉に動くので、液体のような一体感が出る
-// - ホバー中は新しい再編成を止める（狙ったタイルをクリックできるように）
+// モザイクの動きの文法（確定仕様）:
+// - 動きの駆動源はカーソルのみ。カーソルに近いタイルほど重みが連続的に増え、
+//   レイアウトを再計算して0.5秒の補間で追従する。カーソルが動けば「膨らみ」が
+//   ついて動き、止まれば配置も止まる。自律的な組み替え・シャッフルはしない
+// - タイルの基礎サイズは投票数。投票が入ると滑らかに育つ
+// - 並び順は固定（タイルの近所関係は保たれる）
 
 function tileSeed(id: string): number {
   let h = 2166136261;
@@ -68,73 +68,87 @@ export default function Mosaic({
     );
   }, [moments, liveCount]);
 
-  // 振り付けサイクル: 約1〜2秒ごとに構図を再編成し、CSS側の約0.8秒補間で
-  // 全タイルが一斉に滑る。前の補間が終わる頃に次が始まり、壁は止まらない。
-  const [order, setOrder] = useState<number[]>([]);
-  const [feature, setFeature] = useState<number[]>([]); // 主役化の重み係数
-  const countRef = useRef(moments.length);
-  countRef.current = moments.length;
-  const hoveredRef = useRef<string | null>(null);
-  hoveredRef.current = hoveredId;
+  // カーソル位置（レイアウト再計算は約70ms間隔にスロットル）
+  const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
+  const cursorRaw = useRef<{ x: number; y: number } | null>(null);
+  const lastApply = useRef(0);
+  const trailing = useRef<number | null>(null);
 
-  useEffect(() => {
-    setOrder(Array.from({ length: moments.length }, (_, i) => i));
-  }, [moments.length]);
+  const onPointerMove = (e: React.PointerEvent) => {
+    const el = containerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    cursorRaw.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const now = performance.now();
+    const since = now - lastApply.current;
+    if (since > 70) {
+      lastApply.current = now;
+      setCursor(cursorRaw.current);
+    } else if (trailing.current === null) {
+      // 末尾イベントも必ず反映する（カーソルが止まった最終位置に追従しきる）
+      trailing.current = window.setTimeout(() => {
+        trailing.current = null;
+        lastApply.current = performance.now();
+        setCursor(cursorRaw.current);
+      }, 80 - since);
+    }
+  };
+  const onPointerLeave = () => {
+    cursorRaw.current = null;
+    if (trailing.current !== null) {
+      clearTimeout(trailing.current);
+      trailing.current = null;
+    }
+    setCursor(null);
+  };
 
-  useEffect(() => {
-    if (motion <= 0) return;
-    const interval = 3400 - (motion / 100) * 2200; // 100で1.2秒ごと、65で約2秒ごと
-    const step = () => {
-      if (hoveredRef.current) return; // 狙っている最中は動かさない
-      setOrder((prev) => {
-        if (prev.length < 4) return prev;
-        const next = [...prev];
-        const swaps = 2 + Math.floor(Math.random() * 3);
-        for (let s = 0; s < swaps; s++) {
-          const i = Math.floor(Math.random() * (next.length - 1));
-          [next[i], next[i + 1]] = [next[i + 1], next[i]];
-        }
-        if (Math.random() < 0.5) {
-          const from = Math.floor(Math.random() * next.length);
-          const to = Math.floor(Math.random() * next.length);
-          const [item] = next.splice(from, 1);
-          next.splice(to, 0, item);
-        }
-        return next;
-      });
-      // 毎サイクル、全体の約12%が新しい主役度を引き直し、残りは1へ戻っていく
-      setFeature((prev) =>
-        Array.from({ length: countRef.current }, (_, i) => {
-          const cur = prev[i] ?? 1;
-          if (Math.random() < 0.12) {
-            return 0.5 + Math.pow(Math.random(), 1.6) * 2.2; // 0.5〜2.7、たまに大きく
-          }
-          return cur * 0.8 + 0.2; // 1へ緩やかに回帰
-        })
-      );
-    };
-    const t = setInterval(step, interval);
-    return () => clearInterval(t);
-  }, [motion]);
+  const baseWeights = useMemo(
+    () =>
+      moments.map((m) => {
+        const norm = Math.pow(m.votes / maxVotes, 0.72);
+        return 0.38 + norm * 1.62;
+      }),
+    [moments, maxVotes]
+  );
+
+  // 投票数のみの基準レイアウト。各タイルの「定位置の中心」を距離計算の錨にする
+  const baseRects = useMemo(() => {
+    if (size.w === 0 || size.h === 0) return [];
+    return computeLayout(baseWeights, size.w, size.h);
+  }, [baseWeights, size]);
 
   const rects = useMemo(() => {
-    if (size.w === 0 || size.h === 0 || order.length !== moments.length)
-      return [];
-    const orderedWeights = order.map((idx) => {
-      const m = moments[idx];
-      const norm = Math.pow(m.votes / maxVotes, 0.72);
-      return (0.38 + norm * 1.62) * (feature[idx] ?? 1);
+    if (baseRects.length === 0) return [];
+    if (!cursor || motion <= 0) return baseRects;
+    // カーソルに近いタイルほど重みが増える（連続関数なので追従が滑らか）。
+    // 焦点は狭く鋭く: 直下のタイルが主役級に育ち、隣接だけが少し連られる
+    const strength = 1.5 + (motion / 100) * 4.5;
+    const sigma = Math.max(80, size.w * 0.065);
+    const weights = baseWeights.map((w, i) => {
+      const r = baseRects[i];
+      const cx = r.x + r.w / 2;
+      const cy = r.y + r.h / 2;
+      const d2 = (cx - cursor.x) ** 2 + (cy - cursor.y) ** 2;
+      let boost = 1 + strength * Math.exp(-d2 / (2 * sigma * sigma));
+      const contains =
+        cursor.x >= r.x &&
+        cursor.x <= r.x + r.w &&
+        cursor.y >= r.y &&
+        cursor.y <= r.y + r.h;
+      if (contains) boost = Math.max(boost, 1 + strength);
+      return w * boost;
     });
-    const laid = computeLayout(orderedWeights, size.w, size.h);
-    const byMoment: typeof laid = new Array(moments.length);
-    order.forEach((momentIdx, pos) => {
-      byMoment[momentIdx] = laid[pos];
-    });
-    return byMoment;
-  }, [moments, maxVotes, size, feature, order]);
+    return computeLayout(weights, size.w, size.h);
+  }, [baseRects, baseWeights, cursor, motion, size]);
 
   return (
-    <div className="mosaic" data-rev="flow2" ref={containerRef}>
+    <div
+      className="mosaic"
+      data-rev="cursor1"
+      ref={containerRef}
+      onPointerMove={onPointerMove}
+      onPointerLeave={onPointerLeave}
+    >
       {rects.length > 0 &&
         moments.map((m, i) => {
           const r = rects[i];
