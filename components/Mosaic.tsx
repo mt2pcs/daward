@@ -40,6 +40,14 @@ export default function Mosaic({
   const tileEls = useRef<Map<string, HTMLDivElement>>(new Map());
   const innerEls = useRef<Map<string, HTMLDivElement>>(new Map());
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  // タッチ端末（スマホ）: なぞり追従の代わりにタップでフォーカスが移る
+  const [isCoarse, setIsCoarse] = useState(false);
+  useEffect(() => {
+    setIsCoarse(window.matchMedia("(pointer: coarse)").matches);
+  }, []);
+  const focusedIdxRef = useRef<number | null>(null);
+  const tierCache = useRef<Map<string, number>>(new Map());
+  const forceDraw = useRef(true);
 
   const sizeRef = useRef({ w: 0, h: 0 });
   const cursorRef = useRef<{ x: number; y: number } | null>(null);
@@ -111,6 +119,7 @@ export default function Mosaic({
       const baseRects = computeLayout(base, w, h);
 
       const k = 1 - Math.exp(-dt / TAU);
+      const focusedIdx = focusedIdxRef.current;
       let maxDelta = 0;
       for (let i = 0; i < n; i++) {
         let target = base[i];
@@ -126,6 +135,8 @@ export default function Mosaic({
             cursor.y >= r.y &&
             cursor.y <= r.y + r.h;
           if (contains) boost = Math.max(boost, 1 + strength);
+          // タップフォーカス（スマホ）: タイルが小さいぶんPCより強く育てる
+          if (focusedIdx === i) boost = Math.max(boost, 1 + strength * 1.6);
           target *= boost;
         }
         const cur = curWeights.current[i];
@@ -141,6 +152,7 @@ export default function Mosaic({
       if (anchorKey.current !== key) {
         anchorKey.current = key;
         anchorRects.current = baseRects;
+        forceDraw.current = true;
         for (let i = 0; i < n; i++) {
           const el = tileEls.current.get(ids[i]);
           if (!el) continue;
@@ -151,7 +163,14 @@ export default function Mosaic({
       }
 
       // 収束していてカーソルも無ければ描画を省略（完全静止）
-      if (maxDelta < 0.0004 && curRects.current.length === n && !cursor) return;
+      if (
+        !forceDraw.current &&
+        maxDelta < 0.0004 &&
+        curRects.current.length === n &&
+        !cursor
+      )
+        return;
+      forceDraw.current = false;
 
       const rects = computeLayout(curWeights.current, w, h);
       curRects.current = rects;
@@ -168,6 +187,15 @@ export default function Mosaic({
         el.style.transform = `translate3d(${r.x + GAP / 2}px, ${r.y + GAP / 2}px, 0) scale(${sx}, ${sy})`;
         const m = Math.max(sx, sy);
         inner.style.transform = `scale(${m / sx}, ${m / sy})`;
+        // ラベルの出し分け: 現在の実寸に応じたクラスをキャッシュ付きで切替
+        const tier =
+          r.w > 190 && r.h > 120 ? 3 : r.w > 128 && r.h > 82 ? 2 : r.w > 108 && r.h > 72 ? 1 : 0;
+        if (tierCache.current.get(ids[i]) !== tier) {
+          tierCache.current.set(ids[i], tier);
+          el.classList.toggle("sz-votes", tier >= 1);
+          el.classList.toggle("sz-num", tier >= 2);
+          el.classList.toggle("sz-big", tier >= 3);
+        }
       }
     };
     raf = requestAnimationFrame(tick);
@@ -175,13 +203,38 @@ export default function Mosaic({
   }, []);
 
   const onPointerMove = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return; // タッチはタップ駆動（スクロールと衝突させない）
     const el = containerRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
     cursorRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
   };
-  const onPointerLeave = () => {
+  const onPointerLeave = (e: React.PointerEvent) => {
+    if (e.pointerType !== "mouse") return;
     cursorRef.current = null;
+    focusedIdxRef.current = null;
+  };
+
+  // タップ操作（スマホ）: 1回目=そのタイルが育つ / 育ったタイルをもう一度=詳細へ
+  const handleTileClick = (m: MomentWithStats, i: number, e: React.MouseEvent) => {
+    if (!isCoarse) {
+      onSelect(m);
+      return;
+    }
+    if (focusedIdxRef.current === i) {
+      focusedIdxRef.current = null;
+      cursorRef.current = null;
+      setHoveredId(null);
+      onSelect(m);
+      return;
+    }
+    const el = containerRef.current;
+    if (el) {
+      const r = el.getBoundingClientRect();
+      cursorRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    focusedIdxRef.current = i;
+    setHoveredId(m.id);
   };
 
   const liveIds = useMemo(() => {
@@ -196,14 +249,14 @@ export default function Mosaic({
   return (
     <div
       className="mosaic"
-      data-rev="gpu1"
+      data-rev="mobile1"
       ref={containerRef}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
     >
-      {moments.map((m) => {
+      {moments.map((m, i) => {
         const hovered = m.id === hoveredId;
-        const live = liveIds.has(m.id);
+        const live = !isCoarse && liveIds.has(m.id); // スマホは自動再生不可で再生ボタンが散乱するため埋め込み無し
         const seed = tileSeed(m.id);
         const pulse = pulses[m.id];
         return (
@@ -221,7 +274,7 @@ export default function Mosaic({
               if (e.pointerType === "mouse")
                 setHoveredId((v) => (v === m.id ? null : v));
             }}
-            onClick={() => onSelect(m)}
+            onClick={(e) => handleTileClick(m, i, e)}
           >
             <div
               className="tile-inner"

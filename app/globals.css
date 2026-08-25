@@ -167,6 +167,29 @@ textarea {
   pointer-events: none;
 }
 
+/* ラベルはタイルの実寸（JSがsz-*クラスで通知）とフォーカスに応じて出す。
+   小さいタイルに常時表示すると文字スープになるため既定は非表示 */
+.tile-num,
+.tile-title,
+.tile-votes {
+  display: none;
+}
+
+.tile.sz-votes .tile-votes,
+.tile.hovered .tile-votes {
+  display: flex;
+}
+
+.tile.sz-num .tile-num,
+.tile.hovered .tile-num {
+  display: block;
+}
+
+.tile.sz-big .tile-title,
+.tile.hovered .tile-title {
+  display: -webkit-box;
+}
+
 .tile-num {
   font-size: 9px;
   letter-spacing: 0.14em;
@@ -185,7 +208,7 @@ textarea {
   font-weight: 700;
   line-height: 1.35;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
-  display: -webkit-box;
+  /* displayは上の出し分けルールが管理（sz-big/hoveredのときだけ-webkit-box） */
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -921,6 +944,21 @@ textarea {
 }
 
 /* ---------- responsive ---------- */
+
+/* スマホ: モザイクの敷き詰めはそのまま、キャンバスを縦に伸ばして縦スクロール。
+   1枚1枚がPC並みのサイズになる（100枚を1画面に押し込まない） */
+@media (pointer: coarse), (max-width: 767px) {
+  .stage {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .mosaic {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 380vh;
+  }
+}
 
 @media (max-width: 860px) {
   .detail {
