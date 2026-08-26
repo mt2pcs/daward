@@ -1,18 +1,26 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { computeLayout, type LayoutRect } from "@/lib/layout";
+import {
+  buildLayoutTree,
+  layoutFromTree,
+  type LayoutNode,
+  type LayoutRect,
+} from "@/lib/layout";
 import { embedUrl, thumbUrl } from "@/lib/youtube";
 import type { MomentWithStats } from "@/lib/types";
 
 const GAP = 3;
-const TAU = 0.16; // 追従の時定数（秒）。小さいほど機敏
-// モザイクの動きの文法（確定仕様）:
-// - 動きの駆動源はカーソルのみ。静止時は完全静止
-// - 補間は「各矩形をバラバラに動かす」のではなく「重みを毎フレーム滑らかに
-//   追従させ、その都度レイアウト全体を敷き詰め直す」。したがって
-//   どの瞬間を切り出しても隙間・重なりのない完全なモザイクのまま境界だけが滑る
-// - タイルの基礎サイズは投票数。並び順は固定
+// モザイクの動きの文法（リファレンスmp4の全フレーム解析で確定。詳細はCLAUDE.md）:
+// - 各タイルは「フォーカス熱量」e∈[0,1]を持つ。カーソルが乗っている間 τ_GROW で e→1、
+//   それ以外は τ_DECAY で e→0。weight = base × (1 + G·e²)
+// - e²のおかげで立ち上がりは緩く、中盤速く、終盤は指数減速——計測した速度プロファイルと同形
+// - 成長はほぼ全面まで届く規模（G≈60）。前の焦点はゆっくり冷めるので航跡が波として残る
+// - 駆動はカーソルの位置。静止ホバー中も飽和まで成長し、飽和すると完全静止
+// - 補間は「重みを毎フレーム更新して全体を敷き詰め直す」方式。どの瞬間も隙間ゼロ
+const TAU_GROW = 1.2;
+const TAU_DECAY = 2.5;
+const E_CAP_TOUCH = 0.42; // スマホ: 全面まで育つと操作不能になるため熱量上限を設ける
 
 function tileSeed(id: string): number {
   let h = 2166136261;
@@ -74,8 +82,13 @@ export default function Mosaic({
   idsRef.current = moments.map((m) => m.id);
 
   // アニメーションの内部状態（Reactを介さず毎フレーム更新）
+  const energies = useRef<number[]>([]);
   const curWeights = useRef<number[]>([]);
+  const drawnWeights = useRef<number[]>([]);
+  const mouseFocusRef = useRef<number | null>(null);
   const curRects = useRef<LayoutRect[]>([]);
+  // 分割構造はサイズ変更時に一度だけ固定（投票やフォーカスでは作り直さない）
+  const treeRef = useRef<LayoutNode | null>(null);
   // GPU描画の基準: タイルの実寸（width/height）は「アンカー配置」で一度だけ決め、
   // 毎フレームはtransform（GPU合成のみ、再レイアウトなし）で目標矩形へ変形する
   const anchorRects = useRef<LayoutRect[]>([]);
@@ -110,39 +123,52 @@ export default function Mosaic({
         curWeights.current = base.slice();
       }
 
-      const cursor = cursorRef.current;
-      // 参照ツールのTile Power(1.62)相当を既定に。スライダーで0〜3程度まで
-      const strength = (motionRef.current / 100) * 2.4;
-      const sigma = Math.max(80, w * 0.065);
-      // 判定は「投票数のみの基準レイアウト」上で行う（描画位置で判定すると
-      // 育ったタイルに判定が揺さぶられて発振するため、静的な基準に固定する）
-      const baseRects = computeLayout(base, w, h);
+      if (energies.current.length !== n) {
+        energies.current = new Array(n).fill(0);
+      }
 
-      const k = 1 - Math.exp(-dt / TAU);
-      const focusedIdx = focusedIdxRef.current;
-      let maxDelta = 0;
-      for (let i = 0; i < n; i++) {
-        let target = base[i];
-        if (cursor && motionRef.current > 0) {
-          const r = baseRects[i];
-          const cx = r.x + r.w / 2;
-          const cy = r.y + r.h / 2;
-          const d2 = (cx - cursor.x) ** 2 + (cy - cursor.y) ** 2;
-          let boost = 1 + strength * Math.exp(-d2 / (2 * sigma * sigma));
-          const contains =
-            cursor.x >= r.x &&
-            cursor.x <= r.x + r.w &&
-            cursor.y >= r.y &&
-            cursor.y <= r.y + r.h;
-          if (contains) boost = Math.max(boost, 1 + strength);
-          // タップフォーカス（スマホ）: タイルが小さいぶんPCより強く育てる
-          if (focusedIdx === i) boost = Math.max(boost, 1 + strength * 1.6);
-          target *= boost;
+      const cursor = cursorRef.current;
+      const G = (motionRef.current / 100) * 92; // 既定65で G≈60
+      // フォーカス判定（粘着式）: いまフォーカス中のタイルの現在矩形に
+      // カーソルが入っている限りフォーカスを維持する。成長で境界が動いても
+      // 焦点が隣へ滑り落ちて発振しない。外れたときだけ現在矩形で取り直す
+      const hitRects = curRects.current.length === n ? curRects.current : null;
+      let focusedIdx = focusedIdxRef.current; // タップフォーカス（スマホ）
+      if (cursor && hitRects && G > 0) {
+        const inside = (r: LayoutRect) =>
+          cursor.x >= r.x &&
+          cursor.x < r.x + r.w &&
+          cursor.y >= r.y &&
+          cursor.y < r.y + r.h;
+        const held = mouseFocusRef.current;
+        if (held !== null && hitRects[held] && inside(hitRects[held])) {
+          focusedIdx = held;
+        } else {
+          focusedIdx = null;
+          for (let i = 0; i < n; i++) {
+            if (inside(hitRects[i])) {
+              focusedIdx = i;
+              break;
+            }
+          }
         }
-        const cur = curWeights.current[i];
-        const next = cur + (target - cur) * k;
-        curWeights.current[i] = next;
-        maxDelta = Math.max(maxDelta, Math.abs(next - cur) / cur);
+        mouseFocusRef.current = focusedIdx;
+      }
+
+      const kGrow = 1 - Math.exp(-dt / TAU_GROW);
+      const kDecay = 1 - Math.exp(-dt / TAU_DECAY);
+      const eCap = cursor ? 1 : E_CAP_TOUCH; // マウス以外（タップ）は上限付き
+      for (let i = 0; i < n; i++) {
+        const e = energies.current[i];
+        const target = i === focusedIdx ? eCap : 0;
+        let next = e + (target - e) * (target > e ? kGrow : kDecay);
+        // 端に十分近づいたら吸着させ、指数のしっぽを有限時間で終わらせる。
+        // 減衰側の閾値は重み換算でサブピクセル（60×0.004²≈0.1%）に収まる値
+        if (target > e) {
+          if (target - next < 0.0005) next = target;
+        } else if (next < 0.004) next = 0;
+        energies.current[i] = next;
+        curWeights.current[i] = base[i] * (1 + G * next * next);
       }
 
       const ids = idsRef.current;
@@ -151,6 +177,8 @@ export default function Mosaic({
       const key = `${w}x${h}:${n}`;
       if (anchorKey.current !== key) {
         anchorKey.current = key;
+        treeRef.current = buildLayoutTree(base, w, h);
+        const baseRects = layoutFromTree(treeRef.current, base, w, h);
         anchorRects.current = baseRects;
         forceDraw.current = true;
         for (let i = 0; i < n; i++) {
@@ -162,27 +190,48 @@ export default function Mosaic({
         }
       }
 
-      // 収束していてカーソルも無ければ描画を省略（完全静止）
-      if (
-        !forceDraw.current &&
-        maxDelta < 0.0004 &&
-        curRects.current.length === n &&
-        !cursor
-      )
-        return;
+      // 描画省略は「最後に描いた重み」との差で判定する（完全静止の実現）。
+      // 毎フレームの変化量で判定すると、減衰のしっぽで基準に戻り切る前に凍結する
+      const drawn = drawnWeights.current;
+      let needDraw = forceDraw.current || drawn.length !== n;
+      if (!needDraw) {
+        for (let i = 0; i < n; i++) {
+          if (Math.abs(curWeights.current[i] - drawn[i]) / drawn[i] > 0.0015) {
+            needDraw = true;
+            break;
+          }
+        }
+      }
+      if (!needDraw) return;
       forceDraw.current = false;
+      drawnWeights.current = curWeights.current.slice();
 
-      const rects = computeLayout(curWeights.current, w, h);
+      const rects = layoutFromTree(treeRef.current!, curWeights.current, w, h);
       curRects.current = rects;
       const anchors = anchorRects.current;
+      // 実寸の張り直し（拡大ボケ防止）は再レイアウトを伴うため、
+      // 1フレームに最もズレの大きい2枚まで（残りはtransformのままで見た目は正しい）
+      let reanchorBudget = 2;
       for (let i = 0; i < n; i++) {
         const el = tileEls.current.get(ids[i]);
         const inner = innerEls.current.get(ids[i]);
         if (!el || !inner || !anchors[i]) continue;
         const r = rects[i];
-        const a = anchors[i];
-        const sx = Math.max(0.01, (r.w - GAP) / Math.max(1, a.w - GAP));
-        const sy = Math.max(0.01, (r.h - GAP) / Math.max(1, a.h - GAP));
+        let a = anchors[i];
+        let sx = Math.max(0.01, (r.w - GAP) / Math.max(1, a.w - GAP));
+        let sy = Math.max(0.01, (r.h - GAP) / Math.max(1, a.h - GAP));
+        if (
+          reanchorBudget > 0 &&
+          (sx > 2.8 || sy > 2.8 || sx < 0.36 || sy < 0.36)
+        ) {
+          reanchorBudget--;
+          a = { x: r.x, y: r.y, w: r.w, h: r.h };
+          anchors[i] = a;
+          el.style.width = `${Math.max(1, r.w - GAP)}px`;
+          el.style.height = `${Math.max(1, r.h - GAP)}px`;
+          sx = 1;
+          sy = 1;
+        }
         // 外側: GPU合成のみの変形で目標矩形へ。内側: 逆変形で映像の歪みを打ち消す
         el.style.transform = `translate3d(${r.x + GAP / 2}px, ${r.y + GAP / 2}px, 0) scale(${sx}, ${sy})`;
         const m = Math.max(sx, sy);
@@ -213,6 +262,7 @@ export default function Mosaic({
     if (e.pointerType !== "mouse") return;
     cursorRef.current = null;
     focusedIdxRef.current = null;
+    mouseFocusRef.current = null;
   };
 
   // タップ操作（スマホ）: 1回目=そのタイルが育つ / 育ったタイルをもう一度=詳細へ
@@ -223,15 +273,9 @@ export default function Mosaic({
     }
     if (focusedIdxRef.current === i) {
       focusedIdxRef.current = null;
-      cursorRef.current = null;
       setHoveredId(null);
       onSelect(m);
       return;
-    }
-    const el = containerRef.current;
-    if (el) {
-      const r = el.getBoundingClientRect();
-      cursorRef.current = { x: e.clientX - r.left, y: e.clientY - r.top };
     }
     focusedIdxRef.current = i;
     setHoveredId(m.id);
@@ -249,7 +293,7 @@ export default function Mosaic({
   return (
     <div
       className="mosaic"
-      data-rev="mobile1"
+      data-rev="focus1"
       ref={containerRef}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
