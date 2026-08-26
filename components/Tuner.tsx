@@ -9,12 +9,13 @@ export interface Tuning {
   volume: number; // 0..100 歓声の音量（0でオフ）
 }
 
-// 音は「カーソル連動の立体音響」を正しく実装するまでデフォルト無音
-export const DEFAULT_TUNING: Tuning = { motion: 65, live: 10, volume: 0 };
+// カーソル連動の立体音響が入ったので歓声はデフォルトON
+// （保存キーをv2に上げ、旧デフォルトの volume:0 を引き継がない）
+export const DEFAULT_TUNING: Tuning = { motion: 65, live: 10, volume: 60 };
 
 export function loadTuning(): Tuning {
   try {
-    const raw = localStorage.getItem("emoo-tuning");
+    const raw = localStorage.getItem("emoo-tuning-v2");
     if (raw) return { ...DEFAULT_TUNING, ...JSON.parse(raw) };
   } catch {
     /* localStorage不可の環境ではデフォルトで動く */
@@ -24,7 +25,7 @@ export function loadTuning(): Tuning {
 
 export function saveTuning(t: Tuning) {
   try {
-    localStorage.setItem("emoo-tuning", JSON.stringify(t));
+    localStorage.setItem("emoo-tuning-v2", JSON.stringify(t));
   } catch {
     /* noop */
   }

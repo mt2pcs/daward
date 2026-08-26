@@ -137,6 +137,7 @@ export default function MomentsApp({
         pulses={pulses}
         motion={tuning.motion}
         liveCount={tuning.live}
+        soundOn={tuning.volume > 0}
         onSelect={(m) => setSelectedId(m.id)}
       />
 
