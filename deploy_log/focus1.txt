@@ -1,0 +1,9 @@
+focus1（focusEnergyモデル版）デプロイ結果
+
+- 結果: 成功
+- デプロイ時刻: 2026-08-26T02:08:43Z (UTC)
+- コミット: 2ef214d（focusEnergyモデル実装）
+- イメージdigest: sha256:f8eb41e69ebae596730738b80d567cb8fa6481e6dae86403dc52c4db8c198553
+- Cloud Build ID: 03aa726f-ef96-478e-998f-8aa1d1fc3385
+- サービスURL: https://e-mooments-vckorfe4qa-an.a.run.app (HTTP 200)
+- 反映確認: curl -s <URL> | grep -c "focus1" => 1
