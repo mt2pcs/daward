@@ -1,0 +1,9 @@
+mobile1（スマホ対応版）デプロイ結果
+
+- 結果: 成功
+- デプロイ時刻: 2026-08-26T00:54:20Z (UTC)
+- コミット: 9207c21（スマホ対応）
+- イメージdigest: sha256:c42414076c70b7aa0eca1be779d86bce43dbda72a45e5e3cc4b7efde0380918c
+- Cloud Build ID: 4ad82844-87c9-49fb-aabd-0c927f5d4af0
+- サービスURL: https://e-mooments-vckorfe4qa-an.a.run.app (HTTP 200)
+- 反映確認: curl -s <URL> | grep -c "mobile1" => 1
