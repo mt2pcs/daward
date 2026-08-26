@@ -14,19 +14,22 @@ Next.js 14 (App Router, TS)。詳細は README.md を参照。
   使えるためデプロイ可能。** 過去のCloud Run関連作業はすべてこちらで実施している
   （例: 2026-08-24 セッション「AI活用理論の検証とCloud Runアプリ開発」）。
 
-**したがってデプロイ依頼が来たら：**
+**【2026-08-26 更新・現行ルール】デプロイは作業中のセッションが自分で実行する：**
 
-1. ローカル（Remote Control）セッションなら、そのまま実行:
-   ```bash
-   gcloud run deploy e-mooments --source . --region asia-northeast1 --allow-unauthenticated
-   ```
-2. クラウドセッションなら、接続中のローカルセッションへ依頼を転送する
-   （claude-code-remote MCP の create_trigger + fire_trigger で persistent_session_id 宛に送る）。
-   ローカルセッションが無ければ、ユーザーにローカルでの実行を依頼する。
-3. クラウドセッションから直接デプロイできるようにしたい場合は、環境設定に
-   GCPサービスアカウントキー（roles: run.admin, cloudbuild.builds.editor,
-   iam.serviceAccountUser, storage.admin）を環境変数として追加する。
-   googleapis.com 自体は疎通可能なので、キーさえあれば REST API 経由でデプロイできる。
+```bash
+node scripts/deploy_cloud_run.js   # このリポジトリ直下で実行するだけ
+```
+
+- 環境「main」の全セッションに `GCP_SA_KEY` が入っており、クラウドセッションから直接
+  デプロイできる（2026-08-26 にこの方式で成功実証済み）。
+- スクリプト末尾のHTTP確認が403を返すことがあるが、IAM反映の一時的なもの。
+  数秒後に curl し直せば200になる。反映確認は本番HTMLの `data-rev` マーカーで行う。
+- **セッション分割・デプロイ専用セッションへの転送は廃止**。過去のデプロイ専用セッション
+  （session_015FAp35...）はアーカイブ済み、転送用トリガーも全削除済み。
+  理由: 転送先セッションは会話コンテキストを共有できず、ユーザーが直接指示した際に
+  仕様を知らないままUIを勝手に再実装してブランチへプッシュする事故が起きた
+  （2026-08-26、2コミットをユーザー判断で破棄・force-push で復旧）。
+  **開発・検証・デプロイ・会話はすべて1つのセッションで完結させること。**
 
 ## アプリの構成メモ
 
