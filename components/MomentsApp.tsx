@@ -37,20 +37,25 @@ export default function MomentsApp({
 
   const selected = moments.find((m) => m.id === selectedId) ?? null;
 
-  // 歓声エンジンは最初のユーザー操作で起動（ブラウザの自動再生制限）。必ずフェードインする
+  // 歓声エンジンは最初のユーザー操作で起動（ブラウザの自動再生制限）。
+  // 音量設定に関係なく常に武装しておき（音量はmaster側で反映）、
+  // capture段で拾うことでどのUI要素へのクリックでも確実に起動する
+  const [soundArmed, setSoundArmed] = useState(false);
   useEffect(() => {
     const kick = () => {
-      if (tuning.volume > 0) getCrowd().start();
-      window.removeEventListener("pointerdown", kick);
-      window.removeEventListener("keydown", kick);
+      getCrowd().start();
+      setTimeout(
+        () => setSoundArmed((prev) => prev || getCrowd().isActive()),
+        150
+      );
     };
-    window.addEventListener("pointerdown", kick);
-    window.addEventListener("keydown", kick);
+    window.addEventListener("pointerdown", kick, true);
+    window.addEventListener("keydown", kick, true);
     return () => {
-      window.removeEventListener("pointerdown", kick);
-      window.removeEventListener("keydown", kick);
+      window.removeEventListener("pointerdown", kick, true);
+      window.removeEventListener("keydown", kick, true);
     };
-  }, [tuning.volume]);
+  }, []);
 
   useEffect(() => {
     getCrowd().setVolume(tuning.volume / 100);
@@ -138,6 +143,7 @@ export default function MomentsApp({
         motion={tuning.motion}
         liveCount={tuning.live}
         soundOn={tuning.volume > 0}
+        soundLive={soundArmed && tuning.volume > 0}
         onSelect={(m) => setSelectedId(m.id)}
       />
 
@@ -163,6 +169,10 @@ export default function MomentsApp({
         onToggle={() => setTunerOpen((v) => !v)}
         onChange={updateTuning}
       />
+
+      {tuning.volume > 0 && !soundArmed && (
+        <div className="sound-hint">🔊 クリックすると歓声が流れます</div>
+      )}
 
       {selected && (
         <DetailOverlay

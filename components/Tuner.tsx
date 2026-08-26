@@ -5,13 +5,13 @@
 
 export interface Tuning {
   motion: number; // 0..100 モザイクのゆらぎ（0で完全静止）
-  live: number; // 0..14 ミュート自動再生するタイル数
+  live: number; // 0..20 同時にミュート再生するタイル数（画面内の大きい順に選抜）
   volume: number; // 0..100 歓声の音量（0でオフ）
 }
 
 // カーソル連動の立体音響が入ったので歓声はデフォルトON
 // （保存キーをv2に上げ、旧デフォルトの volume:0 を引き継がない）
-export const DEFAULT_TUNING: Tuning = { motion: 65, live: 10, volume: 60 };
+export const DEFAULT_TUNING: Tuning = { motion: 65, live: 12, volume: 60 };
 
 export function loadTuning(): Tuning {
   try {
@@ -61,12 +61,12 @@ export default function Tuner({
           </label>
           <label>
             <span>
-              ライブ再生タイル数 <em>{tuning.live}</em>
+              同時再生タイル数 <em>{tuning.live}</em>
             </span>
             <input
               type="range"
               min={0}
-              max={14}
+              max={20}
               value={tuning.live}
               onChange={(e) => set({ live: Number(e.target.value) })}
             />

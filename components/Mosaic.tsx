@@ -19,9 +19,10 @@ const GAP = 3;
 // - 成長はほぼ全面まで届く規模（G≈60）。前の焦点はゆっくり冷めるので航跡が波として残る
 // - 駆動はカーソルの位置。静止ホバー中も飽和まで成長し、飽和すると完全静止
 // - 補間は「重みを毎フレーム更新して全体を敷き詰め直す」方式。どの瞬間も隙間ゼロ
-// 立ち上がりが遅いと「もたつき」に感じるため、成長は速め・減衰はゆっくり
+// 立ち上がり・戻りが遅いと「もたつき」に感じる。成長は速く、縮小もキビキビ
+// （航跡は残るが引きずらない）
 const TAU_GROW = 0.75;
-const TAU_DECAY = 2.0;
+const TAU_DECAY = 1.1;
 
 function tileSeed(id: string): number {
   let h = 2166136261;
@@ -38,6 +39,7 @@ export default function Mosaic({
   motion,
   liveCount,
   soundOn,
+  soundLive,
   onSelect,
 }: {
   moments: MomentWithStats[];
@@ -45,6 +47,7 @@ export default function Mosaic({
   motion: number; // 0..100 カーソル反応の強さ
   liveCount: number;
   soundOn: boolean; // 歓声の立体音響（音量>0で有効）
+  soundLive: boolean; // 歓声が実際に鳴れる状態（起動済み）→ リング表示に使う
   onSelect: (m: MomentWithStats) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -53,11 +56,13 @@ export default function Mosaic({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   // タッチ端末（スマホ）: なぞり追従の代わりにタップでフォーカスが移る
   const [isCoarse, setIsCoarse] = useState(false);
+  const isCoarseRef = useRef(false);
   useEffect(() => {
-    setIsCoarse(window.matchMedia("(pointer: coarse)").matches);
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    setIsCoarse(coarse);
+    isCoarseRef.current = coarse;
   }, []);
   const focusedIdxRef = useRef<number | null>(null);
-  const tierCache = useRef<Map<string, number>>(new Map());
   const forceDraw = useRef(true);
 
   const sizeRef = useRef({ w: 0, h: 0 });
@@ -72,6 +77,11 @@ export default function Mosaic({
   const maxVotesRef = useRef(1);
   const soundOnRef = useRef(soundOn);
   soundOnRef.current = soundOn;
+  const liveCountRef = useRef(liveCount);
+  liveCountRef.current = liveCount;
+  const visibleIdsRef = useRef<Set<string>>(new Set());
+  const liveSetRef = useRef<Set<string>>(new Set());
+  const liveRefreshAt = useRef(0);
 
   const maxVotes = useMemo(
     () => Math.max(1, ...moments.map((m) => m.votes)),
@@ -204,8 +214,8 @@ export default function Mosaic({
       }
 
       // 立体音響: フォーカス中のモーメントの歓声（音量=投票数×成長度、定位=画面上の位置）
+      const crowd = getCrowd();
       if (soundOnRef.current) {
-        const crowd = getCrowd();
         if (focusedIdx !== null && hitRects) {
           const r = hitRects[focusedIdx];
           const m = momentsRef.current[focusedIdx];
@@ -222,6 +232,34 @@ export default function Mosaic({
       }
 
       const ids = idsRef.current;
+
+      // ライブ再生の選抜: 見えているタイルを大きい順に liveCount 枚（フォーカス中は必ず含む）。
+      // スクロールで顔ぶれが変わるので0.7秒ごとに見直す
+      if (!isCoarseRef.current && now - liveRefreshAt.current > 700) {
+        liveRefreshAt.current = now;
+        const rectsNow = curRects.current;
+        if (rectsNow.length === n) {
+          const cand: { id: string; area: number }[] = [];
+          for (let i = 0; i < n; i++) {
+            if (!visibleIdsRef.current.has(ids[i])) continue;
+            const r = rectsNow[i];
+            cand.push({ id: ids[i], area: i === focusedIdx ? Infinity : r.w * r.h });
+          }
+          cand.sort((a, b) => b.area - a.area);
+          const next = new Set(cand.slice(0, liveCountRef.current).map((c) => c.id));
+          const prev = liveSetRef.current;
+          let changed = next.size !== prev.size;
+          if (!changed) {
+            next.forEach((id) => {
+              if (!prev.has(id)) changed = true;
+            });
+          }
+          if (changed) {
+            liveSetRef.current = next;
+            setLiveSet(next);
+          }
+        }
+      }
 
       // アンカーの張り直し（画面サイズ・タイル数が変わった時だけ。通常は走らない）
       const key = `${w}x${h}:${n}`;
@@ -286,15 +324,13 @@ export default function Mosaic({
         el.style.transform = `translate3d(${r.x + GAP / 2}px, ${r.y + GAP / 2}px, 0) scale(${sx}, ${sy})`;
         const m = Math.max(sx, sy);
         inner.style.transform = `scale(${m / sx}, ${m / sy})`;
-        // ラベルの出し分け: 現在の実寸に応じたクラスをキャッシュ付きで切替
+        // ラベルの出し分け: 現在の実寸に応じたクラスを毎描画で上書き
+        // （ReactのclassName再描画で消されても次のフレームで復元される）
         const tier =
           r.w > 190 && r.h > 120 ? 3 : r.w > 128 && r.h > 82 ? 2 : r.w > 108 && r.h > 72 ? 1 : 0;
-        if (tierCache.current.get(ids[i]) !== tier) {
-          tierCache.current.set(ids[i], tier);
-          el.classList.toggle("sz-votes", tier >= 1);
-          el.classList.toggle("sz-num", tier >= 2);
-          el.classList.toggle("sz-big", tier >= 3);
-        }
+        el.classList.toggle("sz-votes", tier >= 1);
+        el.classList.toggle("sz-num", tier >= 2);
+        el.classList.toggle("sz-big", tier >= 3);
       }
     };
     raf = requestAnimationFrame(tick);
@@ -315,6 +351,7 @@ export default function Mosaic({
 
   // タップ操作（スマホ）: 1回目=そのタイルが育つ / 育ったタイルをもう一度=詳細へ
   const handleTileClick = (m: MomentWithStats, i: number, e: React.MouseEvent) => {
+    getCrowd().start(); // どのクリックでも歓声エンジンを起動（自動再生制限の解除）
     if (!isCoarse) {
       onSelect(m);
       return;
@@ -329,34 +366,22 @@ export default function Mosaic({
     setHoveredId(m.id);
   };
 
-  const liveIds = useMemo(() => {
-    return new Set(
-      [...moments]
-        .sort((a, b) => b.votes - a.votes)
-        .slice(0, liveCount)
-        .map((m) => m.id)
-    );
-  }, [moments, liveCount]);
-
-  // 画面外のタイルにはiframeを挿さない（常時10本のビデオデコードが「もたつき」の一因）
-  const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
+  // ライブ再生は「いま画面に見えているタイルのうち大きいものから liveCount 枚」。
+  // どこへスクロールしても画面の主役級タイルでは常に映像が動いている
+  const [liveSet, setLiveSet] = useState<Set<string>>(new Set());
   useEffect(() => {
     const stage = containerRef.current?.parentElement;
     if (!stage) return;
     const io = new IntersectionObserver(
       (entries) => {
-        setVisibleIds((prev) => {
-          const next = new Set(prev);
-          for (const en of entries) {
-            const id = (en.target as HTMLElement).dataset.mid;
-            if (!id) continue;
-            if (en.isIntersecting) next.add(id);
-            else next.delete(id);
-          }
-          return next;
-        });
+        for (const en of entries) {
+          const id = (en.target as HTMLElement).dataset.mid;
+          if (!id) continue;
+          if (en.isIntersecting) visibleIdsRef.current.add(id);
+          else visibleIdsRef.current.delete(id);
+        }
       },
-      { root: stage, rootMargin: "250px 0px" }
+      { root: stage, rootMargin: "150px 0px" }
     );
     tileEls.current.forEach((el) => io.observe(el));
     return () => io.disconnect();
@@ -365,15 +390,14 @@ export default function Mosaic({
   return (
     <div
       className="mosaic"
-      data-rev="scroll1"
+      data-rev="dynamic1"
       ref={containerRef}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
     >
       {moments.map((m, i) => {
         const hovered = m.id === hoveredId;
-        const live =
-          !isCoarse && liveIds.has(m.id) && visibleIds.has(m.id); // スマホは自動再生不可のため埋め込み無し。PCも画面内のみ
+        const live = !isCoarse && liveSet.has(m.id); // スマホは自動再生不可のため埋め込み無し
         const seed = tileSeed(m.id);
         const pulse = pulses[m.id];
         return (
@@ -384,7 +408,9 @@ export default function Mosaic({
               else tileEls.current.delete(m.id);
             }}
             data-mid={m.id}
-            className={`tile${hovered ? " hovered" : ""}${pulse ? " pulse" : ""}`}
+            className={`tile${hovered ? " hovered" : ""}${
+              hovered && soundLive ? " sonic" : ""
+            }${pulse ? " pulse" : ""}`}
             onPointerEnter={(e) => {
               if (e.pointerType === "mouse") setHoveredId(m.id);
             }}

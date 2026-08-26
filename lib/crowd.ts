@@ -202,6 +202,11 @@ class CrowdEngine {
     g.setTargetAtTime(0, t + 0.3, 0.5 + strength * 0.7);
   }
 
+  // AudioContextが起動済み（=歓声が鳴れる状態）か
+  isActive(): boolean {
+    return this.ctx?.state === "running";
+  }
+
   // 0..1。0でミュート。滑らかに反映
   setVolume(v: number) {
     this.volume = Math.max(0, Math.min(1, v));
