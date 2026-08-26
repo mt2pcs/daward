@@ -169,7 +169,7 @@ export default function Mosaic({
       for (let i = 0; i < n; i++) S += base[i];
       const A = Math.min(
         0.6,
-        Math.max(0.05, 0.82 * (viewH / h) * (motionRef.current / 65))
+        Math.max(0.05, 0.55 * (viewH / h) * (motionRef.current / 65))
       );
       const K = (A * S) / (1 - A);
       const G = motionRef.current > 0 ? 1 : 0; // 0でモーション無効
@@ -221,8 +221,10 @@ export default function Mosaic({
           const m = momentsRef.current[focusedIdx];
           if (r && m) {
             const e = energies.current[focusedIdx];
+            // 投票数で差はつけるが、どのタイルでも「触れたら確かに聞こえる」下限を保証
             const level =
-              Math.pow(m.votes / maxVotesRef.current, 0.7) * (0.3 + 0.7 * e);
+              (0.35 + 0.65 * Math.pow(m.votes / maxVotesRef.current, 0.7)) *
+              (0.4 + 0.6 * e);
             const pan = Math.max(-0.85, Math.min(0.85, ((r.x + r.w / 2) / w) * 2 - 1));
             crowd.setFocus({ key: m.id, level, pan });
           }
@@ -390,7 +392,7 @@ export default function Mosaic({
   return (
     <div
       className="mosaic"
-      data-rev="dynamic1"
+      data-rev="sound2"
       ref={containerRef}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}

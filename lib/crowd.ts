@@ -24,6 +24,7 @@ class CrowdEngine {
   private volume = 0.6; // 0..1（調整パネルから）
   private loopBuf: AudioBuffer | null = null;
   private usingSample = false;
+  private analyser: AnalyserNode | null = null;
 
   start() {
     if (this.ctx) {
@@ -41,7 +42,12 @@ class CrowdEngine {
     this.master = ctx.createGain();
     this.master.gain.value = 0;
     this.master.connect(ctx.destination);
-    this.master.gain.linearRampToValueAtTime(this.volume, ctx.currentTime + 1.2);
+    // 起動後すぐ聞こえ始めることが大事（遅いと「鳴っていない」と判断される）
+    this.master.gain.linearRampToValueAtTime(this.volume, ctx.currentTime + 0.4);
+    // 実際に出ている音量を観測するためのアナライザ（検証用）
+    this.analyser = ctx.createAnalyser();
+    this.analyser.fftSize = 2048;
+    this.master.connect(this.analyser);
 
     // 実録ループの取得を試み、来るまでは合成ノイズで鳴らす
     this.loopBuf = this.makeSynthCrowd(ctx);
@@ -56,6 +62,7 @@ class CrowdEngine {
           pan: v.pan.pan.value,
         })),
         usingSample: this.usingSample,
+        outputRms: this.measureRms(),
       }),
     };
     fetch("/crowd.ogg")
@@ -113,7 +120,7 @@ class CrowdEngine {
     // 群衆帯域の整形（全ボイス共通）
     this.brightness = ctx.createBiquadFilter();
     this.brightness.type = "lowpass";
-    this.brightness.frequency.value = 2600;
+    this.brightness.frequency.value = 3400;
     const hp = ctx.createBiquadFilter();
     hp.type = "highpass";
     hp.frequency.value = 240;
@@ -179,8 +186,8 @@ class CrowdEngine {
       next.pan.pan.setValueAtTime(focus.pan, t);
     }
     const v = this.voices[this.active];
-    // 近づいてくる感じ: 追従はやや遅め。音量は投票数×成長度
-    v.gain.gain.setTargetAtTime(0.05 + 0.62 * focus.level, t, 0.28);
+    // 乗った瞬間から聞こえ、育つほど近づく。音量は投票数×成長度
+    v.gain.gain.setTargetAtTime(0.1 + 0.75 * focus.level, t, 0.15);
     v.pan.pan.setTargetAtTime(focus.pan, t, 0.15);
   }
 
@@ -200,6 +207,16 @@ class CrowdEngine {
     g.setValueAtTime(g.value, t);
     g.linearRampToValueAtTime(0.06 + 0.2 * strength, t + 0.14 + strength * 0.12);
     g.setTargetAtTime(0, t + 0.3, 0.5 + strength * 0.7);
+  }
+
+  // 実際にスピーカーへ出ている信号のRMS（0=無音）。検証用
+  private measureRms(): number {
+    if (!this.analyser) return -1;
+    const buf = new Float32Array(this.analyser.fftSize);
+    this.analyser.getFloatTimeDomainData(buf);
+    let s = 0;
+    for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+    return Math.sqrt(s / buf.length);
   }
 
   // AudioContextが起動済み（=歓声が鳴れる状態）か
