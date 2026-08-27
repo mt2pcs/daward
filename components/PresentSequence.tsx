@@ -5,11 +5,19 @@ import { getCrowd } from "@/lib/crowd";
 import { embedUrl, thumbUrl } from "@/lib/youtube";
 import type { ArcCut, MomentWithStats, VoteResponse } from "@/lib/types";
 
-// スペシャル映像: 感情の弧（序→破→急→頂点→余韻）で編集されたカット表を再生する。
-// - カットはサムネイルではなく実映像（ミュート自動再生、山場秒があれば頭出し）
-// - 次カットの映像は裏でマウントして先回しし、切替の淀みを消す
-// - 歓声エンジンを弧に同期（序は遠く、頂点で最大）
-type Stage = "type" | "arc" | "afterglow" | "logo";
+// スペシャル映像 = 「あなたの言葉から編んだ1本のフィルム」。
+// 見る人に伝えるべき物語は3つ:
+//   1) あなたの言葉を読んだ（タイプライター → 感情の一文字が立ち上がる）
+//   2) 同じ感情を100の瞬間から集めた（カットが流れる間、テーマと進行が見え続ける）
+//   3) だから最後はあなたの瞬間（一拍置いて宣言 → 頂点 → エンドカード）
+// 画面はPC/スマホ共通のストーリー型1カラム（映像は16:9帯・クロップ無し）。
+type Step =
+  | { kind: "theme"; ms: number }
+  | { kind: "cut"; ms: number; cut: ArcCut; nth: number }
+  | { kind: "bridge"; ms: number }
+  | { kind: "endcard"; ms: number };
+
+type Stage = "type" | "film" | "logo";
 
 const FALLBACK_TEXT = "スポーツは、心を震わせる。";
 const SWELL: Record<ArcCut["role"], number> = {
@@ -27,7 +35,7 @@ export default function PresentSequence({
   onClose: () => void;
 }) {
   const [stage, setStage] = useState<Stage>("type");
-  const [cutIdx, setCutIdx] = useState(0);
+  const [stepIdx, setStepIdx] = useState(0);
   const [typedCount, setTypedCount] = useState(0);
   const [run, setRun] = useState(0); // 「もう一度再生」用
 
@@ -36,72 +44,60 @@ export default function PresentSequence({
     return t.length > 0 ? `“${t}”` : FALLBACK_TEXT;
   }, [data.comment.text]);
 
-  // カット表（旧レスポンス互換: cuts が無ければ matched から擬似的に組む）
-  const cuts = useMemo<ArcCut[]>(() => {
-    if (data.cuts && data.cuts.length > 0) return data.cuts;
-    const fallback: ArcCut[] = data.matched.map((m) => ({
-      id: m.id,
-      role: "rise",
-      ms: 1800,
-      startSec: 0,
-      youtubeId: m.youtubeId,
-      title: m.title,
-      event: m.event,
-      emotion: m.emotions[0],
-    }));
-    fallback.push({
-      id: data.moment.id,
-      role: "yours",
-      ms: 4200,
-      startSec: 0,
-      youtubeId: data.moment.youtubeId,
-      title: data.moment.title,
-      event: data.moment.event,
-      emotion: data.moment.emotions[0],
-    });
-    return fallback;
-  }, [data]);
+  const cuts = useMemo<ArcCut[]>(
+    () => (data.cuts && data.cuts.length > 0 ? data.cuts : []),
+    [data]
+  );
+
+  // フィルムのタイムライン: テーマ宣言 → カット群 → 一拍 → あなたの瞬間 → エンドカード
+  const steps = useMemo<Step[]>(() => {
+    const s: Step[] = [{ kind: "theme", ms: 2400 }];
+    let nth = 0;
+    for (const c of cuts) {
+      if (c.role === "yours") s.push({ kind: "bridge", ms: 1100 });
+      s.push({ kind: "cut", ms: c.ms, cut: c, nth: nth++ });
+    }
+    s.push({ kind: "endcard", ms: 3200 });
+    return s;
+  }, [cuts]);
 
   // typewriter
   useEffect(() => {
     if (stage !== "type") return;
     if (typedCount >= text.length) {
-      const t = setTimeout(() => setStage("arc"), 1100);
+      const t = setTimeout(() => setStage("film"), 900);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => setTypedCount((c) => c + 1), 72);
     return () => clearTimeout(t);
   }, [stage, typedCount, text]);
 
-  // 弧の再生: role ごとのカット長で進み、歓声を同期させる
+  // フィルム進行
   useEffect(() => {
-    if (stage !== "arc") return;
-    const cut = cuts[cutIdx];
-    if (!cut) {
-      setStage("afterglow");
+    if (stage !== "film") return;
+    const step = steps[stepIdx];
+    if (!step) {
+      setStage("logo");
       return;
     }
-    getCrowd().swell(SWELL[cut.role]);
+    if (step.kind === "cut") getCrowd().swell(SWELL[step.cut.role]);
     const t = setTimeout(() => {
-      if (cutIdx < cuts.length - 1) setCutIdx((i) => i + 1);
-      else setStage("afterglow");
-    }, cut.ms);
+      if (stepIdx < steps.length - 1) setStepIdx((i) => i + 1);
+      else setStage("logo");
+    }, step.ms);
     return () => clearTimeout(t);
-  }, [stage, cutIdx, cuts]);
-
-  // 余韻: 黒の中にコメントがもう一度浮かび、ロゴへ
-  useEffect(() => {
-    if (stage !== "afterglow") return;
-    const t = setTimeout(() => setStage("logo"), 2600);
-    return () => clearTimeout(t);
-  }, [stage]);
+  }, [stage, stepIdx, steps]);
 
   const replay = () => {
     setStage("type");
-    setCutIdx(0);
+    setStepIdx(0);
     setTypedCount(0);
     setRun((r) => r + 1);
   };
+
+  const step = steps[stepIdx];
+  const cutSteps = steps.filter((s): s is Extract<Step, { kind: "cut" }> => s.kind === "cut");
+  const activeNth = step?.kind === "cut" ? step.nth : null;
 
   return (
     <div className="present" key={run}>
@@ -113,11 +109,11 @@ export default function PresentSequence({
 
       {stage === "type" && (
         <>
-          {/* タイプライターの裏で最初のカットを先回し再生（弧の開始で読み込みを見せない） */}
+          {/* タイプライターの裏で最初のカットを先回し再生（読み込みを見せない） */}
           {cuts.slice(0, 2).map((c, i) => (
-            <ArcClip key={`pre-${c.id}-${i}`} cut={c} active={false} preload />
+            <StoryCut key={`pre-${c.id}-${i}`} cut={c} active={false} preload />
           ))}
-          <div className="present-center type-layer">
+          <div className="present-center">
             <div className="typewriter">
               {text.slice(0, typedCount)}
               <span className="caret" />
@@ -126,26 +122,68 @@ export default function PresentSequence({
         </>
       )}
 
-      {stage === "arc" && (
+      {stage === "film" && step && (
         <>
-          {cuts.map((c, i) => (
-            <ArcClip
-              key={`${c.id}-${i}`}
-              cut={c}
-              active={i === cutIdx}
-              preload={i === cutIdx + 1 || i === cutIdx + 2}
+          {/* カットは常にマウントし、進行に合わせて表示。次カットは裏で先回し */}
+          {cutSteps.map((s) => (
+            <StoryCut
+              key={`${s.cut.id}-${s.nth}`}
+              cut={s.cut}
+              active={activeNth === s.nth}
+              preload={activeNth !== null && s.nth > activeNth && s.nth <= activeNth + 2}
             />
           ))}
-          {/* カット切替の瞬き */}
-          <div className="flash on" key={`f${cutIdx}`} />
-          <div className="arc-theme">#{data.emotion}</div>
-        </>
-      )}
 
-      {stage === "afterglow" && (
-        <div className="present-center">
-          <div className="afterglow-text">{text}</div>
-        </div>
+          {step.kind === "theme" && (
+            <div className="present-center film-card">
+              <div className="theme-kanji">{data.emotion}</div>
+              <div className="film-copy">
+                その言葉と同じ震えを、100の瞬間から。
+              </div>
+            </div>
+          )}
+
+          {step.kind === "bridge" && (
+            <div className="present-center film-card">
+              <div className="film-copy bridge-copy">
+                そして、あなたの選んだ瞬間。
+              </div>
+            </div>
+          )}
+
+          {step.kind === "endcard" && (
+            <div className="present-center film-card">
+              <div className="endcard">
+                <div className="endcard-kanji">{data.emotion}</div>
+                <div className="endcard-comment">{text}</div>
+                <div className="endcard-title">
+                  MOMENT #{String(data.moment.index).padStart(3, "0")}{" "}
+                  {data.moment.title}
+                </div>
+                <div className="endcard-sub">
+                  あなたの一票と言葉から編まれた、あなただけのフィルム
+                </div>
+              </div>
+            </div>
+          )}
+
+          {(step.kind === "cut" || step.kind === "bridge") && (
+            <>
+              <div className="film-theme">#{data.emotion}</div>
+              <div className="film-progress">
+                {cutSteps.map((s) => (
+                  <span
+                    key={s.nth}
+                    className={`film-dot${
+                      activeNth !== null && s.nth <= activeNth ? " on" : ""
+                    }${s.cut.role === "yours" ? " yours" : ""}`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+          {step.kind === "cut" && <div className="flash on" key={`f${stepIdx}`} />}
+        </>
       )}
 
       {stage === "logo" && (
@@ -172,7 +210,8 @@ export default function PresentSequence({
   );
 }
 
-function ArcClip({
+// ストーリー型1カラムの1カット: 感情（上）/ 16:9映像帯・クロップ無し（中央）/ タイトル（下）
+function StoryCut({
   cut,
   active,
   preload,
@@ -181,43 +220,30 @@ function ArcClip({
   active: boolean;
   preload: boolean;
 }) {
-  // 表示中と次以降のカットだけマウント（次カットは裏で再生を先回し）
   if (!active && !preload) return null;
   const yours = cut.role === "yours";
   return (
     <div
-      className={`arc-cut role-${cut.role}${active ? " active" : ""}`}
+      className={`story-cut role-${cut.role}${active ? " active" : ""}`}
       aria-hidden={!active}
     >
-      <PosterImg youtubeId={cut.youtubeId} title={cut.title} />
-      <iframe
-        src={embedUrl(cut.youtubeId, {
-          autoplay: true,
-          mute: true,
-          controls: false,
-          start: cut.startSec,
-        })}
-        title={cut.title}
-        tabIndex={-1}
-        aria-hidden
-      />
-      <div className="clip-shade" />
-      {yours ? (
-        <div className="yours-overlay">
-          <div className="yours-kicker">YOUR MOMENT</div>
-          <div className="yours-title">{cut.title}</div>
-          <div className="yours-sub">
-            {cut.event} — #{cut.emotion}
-          </div>
-        </div>
-      ) : (
-        <div className="clip-label">
-          <div className="clip-emotion">{cut.emotion}</div>
-          <div className="clip-title">
-            {cut.title} — {cut.event}
-          </div>
-        </div>
-      )}
+      <div className="story-emotion">{yours ? "YOUR MOMENT" : cut.emotion}</div>
+      <div className={`story-band${yours ? " yours" : ""}`}>
+        <PosterImg youtubeId={cut.youtubeId} title={cut.title} />
+        <iframe
+          src={embedUrl(cut.youtubeId, {
+            autoplay: true,
+            mute: true,
+            controls: false,
+            start: cut.startSec,
+          })}
+          title={cut.title}
+          tabIndex={-1}
+          aria-hidden
+        />
+      </div>
+      <div className="story-title">{cut.title}</div>
+      <div className="story-event">{cut.event}</div>
     </div>
   );
 }
@@ -228,7 +254,7 @@ function PosterImg({ youtubeId, title }: { youtubeId: string; title: string }) {
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      className="arc-poster"
+      className="story-poster"
       src={thumbUrl(youtubeId, quality)}
       alt={title}
       draggable={false}
@@ -237,7 +263,7 @@ function PosterImg({ youtubeId, title }: { youtubeId: string; title: string }) {
   );
 }
 
-// 旧UIで使用（詳細画面等から参照される可能性があるため残置）
+// 旧UIから参照される可能性があるため残置
 export function FallbackImg({ moment }: { moment: MomentWithStats }) {
   const [quality, setQuality] = useState<"maxres" | "hq" | "mq">("maxres");
   return (
