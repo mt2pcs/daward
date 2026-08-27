@@ -206,7 +206,7 @@ export default function MomentsApp({
       )}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev arc1</div>
+      <div className="rev-tag">rev arc2</div>
 
       {selected && (
         <DetailOverlay

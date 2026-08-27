@@ -116,11 +116,16 @@ export function buildArc(
     lastSport
   );
 
+  // 山場秒が未設定の間のヒューリスティック: ハイライト動画は冒頭にタイトルや
+  // 助走が入ることが多いため、本編が動いている時間帯から入る（curated値が入れば優先）
+  const startOf = (m: Moment, role: ArcCut["role"]) =>
+    m.peakSec && m.peakSec > 0 ? m.peakSec : role === "yours" ? 12 : 18;
+
   const cut = (m: Moment, role: ArcCut["role"]): ArcCut => ({
     id: m.id,
     role,
     ms: CUT_MS[role],
-    startSec: m.peakSec ?? 0,
+    startSec: startOf(m, role),
     youtubeId: m.youtubeId,
     title: m.title,
     event: m.event,

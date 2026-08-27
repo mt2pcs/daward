@@ -13,9 +13,9 @@ type Stage = "type" | "arc" | "afterglow" | "logo";
 
 const FALLBACK_TEXT = "スポーツは、心を震わせる。";
 const SWELL: Record<ArcCut["role"], number> = {
-  intro: 0.15,
-  rise: 0.4,
-  climax: 0.75,
+  intro: 0.3,
+  rise: 0.55,
+  climax: 0.85,
   yours: 1.0,
 };
 
@@ -112,12 +112,18 @@ export default function PresentSequence({
       )}
 
       {stage === "type" && (
-        <div className="present-center">
-          <div className="typewriter">
-            {text.slice(0, typedCount)}
-            <span className="caret" />
+        <>
+          {/* タイプライターの裏で最初のカットを先回し再生（弧の開始で読み込みを見せない） */}
+          {cuts.slice(0, 2).map((c, i) => (
+            <ArcClip key={`pre-${c.id}-${i}`} cut={c} active={false} preload />
+          ))}
+          <div className="present-center type-layer">
+            <div className="typewriter">
+              {text.slice(0, typedCount)}
+              <span className="caret" />
+            </div>
           </div>
-        </div>
+        </>
       )}
 
       {stage === "arc" && (

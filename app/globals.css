@@ -1036,6 +1036,86 @@ textarea {
   }
 }
 
+/* スマホ縦画面: 横長映像を全画面クロップせず、縦の構成として設計する。
+   映像は中央の16:9帯（クロップ無し）、感情の大文字を帯の上、タイトルを帯の下へ */
+@media (orientation: portrait) {
+  .arc-cut iframe {
+    width: 100vw;
+    height: 56.25vw;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .arc-poster {
+    inset: auto;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 100%;
+    height: 56.25vw;
+    filter: brightness(0.85);
+  }
+  .arc-cut .clip-shade {
+    display: none;
+  }
+  .arc-cut .clip-label {
+    position: static; /* 子要素の絶対配置の基準をカット全体にする */
+  }
+  .clip-emotion {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(50% + 28.2vw + 5vmin);
+    text-align: center;
+    font-size: clamp(44px, 15vw, 76px);
+  }
+  .clip-title {
+    position: absolute;
+    left: 8vw;
+    right: 8vw;
+    top: calc(50% + 28.2vw + 5vmin);
+    text-align: center;
+    margin-top: 0;
+  }
+  .arc-theme {
+    top: auto;
+    bottom: 6vmin;
+    left: 0;
+    right: 0;
+    text-align: center;
+  }
+  .arc-cut.role-yours::after {
+    inset: auto 2.5vw;
+    top: calc(50% - 29.7vw);
+    height: 59.4vw;
+  }
+  .yours-overlay {
+    position: static;
+  }
+  .yours-overlay .yours-kicker {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(50% + 30.5vw + 2vmin);
+    text-align: center;
+  }
+  .yours-overlay .yours-title {
+    position: absolute;
+    left: 6vw;
+    right: 6vw;
+    top: calc(50% + 30.5vw + 2vmin);
+    margin-top: 0;
+    text-align: center;
+  }
+  .yours-overlay .yours-sub {
+    position: absolute;
+    left: 6vw;
+    right: 6vw;
+    top: calc(50% + 30.5vw + 11vmin);
+    text-align: center;
+  }
+}
+
 .yours-kicker {
   font-size: 12px;
   letter-spacing: 0.5em;
