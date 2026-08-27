@@ -37,10 +37,19 @@ export default function MomentsApp({
 
   const selected = moments.find((m) => m.id === selectedId) ?? null;
 
-  // 歓声エンジンは最初のユーザー操作で起動（ブラウザの自動再生制限）。
-  // 音量設定に関係なく常に武装しておき（音量はmaster側で反映）、
-  // capture段で拾うことでどのUI要素へのクリックでも確実に起動する
+  // エントランス: ブラウザは最初のクリックまで音を出せないため、
+  // 「入場する」ボタンを世界観の入口にして、その1クリックで音を解錠する
+  const [entered, setEntered] = useState(false);
+  const [gateLeaving, setGateLeaving] = useState(false);
   const [soundArmed, setSoundArmed] = useState(false);
+  const enter = useCallback(() => {
+    getCrowd().start();
+    setSoundArmed(true);
+    setGateLeaving(true);
+    setTimeout(() => setEntered(true), 750);
+  }, []);
+
+  // 保険: ゲートを介さない操作（キー入力等）でもエンジンを起動できるようにする
   useEffect(() => {
     const kick = () => {
       getCrowd().start();
@@ -176,12 +185,28 @@ export default function MomentsApp({
         onChange={updateTuning}
       />
 
-      {tuning.volume > 0 && !soundArmed && (
-        <div className="sound-hint">🔊 クリックすると歓声が流れます</div>
+      {!entered && (
+        <div className={`entry-gate${gateLeaving ? " leaving" : ""}`}>
+          <div className="entry-inner">
+            <div className="entry-kicker">DAZN AWARDS 2026 — FAN VOTE</div>
+            <h1 className="entry-title">
+              É M<em>OO</em>MENTS <em>100</em>
+            </h1>
+            <p className="entry-copy">
+              心を震わせた100の瞬間が、投票で大きく育っていく。
+              <br />
+              触れれば、その瞬間の歓声が聞こえてくる。
+            </p>
+            <button className="entry-button" onClick={enter}>
+              入場する
+            </button>
+            <div className="entry-note">🔊 サウンドが流れます</div>
+          </div>
+        </div>
       )}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev sound3</div>
+      <div className="rev-tag">rev entry1</div>
 
       {selected && (
         <DetailOverlay
