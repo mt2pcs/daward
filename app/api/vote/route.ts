@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { buildArc } from "@/lib/arc";
 import { analyzeEmotion, matchMoments } from "@/lib/emotion";
 import { addVote, getMoment, getStore, withStats } from "@/lib/store";
 import type { VoteResponse } from "@/lib/types";
@@ -25,10 +26,12 @@ export async function POST(req: Request) {
 
   const store = getStore();
   const matched = matchMoments(store.moments, store.votes, emotion, moment.id, 3);
+  const cuts = buildArc(store.moments, moment.id, emotion);
 
   const res: VoteResponse = {
     moment: withStats(moment),
     matched: matched.map(withStats),
+    cuts,
     emotion,
     comment,
   };

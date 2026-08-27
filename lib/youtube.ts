@@ -13,10 +13,17 @@ export function thumbUrl(
 
 export function embedUrl(
   youtubeId: string,
-  opts: { autoplay?: boolean; mute?: boolean; loop?: boolean; controls?: boolean } = {}
+  opts: {
+    autoplay?: boolean;
+    mute?: boolean;
+    loop?: boolean;
+    controls?: boolean;
+    start?: number; // 山場の頭出し秒
+  } = {}
 ): string {
   const p = new URLSearchParams();
   if (opts.autoplay) p.set("autoplay", "1");
+  if (opts.start && opts.start > 0) p.set("start", String(Math.floor(opts.start)));
   if (opts.mute) p.set("mute", "1");
   if (opts.controls === false) p.set("controls", "0");
   if (opts.loop) {

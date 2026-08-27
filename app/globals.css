@@ -949,6 +949,93 @@ textarea {
   }
 }
 
+/* ---------- 感情の弧（実映像カット） ---------- */
+.arc-cut {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.22s linear;
+  pointer-events: none;
+}
+.arc-cut.active {
+  opacity: 1;
+}
+.arc-cut iframe {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100vw, 177.78vh);
+  height: max(100vh, 56.25vw);
+  transform: translate(-50%, -50%);
+  border: 0;
+  background: #000;
+  pointer-events: none;
+}
+.arc-poster {
+  position: absolute;
+  inset: -6%;
+  width: 112%;
+  height: 112%;
+  object-fit: cover;
+  filter: blur(3px) brightness(0.65);
+}
+/* 弧の中の役割ごとにトーンを変える: 序は沈め、急は張る */
+.arc-cut.role-intro iframe {
+  filter: brightness(0.82) saturate(0.9);
+}
+.arc-cut.role-climax iframe {
+  filter: brightness(1.05) saturate(1.08) contrast(1.03);
+}
+.arc-cut.role-yours::after {
+  content: "";
+  position: absolute;
+  inset: 3.2vmin;
+  border: 1px solid rgba(235, 255, 0, 0.75);
+  box-shadow:
+    0 0 40px rgba(235, 255, 0, 0.16),
+    inset 0 0 70px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  animation: fade-in 0.8s ease;
+}
+.yours-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8vmin;
+  text-align: center;
+}
+.arc-theme {
+  position: absolute;
+  top: 5vmin;
+  left: 6vmin;
+  font-size: clamp(15px, 2vw, 20px);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  color: var(--yellow);
+  opacity: 0.85;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.65);
+}
+.afterglow-text {
+  max-width: 720px;
+  font-size: clamp(16px, 2.4vw, 24px);
+  font-weight: 600;
+  line-height: 2.1;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.85);
+  animation: afterglow-in 2.4s ease both;
+}
+@keyframes afterglow-in {
+  from {
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.85;
+  }
+}
+
 .yours-kicker {
   font-size: 12px;
   letter-spacing: 0.5em;

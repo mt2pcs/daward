@@ -1,13 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { thumbUrl } from "@/lib/youtube";
-import type { MomentWithStats, VoteResponse } from "@/lib/types";
+import { getCrowd } from "@/lib/crowd";
+import { embedUrl, thumbUrl } from "@/lib/youtube";
+import type { ArcCut, MomentWithStats, VoteResponse } from "@/lib/types";
 
-type Stage = "type" | "clips" | "yours" | "logo";
+// スペシャル映像: 感情の弧（序→破→急→頂点→余韻）で編集されたカット表を再生する。
+// - カットはサムネイルではなく実映像（ミュート自動再生、山場秒があれば頭出し）
+// - 次カットの映像は裏でマウントして先回しし、切替の淀みを消す
+// - 歓声エンジンを弧に同期（序は遠く、頂点で最大）
+type Stage = "type" | "arc" | "afterglow" | "logo";
 
-const CLIP_MS = 1900;
 const FALLBACK_TEXT = "スポーツは、心を震わせる。";
+const SWELL: Record<ArcCut["role"], number> = {
+  intro: 0.15,
+  rise: 0.4,
+  climax: 0.75,
+  yours: 1.0,
+};
 
 export default function PresentSequence({
   data,
@@ -17,7 +27,7 @@ export default function PresentSequence({
   onClose: () => void;
 }) {
   const [stage, setStage] = useState<Stage>("type");
-  const [clipIdx, setClipIdx] = useState(0);
+  const [cutIdx, setCutIdx] = useState(0);
   const [typedCount, setTypedCount] = useState(0);
   const [run, setRun] = useState(0); // 「もう一度再生」用
 
@@ -26,42 +36,69 @@ export default function PresentSequence({
     return t.length > 0 ? `“${t}”` : FALLBACK_TEXT;
   }, [data.comment.text]);
 
-  const clips = data.matched;
+  // カット表（旧レスポンス互換: cuts が無ければ matched から擬似的に組む）
+  const cuts = useMemo<ArcCut[]>(() => {
+    if (data.cuts && data.cuts.length > 0) return data.cuts;
+    const fallback: ArcCut[] = data.matched.map((m) => ({
+      id: m.id,
+      role: "rise",
+      ms: 1800,
+      startSec: 0,
+      youtubeId: m.youtubeId,
+      title: m.title,
+      event: m.event,
+      emotion: m.emotions[0],
+    }));
+    fallback.push({
+      id: data.moment.id,
+      role: "yours",
+      ms: 4200,
+      startSec: 0,
+      youtubeId: data.moment.youtubeId,
+      title: data.moment.title,
+      event: data.moment.event,
+      emotion: data.moment.emotions[0],
+    });
+    return fallback;
+  }, [data]);
 
   // typewriter
   useEffect(() => {
     if (stage !== "type") return;
     if (typedCount >= text.length) {
-      const t = setTimeout(
-        () => setStage(clips.length > 0 ? "clips" : "yours"),
-        1150
-      );
+      const t = setTimeout(() => setStage("arc"), 1100);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => setTypedCount((c) => c + 1), 72);
     return () => clearTimeout(t);
-  }, [stage, typedCount, text, clips.length]);
+  }, [stage, typedCount, text]);
 
-  // tempo cuts
+  // 弧の再生: role ごとのカット長で進み、歓声を同期させる
   useEffect(() => {
-    if (stage !== "clips") return;
+    if (stage !== "arc") return;
+    const cut = cuts[cutIdx];
+    if (!cut) {
+      setStage("afterglow");
+      return;
+    }
+    getCrowd().swell(SWELL[cut.role]);
     const t = setTimeout(() => {
-      if (clipIdx < clips.length - 1) setClipIdx((i) => i + 1);
-      else setStage("yours");
-    }, CLIP_MS);
+      if (cutIdx < cuts.length - 1) setCutIdx((i) => i + 1);
+      else setStage("afterglow");
+    }, cut.ms);
     return () => clearTimeout(t);
-  }, [stage, clipIdx, clips.length]);
+  }, [stage, cutIdx, cuts]);
 
-  // your moment → logo
+  // 余韻: 黒の中にコメントがもう一度浮かび、ロゴへ
   useEffect(() => {
-    if (stage !== "yours") return;
-    const t = setTimeout(() => setStage("logo"), 3400);
+    if (stage !== "afterglow") return;
+    const t = setTimeout(() => setStage("logo"), 2600);
     return () => clearTimeout(t);
   }, [stage]);
 
   const replay = () => {
     setStage("type");
-    setClipIdx(0);
+    setCutIdx(0);
     setTypedCount(0);
     setRun((r) => r + 1);
   };
@@ -83,23 +120,25 @@ export default function PresentSequence({
         </div>
       )}
 
-      {stage === "clips" &&
-        clips.map((m, i) => (
-          <Clip key={m.id} moment={m} active={i === clipIdx} />
-        ))}
-      {stage === "clips" && <div className="flash on" key={`f${clipIdx}`} />}
+      {stage === "arc" && (
+        <>
+          {cuts.map((c, i) => (
+            <ArcClip
+              key={`${c.id}-${i}`}
+              cut={c}
+              active={i === cutIdx}
+              preload={i === cutIdx + 1 || i === cutIdx + 2}
+            />
+          ))}
+          {/* カット切替の瞬き */}
+          <div className="flash on" key={`f${cutIdx}`} />
+          <div className="arc-theme">#{data.emotion}</div>
+        </>
+      )}
 
-      {stage === "yours" && (
-        <div className="present-center" style={{ flexDirection: "column" }}>
-          <div className="yours-kicker">YOUR MOMENT</div>
-          <div className="yours-frame">
-            <FallbackImg moment={data.moment} />
-          </div>
-          <div className="yours-title">{data.moment.title}</div>
-          <div className="yours-sub">
-            MOMENT #{String(data.moment.index).padStart(3, "0")} / 100
-            に投票しました — #{data.emotion}
-          </div>
+      {stage === "afterglow" && (
+        <div className="present-center">
+          <div className="afterglow-text">{text}</div>
         </div>
       )}
 
@@ -127,29 +166,73 @@ export default function PresentSequence({
   );
 }
 
-function Clip({
-  moment,
+function ArcClip({
+  cut,
   active,
+  preload,
 }: {
-  moment: MomentWithStats;
+  cut: ArcCut;
   active: boolean;
+  preload: boolean;
 }) {
+  // 表示中と次以降のカットだけマウント（次カットは裏で再生を先回し）
+  if (!active && !preload) return null;
+  const yours = cut.role === "yours";
   return (
-    <div className={`present-clip${active ? " active" : ""}`}>
-      <FallbackImg moment={moment} />
+    <div
+      className={`arc-cut role-${cut.role}${active ? " active" : ""}`}
+      aria-hidden={!active}
+    >
+      <PosterImg youtubeId={cut.youtubeId} title={cut.title} />
+      <iframe
+        src={embedUrl(cut.youtubeId, {
+          autoplay: true,
+          mute: true,
+          controls: false,
+          start: cut.startSec,
+        })}
+        title={cut.title}
+        tabIndex={-1}
+        aria-hidden
+      />
       <div className="clip-shade" />
-      <div className="clip-label">
-        <div className="clip-emotion">{moment.emotions[0]}</div>
-        <div className="clip-title">
-          {moment.title} — {moment.event}
+      {yours ? (
+        <div className="yours-overlay">
+          <div className="yours-kicker">YOUR MOMENT</div>
+          <div className="yours-title">{cut.title}</div>
+          <div className="yours-sub">
+            {cut.event} — #{cut.emotion}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="clip-label">
+          <div className="clip-emotion">{cut.emotion}</div>
+          <div className="clip-title">
+            {cut.title} — {cut.event}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// maxres → hq → mq の順でサムネイルをフォールバック
-function FallbackImg({ moment }: { moment: MomentWithStats }) {
+// iframeの読み込み中に黒画面を見せないための下敷き
+function PosterImg({ youtubeId, title }: { youtubeId: string; title: string }) {
+  const [quality, setQuality] = useState<"hq" | "mq">("hq");
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      className="arc-poster"
+      src={thumbUrl(youtubeId, quality)}
+      alt={title}
+      draggable={false}
+      onError={() => setQuality("mq")}
+    />
+  );
+}
+
+// 旧UIで使用（詳細画面等から参照される可能性があるため残置）
+export function FallbackImg({ moment }: { moment: MomentWithStats }) {
   const [quality, setQuality] = useState<"maxres" | "hq" | "mq">("maxres");
   return (
     // eslint-disable-next-line @next/next/no-img-element
@@ -161,7 +244,6 @@ function FallbackImg({ moment }: { moment: MomentWithStats }) {
         setQuality((q) => (q === "maxres" ? "hq" : "mq"));
       }}
       onLoad={(e) => {
-        // maxresが存在しない場合、YouTubeは120x90のプレースホルダを返すので検出して落とす
         const img = e.currentTarget;
         if (quality === "maxres" && img.naturalWidth <= 120) setQuality("hq");
       }}
