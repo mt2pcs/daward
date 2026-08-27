@@ -97,6 +97,20 @@ textarea {
   50% { opacity: 1; }
 }
 
+/* ビルド刻印（左下・極小・薄い） */
+.rev-tag {
+  position: fixed;
+  left: 10px;
+  bottom: 8px;
+  z-index: 20;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
+}
+
 .tile {
   position: absolute;
   left: 0;

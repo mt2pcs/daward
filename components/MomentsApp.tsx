@@ -50,10 +50,16 @@ export default function MomentsApp({
       );
     };
     window.addEventListener("pointerdown", kick, true);
+    window.addEventListener("pointerup", kick, true);
+    window.addEventListener("click", kick, true);
     window.addEventListener("keydown", kick, true);
+    window.addEventListener("touchend", kick, true);
     return () => {
       window.removeEventListener("pointerdown", kick, true);
+      window.removeEventListener("pointerup", kick, true);
+      window.removeEventListener("click", kick, true);
       window.removeEventListener("keydown", kick, true);
+      window.removeEventListener("touchend", kick, true);
     };
   }, []);
 
@@ -173,6 +179,9 @@ export default function MomentsApp({
       {tuning.volume > 0 && !soundArmed && (
         <div className="sound-hint">🔊 クリックすると歓声が流れます</div>
       )}
+
+      {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
+      <div className="rev-tag">rev sound3</div>
 
       {selected && (
         <DetailOverlay

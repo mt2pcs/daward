@@ -392,7 +392,7 @@ export default function Mosaic({
   return (
     <div
       className="mosaic"
-      data-rev="sound2"
+      data-rev="sound3"
       ref={containerRef}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
