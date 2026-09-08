@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { MomentWithStats, VoteResponse } from "@/lib/types";
+import type { Emotion, MomentWithStats, VoteResponse } from "@/lib/types";
 import { getCrowd } from "@/lib/crowd";
-import Mosaic from "./Mosaic";
+import { textToVector } from "@/lib/emotionSpace";
+import Galaxy, { type GalaxyQuery } from "./Galaxy";
+import QueryBar from "./QueryBar";
+import Vortex from "./Vortex";
 import DetailOverlay from "./DetailOverlay";
 import PresentSequence from "./PresentSequence";
 import Tuner, {
@@ -13,6 +16,9 @@ import Tuner, {
   type Tuning,
 } from "./Tuner";
 
+// 体験の骨格:
+//   熱狂の渦（エントランス）→ 感情の宇宙（8つの星団に100の瞬間）
+//   → 言葉で宇宙を組み替える → 瞬間に触れて投票 → あなたの言葉から編んだフィルム
 export default function MomentsApp({
   initialMoments,
 }: {
@@ -34,39 +40,24 @@ export default function MomentsApp({
     () => moments.reduce((s, m) => s + m.votes, 0),
     [moments]
   );
-
   const selected = moments.find((m) => m.id === selectedId) ?? null;
 
-  // エントランス: ブラウザは最初のクリックまで音を出せないため、
-  // 「入場する」ボタンを世界観の入口にして、その1クリックで音を解錠する
+  // エントランス（熱狂の渦）: 「入場する」の1クリックが音の解錠を兼ねる
   const [entered, setEntered] = useState(false);
-  const [gateLeaving, setGateLeaving] = useState(false);
-  const [soundArmed, setSoundArmed] = useState(false);
+  const [vortexDone, setVortexDone] = useState(false);
   const enter = useCallback(() => {
     getCrowd().start();
-    setSoundArmed(true);
-    setGateLeaving(true);
-    setTimeout(() => setEntered(true), 750);
+    setEntered(true); // 渦が弾け始めた時点で宇宙のリビールを開始
   }, []);
 
-  // 保険: ゲートを介さない操作（キー入力等）でもエンジンを起動できるようにする
+  // 保険: どの操作でも歓声エンジンを起動できるようにする
   useEffect(() => {
-    const kick = () => {
-      getCrowd().start();
-      setTimeout(
-        () => setSoundArmed((prev) => prev || getCrowd().isActive()),
-        150
-      );
-    };
+    const kick = () => getCrowd().start();
     window.addEventListener("pointerdown", kick, true);
-    window.addEventListener("pointerup", kick, true);
-    window.addEventListener("click", kick, true);
     window.addEventListener("keydown", kick, true);
     window.addEventListener("touchend", kick, true);
     return () => {
       window.removeEventListener("pointerdown", kick, true);
-      window.removeEventListener("pointerup", kick, true);
-      window.removeEventListener("click", kick, true);
       window.removeEventListener("keydown", kick, true);
       window.removeEventListener("touchend", kick, true);
     };
@@ -81,6 +72,19 @@ export default function MomentsApp({
     saveTuning(t);
     if (t.volume > 0) getCrowd().start();
   }, []);
+
+  // 言葉で宇宙を組み替える
+  const [query, setQuery] = useState<(GalaxyQuery & { text: string; primary: Emotion }) | null>(null);
+  const [themeFlash, setThemeFlash] = useState<{ e: Emotion; key: number } | null>(null);
+  const applyQuery = useCallback((text: string) => {
+    const r = textToVector(text);
+    if (!r) return false;
+    setQuery({ vec: r.vec, label: text, text, primary: r.primary });
+    setThemeFlash({ e: r.primary, key: Date.now() });
+    getCrowd().swell(0.6);
+    return true;
+  }, []);
+  const resetQuery = useCallback(() => setQuery(null), []);
 
   const registerPulse = useCallback((momentId: string) => {
     const now = Date.now();
@@ -152,15 +156,20 @@ export default function MomentsApp({
 
   return (
     <div className="stage">
-      <Mosaic
+      <Galaxy
         moments={moments}
         pulses={pulses}
-        motion={tuning.motion}
-        liveCount={tuning.live}
+        query={query}
+        active={entered}
         soundOn={tuning.volume > 0}
-        soundLive={soundArmed && tuning.volume > 0}
         onSelect={(m) => setSelectedId(m.id)}
       />
+
+      {themeFlash && (
+        <div className="galaxy-theme" key={themeFlash.key}>
+          {themeFlash.e}
+        </div>
+      )}
 
       <header className="hud">
         <div className="hud-brand">
@@ -169,7 +178,7 @@ export default function MomentsApp({
             É M<em>OO</em>MENTS <em>100</em>
           </h1>
           <div className="hud-hint">
-            心を震わせた100の瞬間。気になったモーメントに触れて、投票しよう。
+            感情でつながる100の瞬間。言葉で組み替え、心が動いた瞬間に投票しよう。
           </div>
         </div>
         <div className="hud-right">
@@ -178,6 +187,15 @@ export default function MomentsApp({
         </div>
       </header>
 
+      {vortexDone && (
+        <QueryBar
+          active={query?.text ?? null}
+          theme={query?.primary ?? null}
+          onQuery={applyQuery}
+          onReset={resetQuery}
+        />
+      )}
+
       <Tuner
         tuning={tuning}
         open={tunerOpen}
@@ -185,32 +203,24 @@ export default function MomentsApp({
         onChange={updateTuning}
       />
 
-      {!entered && (
-        <div className={`entry-gate${gateLeaving ? " leaving" : ""}`}>
-          <div className="entry-inner">
-            <div className="entry-kicker">DAZN AWARDS 2026 — FAN VOTE</div>
-            <h1 className="entry-title">
-              É M<em>OO</em>MENTS <em>100</em>
-            </h1>
-            <p className="entry-copy">
-              心を震わせた100の瞬間が、投票で大きく育っていく。
-              <br />
-              触れれば、その瞬間の歓声が聞こえてくる。
-            </p>
-            <button className="entry-button" onClick={enter}>
-              入場する
-            </button>
-            <div className="entry-note">🔊 サウンドが流れます</div>
-          </div>
-        </div>
+      {!vortexDone && (
+        <Vortex
+          moments={moments}
+          onEnter={() => setVortexDone(true)}
+        />
+      )}
+      {/* 「入場する」押下を渦のバースト開始と同時に受け取る */}
+      {!entered && !vortexDone && (
+        <EnterWatcher onEnter={enter} />
       )}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev film1</div>
+      <div className="rev-tag">rev galaxy1</div>
 
       {selected && (
         <DetailOverlay
           moment={selected}
+          query={query?.text}
           onClose={() => setSelectedId(null)}
           onVoted={handleVoted}
         />
@@ -221,4 +231,17 @@ export default function MomentsApp({
       )}
     </div>
   );
+}
+
+// Vortex内の「入場する」クリックを捕捉して、渦のバーストと同時に宇宙のリビールを始める
+function EnterWatcher({ onEnter }: { onEnter: () => void }) {
+  useEffect(() => {
+    const h = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t.closest(".entry-button")) onEnter();
+    };
+    document.addEventListener("click", h, true);
+    return () => document.removeEventListener("click", h, true);
+  }, [onEnter]);
+  return null;
 }

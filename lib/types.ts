@@ -58,4 +58,5 @@ export interface VoteResponse {
   cuts: ArcCut[]; // 感情の弧として編集されたカット表（頂点=投票先を含む）
   emotion: Emotion;
   comment: MomentComment;
+  query?: string; // 宇宙を組み替えるのに使った言葉（フィルムのテーマに反映）
 }

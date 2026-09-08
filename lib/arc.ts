@@ -44,15 +44,19 @@ const CUT_MS: Record<ArcCut["role"], number> = {
 export function buildArc(
   moments: Moment[],
   votedId: string,
-  commentEmotion: Emotion
+  commentEmotion: Emotion,
+  queryVec?: number[] | null
 ): ArcCut[] {
   const voted = moments.find((m) => m.id === votedId);
   if (!voted) return [];
 
-  // テーマベクトル: 投票先の感情 65% + コメントの感情 35%
-  const theme = vecOf(voted).slice();
+  // テーマベクトル: 投票先の感情 + 宇宙を組み替えた言葉 + コメントの感情
+  const theme = vecOf(voted).map((x) => x * 0.6);
+  if (queryVec && queryVec.length === theme.length) {
+    for (let i = 0; i < theme.length; i++) theme[i] += queryVec[i] * 0.6;
+  }
   const ci = EMOTIONS.indexOf(commentEmotion);
-  if (ci >= 0) theme[ci] = Math.min(1.2, theme[ci] * 0.65 + 0.55);
+  if (ci >= 0) theme[ci] = Math.min(1.4, theme[ci] + 0.45);
 
   const scored = moments
     .filter((m) => m.id !== votedId)

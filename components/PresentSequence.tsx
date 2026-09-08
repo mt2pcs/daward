@@ -39,10 +39,13 @@ export default function PresentSequence({
   const [typedCount, setTypedCount] = useState(0);
   const [run, setRun] = useState(0); // 「もう一度再生」用
 
+  // タイプライターに出す言葉: コメント > 宇宙を組み替えた言葉 > 定型
   const text = useMemo(() => {
     const t = data.comment.text.trim();
-    return t.length > 0 ? `“${t}”` : FALLBACK_TEXT;
-  }, [data.comment.text]);
+    if (t.length > 0) return `“${t}”`;
+    if (data.query) return `“${data.query}”`;
+    return FALLBACK_TEXT;
+  }, [data.comment.text, data.query]);
 
   const cuts = useMemo<ArcCut[]>(
     () => (data.cuts && data.cuts.length > 0 ? data.cuts : []),
@@ -138,6 +141,7 @@ export default function PresentSequence({
             <div className="present-center film-card">
               <div className="theme-kanji">{data.emotion}</div>
               <div className="film-copy">
+                {data.query ? `“${data.query}”——` : ""}
                 その言葉と同じ震えを、100の瞬間から。
               </div>
             </div>

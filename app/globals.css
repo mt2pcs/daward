@@ -1287,3 +1287,212 @@ textarea {
     font-size: 11px;
   }
 }
+
+/* ---------- 感情の宇宙（Galaxy） ---------- */
+.galaxy {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #050505;
+}
+.galaxy canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+.galaxy-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.galaxy-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: clamp(22px, 4.2vmin, 40px);
+  font-weight: 900;
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 24px currentColor, 0 2px 20px rgba(0, 0, 0, 0.8);
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  will-change: transform;
+  white-space: nowrap;
+}
+.galaxy-hover {
+  position: absolute;
+  left: 50%;
+  top: 14vh;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(10, 10, 12, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  font-size: 12.5px;
+  font-weight: 700;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 90vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: fade-in 0.25s ease;
+}
+/* 言葉で組み替えた瞬間、テーマの一文字が中央に立つ */
+.galaxy-theme {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 15;
+  font-size: clamp(90px, 26vmin, 220px);
+  font-weight: 900;
+  color: var(--yellow);
+  text-shadow: 0 0 60px rgba(235, 255, 0, 0.35);
+  animation: theme-pop 2.2s ease forwards;
+}
+@keyframes theme-pop {
+  0% { opacity: 0; transform: scale(0.7); }
+  18% { opacity: 1; transform: scale(1); }
+  70% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1.12); }
+}
+
+/* ---------- 言葉の入力（QueryBar） ---------- */
+.query-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 25;
+  width: min(92vw, 640px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+.query-form {
+  display: flex;
+  width: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 10, 12, 0.78);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.query-input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 20px;
+  background: transparent;
+  border: 0;
+  color: var(--fg);
+  font-size: 15px;
+  outline: none;
+}
+.query-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+.query-submit {
+  padding: 0 22px;
+  border: 0;
+  background: var(--yellow);
+  color: #0a0a0c;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.query-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.query-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(10, 10, 12, 0.6);
+  color: var(--dim);
+  font-size: 11.5px;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.query-chip:hover {
+  color: var(--yellow);
+  border-color: rgba(235, 255, 0, 0.5);
+}
+.query-active {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 999px;
+  background: rgba(10, 10, 12, 0.6);
+  border: 1px solid rgba(235, 255, 0, 0.35);
+  font-size: 12.5px;
+}
+.query-theme {
+  color: var(--yellow);
+  font-weight: 900;
+}
+.query-text {
+  color: var(--fg);
+  max-width: 50vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.query-reset {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: transparent;
+  color: var(--dim);
+  font-size: 11px;
+}
+.query-reset:hover {
+  color: var(--fg);
+}
+.query-miss {
+  font-size: 11px;
+  color: var(--dim);
+}
+
+/* ---------- 熱狂の渦（Vortex エントランス） ---------- */
+.vortex {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: #050505;
+  transition: opacity 0.6s ease 0.6s;
+}
+.vortex.leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+.vortex-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.vortex-ui {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 24px 16vh; /* 渦の核（中心）がコピーに被らないよう上へ寄せる */
+  animation: rise-in 0.8s ease;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.8);
+}
+.vortex.leaving .vortex-ui {
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}

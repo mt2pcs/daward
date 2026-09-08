@@ -10,10 +10,12 @@ import type {
 
 export default function DetailOverlay({
   moment,
+  query,
   onClose,
   onVoted,
 }: {
   moment: MomentWithStats;
+  query?: string; // 宇宙を組み替えるのに使った言葉（フィルムのテーマへ）
   onClose: () => void;
   onVoted: (res: VoteResponse) => void;
 }) {
@@ -53,7 +55,7 @@ export default function DetailOverlay({
       const r = await fetch("/api/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ momentId: moment.id, comment: text, author }),
+        body: JSON.stringify({ momentId: moment.id, comment: text, author, query }),
       });
       if (!r.ok) throw new Error(`vote failed: ${r.status}`);
       const res: VoteResponse = await r.json();
