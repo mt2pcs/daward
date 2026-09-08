@@ -1,47 +1,42 @@
 "use client";
 
 import { useState } from "react";
-import type { Emotion } from "@/lib/types";
+import type { Interpretation } from "@/lib/interpret";
 
-// 言葉で宇宙を組み替える入力。体験の核なので常に画面下に居る
-const SUGGESTIONS = [
-  "めちゃくちゃ泣ける",
-  "鳥肌が止まらない",
-  "最後まで諦めない",
-  "日本中がひとつになった",
-  "最後の花道",
-];
+// 言葉で渦を組み替える入力。体験の核なので常に画面下に居る
+const SUGGESTIONS = ["ベテランの熱量", "めちゃくちゃ泣ける", "日本中が沸いた夜", "土壇場の一撃", "若き才能の覚醒"];
 
 export default function QueryBar({
   active,
-  theme,
+  busy,
   onQuery,
   onReset,
 }: {
-  active: string | null; // 適用中の言葉
-  theme: Emotion | null;
-  onQuery: (text: string) => boolean; // false=解釈できなかった
+  active: Interpretation | null; // 適用中の言葉（初期状態は null）
+  busy: boolean; // 解釈中
+  onQuery: (text: string) => Promise<boolean>; // false=解釈できなかった
   onReset: () => void;
 }) {
   const [text, setText] = useState("");
   const [miss, setMiss] = useState(false);
 
-  const submit = (t: string) => {
+  const submit = async (t: string) => {
     const v = t.trim();
-    if (!v) return;
-    const ok = onQuery(v);
+    if (!v || busy) return;
+    setMiss(false);
+    const ok = await onQuery(v);
     setMiss(!ok);
     if (ok) setText("");
   };
 
   return (
-    <div className="query-bar">
+    <div className={`query-bar${busy ? " busy" : ""}`}>
       {active ? (
         <div className="query-active">
-          <span className="query-theme">#{theme}</span>
-          <span className="query-text">“{active}”</span>
+          <span className="query-theme">#{active.theme}</span>
+          <span className="query-text">“{active.text}”</span>
           <button className="query-reset" onClick={onReset}>
-            地図に戻る
+            元の渦に戻る
           </button>
         </div>
       ) : (
@@ -69,14 +64,13 @@ export default function QueryBar({
           }}
           placeholder="いま、どんな熱狂を観たい？"
           maxLength={60}
+          disabled={busy}
         />
-        <button className="query-submit" type="submit">
-          組み替える
+        <button className="query-submit" type="submit" disabled={busy}>
+          {busy ? "渦を読んでいます…" : "渦を組み替える"}
         </button>
       </form>
-      {miss && (
-        <div className="query-miss">その言葉の感情はまだ読み取れませんでした。別の言い方で試してください</div>
-      )}
+      {miss && <div className="query-miss">その言葉に合う瞬間が見つかりませんでした。別の言い方で試してください</div>}
     </div>
   );
 }

@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Emotion, MomentWithStats, VoteResponse } from "@/lib/types";
+import type { MomentWithStats, VoteResponse } from "@/lib/types";
 import { getCrowd } from "@/lib/crowd";
-import { textToVector } from "@/lib/emotionSpace";
-import Galaxy, { type GalaxyQuery } from "./Galaxy";
+import { defaultDictionary, type Interpretation } from "@/lib/interpret";
+import VortexSpace, { type Phase } from "./VortexSpace";
+import Entrance from "./Entrance";
 import QueryBar from "./QueryBar";
-import Vortex from "./Vortex";
 import DetailOverlay from "./DetailOverlay";
 import PresentSequence from "./PresentSequence";
 import Tuner, {
@@ -17,8 +17,9 @@ import Tuner, {
 } from "./Tuner";
 
 // 体験の骨格:
-//   熱狂の渦（エントランス）→ 感情の宇宙（8つの星団に100の瞬間）
-//   → 言葉で宇宙を組み替える → 瞬間に触れて投票 → あなたの言葉から編んだフィルム
+//   熱狂の渦（100本のサムネイルが捻れて渦になる）→ 入場で渦の中へ
+//   → 100の映像カードが渦を公転（腕はAIが命名）→ 言葉で渦が組み替わる（AIが腕を作り直す）
+//   → カードに触れて投票 → あなたの言葉から編んだフィルム
 export default function MomentsApp({
   initialMoments,
 }: {
@@ -42,12 +43,13 @@ export default function MomentsApp({
   );
   const selected = moments.find((m) => m.id === selectedId) ?? null;
 
-  // エントランス（熱狂の渦）: 「入場する」の1クリックが音の解錠を兼ねる
-  const [entered, setEntered] = useState(false);
-  const [vortexDone, setVortexDone] = useState(false);
+  // エントランス: 「入場する」の1クリックが音の解錠を兼ねる
+  const [phase, setPhase] = useState<Phase>("entry");
+  const [leaving, setLeaving] = useState(false);
   const enter = useCallback(() => {
     getCrowd().start();
-    setEntered(true); // 渦が弾け始めた時点で宇宙のリビールを開始
+    setLeaving(true);
+    setPhase("space");
   }, []);
 
   // 保険: どの操作でも歓声エンジンを起動できるようにする
@@ -73,18 +75,46 @@ export default function MomentsApp({
     if (t.volume > 0) getCrowd().start();
   }, []);
 
-  // 言葉で宇宙を組み替える
-  const [query, setQuery] = useState<(GalaxyQuery & { text: string; primary: Emotion }) | null>(null);
-  const [themeFlash, setThemeFlash] = useState<{ e: Emotion; key: number } | null>(null);
-  const applyQuery = useCallback((text: string) => {
-    const r = textToVector(text);
-    if (!r) return false;
-    setQuery({ vec: r.vec, label: text, text, primary: r.primary });
-    setThemeFlash({ e: r.primary, key: Date.now() });
-    getCrowd().swell(0.6);
-    return true;
+  // 渦の腕: 初期状態はAIが映像データから生成（届くまでは感情ベースの暫定）
+  const [baseArms, setBaseArms] = useState<Interpretation>(() => defaultDictionary(initialMoments));
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/arms")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: Interpretation | null) => {
+        if (alive && d && d.arms?.length) setBaseArms(d);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 言葉で渦を組み替える（LLMが腕を作り直す）
+  const [query, setQuery] = useState<Interpretation | null>(null);
+  const [busy, setBusy] = useState(false);
+  const applyQuery = useCallback(async (text: string) => {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/interpret", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!r.ok) return false;
+      const d: Interpretation = await r.json();
+      if (!d.arms?.length) return false;
+      setQuery(d);
+      getCrowd().swell(0.7);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setBusy(false);
+    }
   }, []);
   const resetQuery = useCallback(() => setQuery(null), []);
+  const arms = query ?? baseArms;
 
   const registerPulse = useCallback((momentId: string) => {
     const now = Date.now();
@@ -156,29 +186,24 @@ export default function MomentsApp({
 
   return (
     <div className="stage">
-      <Galaxy
+      <VortexSpace
         moments={moments}
+        arms={arms}
         pulses={pulses}
-        query={query}
-        active={entered}
+        phase={phase}
+        focusId={selectedId}
         soundOn={tuning.volume > 0}
         onSelect={(m) => setSelectedId(m.id)}
       />
 
-      {themeFlash && (
-        <div className="galaxy-theme" key={themeFlash.key}>
-          {themeFlash.e}
-        </div>
-      )}
-
-      <header className="hud">
+      <header className={`hud${phase === "entry" ? " hidden-hud" : ""}`}>
         <div className="hud-brand">
           <div className="hud-kicker">DAZN AWARDS 2026 — FAN VOTE</div>
           <h1>
             É M<em>OO</em>MENTS <em>100</em>
           </h1>
           <div className="hud-hint">
-            感情でつながる100の瞬間。言葉で組み替え、心が動いた瞬間に投票しよう。
+            100の瞬間が渦を巻く。言葉で渦を組み替え、心が動いた瞬間に投票しよう。
           </div>
         </div>
         <div className="hud-right">
@@ -187,13 +212,8 @@ export default function MomentsApp({
         </div>
       </header>
 
-      {vortexDone && (
-        <QueryBar
-          active={query?.text ?? null}
-          theme={query?.primary ?? null}
-          onQuery={applyQuery}
-          onReset={resetQuery}
-        />
+      {phase === "space" && (
+        <QueryBar active={query} busy={busy} onQuery={applyQuery} onReset={resetQuery} />
       )}
 
       <Tuner
@@ -203,24 +223,17 @@ export default function MomentsApp({
         onChange={updateTuning}
       />
 
-      {!vortexDone && (
-        <Vortex
-          moments={moments}
-          onEnter={() => setVortexDone(true)}
-        />
-      )}
-      {/* 「入場する」押下を渦のバースト開始と同時に受け取る */}
-      {!entered && !vortexDone && (
-        <EnterWatcher onEnter={enter} />
-      )}
+      {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} /> : null}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev galaxy2</div>
+      <div className="rev-tag">rev vortex1</div>
 
       {selected && (
         <DetailOverlay
           moment={selected}
           query={query?.text}
+          queryVec={query?.vec}
+          queryPrimary={query?.primary}
           onClose={() => setSelectedId(null)}
           onVoted={handleVoted}
         />
@@ -231,17 +244,4 @@ export default function MomentsApp({
       )}
     </div>
   );
-}
-
-// Vortex内の「入場する」クリックを捕捉して、渦のバーストと同時に宇宙のリビールを始める
-function EnterWatcher({ onEnter }: { onEnter: () => void }) {
-  useEffect(() => {
-    const h = (e: Event) => {
-      const t = e.target as HTMLElement | null;
-      if (t && t.closest(".entry-button")) onEnter();
-    };
-    document.addEventListener("click", h, true);
-    return () => document.removeEventListener("click", h, true);
-  }, [onEnter]);
-  return null;
 }

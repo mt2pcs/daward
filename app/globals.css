@@ -1514,3 +1514,217 @@ textarea {
   opacity: 0;
   transition: opacity 0.35s ease;
 }
+
+/* ===== 熱狂の渦（vortex1）: 背景の渦 + CSS3Dのカード ===== */
+.vs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #050506;
+  cursor: grab;
+  touch-action: none;
+}
+.vs:active {
+  cursor: grabbing;
+}
+.vs-gl,
+.vs-css {
+  position: absolute !important;
+  inset: 0;
+}
+.vs-css {
+  pointer-events: none;
+}
+.vs-css > div {
+  pointer-events: none;
+}
+.vcard {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #101014;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55), 0 0 0 1.5px rgba(255, 255, 255, 0.08);
+  pointer-events: auto;
+  cursor: pointer;
+  transition: box-shadow 0.35s ease;
+  will-change: transform, opacity;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.vcard::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 2px var(--c, #fff);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.vcard.hovered::after,
+.vcard.sonic::after {
+  opacity: 0.9;
+}
+.vcard.hovered {
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.7), 0 0 60px rgba(255, 255, 255, 0.12);
+}
+.vcard-media {
+  position: absolute;
+  inset: 0;
+}
+.vcard-media {
+  background: linear-gradient(135deg, #2a2a33, #0e0e12);
+}
+.vcard-media img,
+.vcard-media iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border: 0;
+  pointer-events: none;
+}
+.vcard-media iframe {
+  transform: scale(1.35); /* YouTubeの黒帯・UIを外へ */
+}
+.vcard-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0) 50%);
+  pointer-events: none;
+}
+.vcard-title {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.vcard-votes {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: rgba(8, 8, 10, 0.75);
+  border: 1px solid rgba(235, 255, 0, 0.55);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.vcard.hovered .vcard-votes,
+.vcard.pulse .vcard-votes {
+  opacity: 1;
+}
+.vcard.pulse {
+  animation: vcard-pulse 1.2s ease-out;
+}
+@keyframes vcard-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(235, 255, 0, 0.9), 0 30px 60px rgba(0, 0, 0, 0.55); }
+  100% { box-shadow: 0 0 0 40px rgba(235, 255, 0, 0), 0 30px 60px rgba(0, 0, 0, 0.55); }
+}
+.vlabel {
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.8s ease;
+}
+.vlabel span {
+  display: inline-block;
+  padding: 0 4px 6px;
+  font-size: 44px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: #fff;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.8);
+  border-bottom: 5px solid var(--c, #fff);
+}
+
+/* エントランスの文字（背景の渦は VortexSpace） */
+.entrance {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  padding: 0 7vw;
+  pointer-events: none;
+  transition: opacity 0.9s ease;
+}
+.entrance.leaving {
+  opacity: 0;
+}
+.entrance-ui {
+  pointer-events: auto;
+  max-width: 720px;
+  animation: rise-in 0.8s ease;
+}
+.entrance .entry-title {
+  font-size: clamp(38px, 5.6vw, 84px);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-shadow: 0 6px 40px rgba(0, 0, 0, 0.8);
+}
+.entrance .entry-copy {
+  font-size: clamp(15px, 1.6vw, 22px);
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.9);
+  margin-top: 16px;
+}
+.entrance .entry-button {
+  background: var(--yellow);
+  color: #0a0a0c;
+  border-color: var(--yellow);
+  padding: 16px 60px;
+  font-size: 15px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+.entrance .entry-button:hover {
+  box-shadow: 0 0 44px rgba(235, 255, 0, 0.5);
+}
+.entrance.leaving .entrance-ui {
+  pointer-events: none;
+}
+.hud.hidden-hud {
+  opacity: 0;
+}
+.hud {
+  transition: opacity 0.9s ease;
+}
+.query-bar.busy .query-submit {
+  background: #2a2a2e;
+  color: var(--yellow);
+  animation: busy-glow 1.2s ease-in-out infinite;
+}
+@keyframes busy-glow {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(235, 255, 0, 0.3); }
+  50% { box-shadow: inset 0 0 0 1px rgba(235, 255, 0, 0.9); }
+}
+@media (max-width: 767px) {
+  .entrance {
+    align-items: flex-end;
+    padding: 0 24px 22vh;
+  }
+  .vcard-title {
+    font-size: 17px;
+  }
+  .vlabel span {
+    font-size: 40px;
+  }
+}

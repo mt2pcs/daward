@@ -194,7 +194,16 @@ async function main() {
   const runBase = `https://run.googleapis.com/v2/projects/${PROJECT}/locations/${REGION}/services`;
   const svcBody = {
     template: {
-      containers: [{ image: deployImage, ports: [{ containerPort: 8080 }], resources: { limits: { memory: '512Mi', cpu: '1' } } }],
+      containers: [{
+        image: deployImage,
+        ports: [{ containerPort: 8080 }],
+        resources: { limits: { memory: '512Mi', cpu: '1' } },
+        // 言葉の解釈（/api/interpret）用。セッション環境の OPENAI_API_KEY をそのまま本番サービスの環境変数へ渡す
+        env: [
+          ...(process.env.OPENAI_API_KEY ? [{ name: 'OPENAI_API_KEY', value: process.env.OPENAI_API_KEY }] : []),
+          ...(process.env.OPENAI_MODEL ? [{ name: 'OPENAI_MODEL', value: process.env.OPENAI_MODEL }] : []),
+        ],
+      }],
     },
   };
   let existing = await withApiEnable('run.googleapis.com', () => api('GET', `${runBase}/${SERVICE}`));
