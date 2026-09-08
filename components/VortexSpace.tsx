@@ -814,16 +814,17 @@ export default function VortexSpace({
       c.tro = -26;
       c.mat.depthTest = false;
       c.mesh.renderOrder = 10;
-      // カメラが腕に沿って滑り、そのカードの前（漏斗の内側）で止まる。視線はカードの少し奥＝渦の目の方向
-      const p = c.pos.clone();
-      const axisPt = new THREE.Vector3(0, 0, p.z);
-      const inward = axisPt.sub(p).normalize();
-      // 漏斗の内側（軸寄り）から、そのカードを画面中央やや左下に。背景は壁の帯と渦の目
-      const to = p.clone().add(inward.multiplyScalar(c.size * 2.2)).add(new THREE.Vector3(0, 0, 14));
-      const look = p.clone().lerp(new THREE.Vector3(0, 0, EYE_Z), 0.3).add(new THREE.Vector3(0, -c.size * 0.55, 0)); // カードは左中段、視界の大半は渦の奥
+      // 渦そのものが最短方向に回って、主役を手前下（カメラの側）へ運ぶ。角度は目標値で計算する
+      const thNow = c.tbase + c.ts * TWIST + c.aj + spin + dragSpin;
+      const want = -Math.PI / 2 - 0.35;
+      let d = want - thNow;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      tourSpinTarget = dragSpin + d;
+      // カメラは別のトゥイーンで先回りしない。毎フレーム主役の到着地点を追う（tick の follow）
       camFree = false;
       flyingTo = null;
-      camTween = { from: camera.position.clone(), to, lookFrom: camLook.clone(), lookTo: look, t0: performance.now(), dur: 1500 };
+      camTween = null;
+      spinBoost = 0;
       getCrowd().swell(0.35);
       const arm = currentArms.arms[tour.arm];
       st.onTour?.({ armName: arm.name, color: arm.color, index: tour.idx, total: tour.ids.length, moment: c.m });
@@ -914,6 +915,11 @@ export default function VortexSpace({
     };
     // 検証用: 画面上で最も大きく見えているカードの位置
     (window as unknown as { __vs?: unknown }).__vs = {
+      cam: () => {
+        const sc = tour && tour.idx >= 0 ? cards.get(tour.ids[tour.idx]) : undefined;
+        const th = sc ? sc.tbase + sc.ts * TWIST + sc.aj + spin + dragSpin : null;
+        return { t: performance.now(), cx: camera.position.x, cy: camera.position.y, cz: camera.position.z, lz: camLook.z, sx: sc?.pos.x ?? null, sy: sc?.pos.y ?? null, sz: sc?.pos.z ?? null, idx: tour?.idx ?? -1, th, spin, dragSpin, tourSpinTarget, base: sc?.base ?? null, tbase: sc?.tbase ?? null, ts: sc?.ts ?? null, s: sc?.s ?? null, ro: sc?.ro ?? null };
+      },
       labelAt: (i: number) => {
         const l = labels[i];
         if (!l) return null;
@@ -1094,9 +1100,11 @@ export default function VortexSpace({
         // ツアー中（移動が終わった後）: 主役の現在位置を追い続ける（ドラッグや揺れで外れない）
         const sc = tour.idx >= 0 ? cards.get(tour.ids[tour.idx]) : undefined;
         if (sc) {
-          const pose = tourPose(sc.pos);
-          camera.position.lerp(pose.to, 1 - Math.exp(-dt / 0.55));
-          camLook.lerp(pose.look, 1 - Math.exp(-dt / 0.55));
+          // 主役の「到着地点」を追う（今の位置を追うと、主役が奥から出てくる間カメラも奥へ潜ってしまう＝二段階の動き）
+          posOf(sc.tbase, sc.ts, sc.tro, sc.aj, spin + tourSpinTarget, tmp3);
+          const pose = tourPose(tmp3);
+          camera.position.lerp(pose.to, 1 - Math.exp(-dt / 0.6));
+          camLook.lerp(pose.look, 1 - Math.exp(-dt / 0.6));
         }
       } else if (camFree) {
         if (phaseNow === "entry") {
@@ -1119,9 +1127,10 @@ export default function VortexSpace({
           c.ts -= dt * flow * 0.4;
           if (c.ts < S_MIN) { c.ts += S_MAX - S_MIN; c.s = c.ts; c.size = 1; }
         }
-        c.base = damp(c.base, c.tbase, dt, 1.1);
-        c.s = damp(c.s, c.ts, dt, 1.0);
-        c.ro = damp(c.ro, c.tro + loosen * 16 * (c.inArm ? 1 : 0), dt, 0.9);
+        const tauT = tour && tour.ids.includes(c.id) ? 0.55 : 1.0; // ツアーの腕はカメラと同じ速さでレーンへ
+        c.base = damp(c.base, c.tbase, dt, tour ? 0.6 : 1.1);
+        c.s = damp(c.s, c.ts, dt, tauT);
+        c.ro = damp(c.ro, c.tro + loosen * 16 * (c.inArm ? 1 : 0), dt, tauT);
         const hovered = hoverId === c.id;
         const sizeS = c.inArm ? 1.55 - 0.8 * Math.max(0, Math.min(1, c.s)) : 1;
         c.size = damp(c.size, c.tsize * sizeS * (hovered ? 1.2 : 1) * (c.stage ? 1.4 : 1), dt, 0.25);
@@ -1159,7 +1168,7 @@ export default function VortexSpace({
         }
         l.mesh.position.copy(l.pos);
         l.mesh.lookAt(cam); // ラベルは常に読める向き
-        const hide = phaseNow === "entry" || (pendingNow !== null && l.centerAt < 0) || !born;
+        const hide = phaseNow === "entry" || (pendingNow !== null && l.centerAt < 0) || !born || (tour !== null && l.arm === tour.arm); // ツアー中の腕の名前は見出しに出す（壁の帯は手前に来て巨大化するので消す）
         l.mat.opacity = damp(l.mat.opacity, hide ? 0 : 0.98, dt, hide ? 0.4 : 0.25);
       }
       const dirtyNow = tour !== null || Math.abs(dragSpin) > 0.12 || Math.abs(dollyTarget - 30) > 3 || (!camFree && !flyingTo && !camTween);
