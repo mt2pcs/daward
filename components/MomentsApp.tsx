@@ -243,6 +243,7 @@ export default function MomentsApp({
         <div className="hud-right">
           <div className="hud-total">{totalVotes.toLocaleString()}</div>
           <div className="hud-total-label">TOTAL VOTES</div>
+          <a className="hud-graph-link" href="/graph">CONTEXT GRAPH ↗</a>
         </div>
       </header>
 
@@ -260,7 +261,7 @@ export default function MomentsApp({
       {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} /> : null}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev vortex5</div>
+      <div className="rev-tag">rev graph1</div>
 
       {selected && (
         <DetailOverlay

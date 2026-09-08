@@ -288,6 +288,25 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
   距離 32/40）。旧実装は 1440×900 でも主役が右下で入力欄に重なっていた。
 - 検証: `scratchpad/dive_test.mjs`（`?dive=26000` で吸い込みを26秒に引き伸ばし、1100×690、スクショ約1.6秒間隔）→ `dive_sheet3.png`。
 
+### CONTEXT GRAPH（/graph・graph1・2026-09-08）— 「裏側ですごい処理が行われている感」を見せる別ページ
+
+ユーザー要望: 体験はシームレスだがユニークさが伝わらない。ハイライトの文脈が分解された様を Obsidian のグラフビューばりのUIで見せたい
+（張りぼてで良い）。
+
+- データ: `scripts/gen_context.mjs`（gpt-5.4-mini、10本ずつ）で `data/context.json` を生成。各瞬間 → people / teams / competition /
+  motifs（一般語のモチーフ、183種。土壇場×20 王者の証明×20 記録更新×16 など共有語がハブになる）/ beats（起転結）/ why / crowd。
+  再生成: `NODE_USE_ENV_PROXY=1 node scripts/gen_context.mjs`。
+- `lib/contextGraph.ts` がノード（瞬間・人物・チーム・大会・モチーフ・感情・競技 = 533）とリンク（1,202。瞬間↔属性＋感情ベクトルの
+  cos類似 上位2）を構築。`components/ContextGraph.tsx` は Canvas 2D の自前力学（全対反発 O(n²)・リンクばね・弱い中心引力・
+  d3 と同じ alpha 冷却）。**毛玉にならない勘所**: 反発は長距離まで（cutoff 900）、中心引力は弱く、次数1の衛星はリンクを短く強く
+  してハブに寄り添わせる。短距離反発＋強い中心引力だと均一な球になる。
+- UI: 左に Obsidian と同じ「フィルター / 表示 / 力」パネル（検索、種類ごとのON/OFF、ノード・リンク・テキストしきい値、
+  中心引力・反発・リンク強さ・距離）。ホバーで隣接だけ光り他は沈む。クリックで右にインスペクタ（サムネ、抽出エンティティ、
+  モチーフ、感情8軸バー、物語の弧、なぜ心が動くか、場内、感情が近い瞬間、タイプする処理ログ）。起動時に CONTEXT ENGINE のログ
+  （実件数）を流してからグラフが中心から開き、操作するまで自動フィット。下部にステータス（nodes/links/layout%/fps/pipeline）。
+- 本体HUDの TOTAL VOTES 下に「CONTEXT GRAPH ↗」、グラフ側に「← 渦へ戻る」。
+- 検証: `scratchpad/graph_test.mjs` / `graph_quick.mjs`（WebGL不要なので速い）→ `graph_sheet.png`, `graph_overview.png`。
+
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）
 
 - 「後で確認する」と言うときは、必ず send_later 等で実際にスケジュールする。できない場合は「できない」と言う。
