@@ -17,6 +17,7 @@ export default function Entrance({ leaving, onEnter }: { leaving: boolean; onEnt
           渦に入る
         </button>
         <div className="entry-note">🔊 サウンドが流れます</div>
+        <a className="entry-graph-link" href="/graph">CONTEXT GRAPH ↗ <small>裏側の仕組みを見る</small></a>
       </div>
     </div>
   );
