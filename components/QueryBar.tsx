@@ -3,27 +3,26 @@
 import { useState } from "react";
 import type { Interpretation } from "@/lib/interpret";
 
-// 言葉で渦を組み替える入力。体験の核なので常に画面下に居る。
-// 「戻る」は無い: 次の言葉を入れれば渦はまた組み替わる。提案の言葉はAIが直前の特集から出す
+// 言葉で渦を組み替える入力。提案の言葉は入力欄に入るだけで、送信は「渦を組み替える」で行う（押した瞬間から演出が始まる）
 export default function QueryBar({
   current,
   busy,
   onQuery,
 }: {
-  current: Interpretation | null; // いま渦を作っている解釈（初期状態は text=""）
-  busy: boolean; // 解釈中
-  onQuery: (text: string) => Promise<boolean>; // false=解釈できなかった
+  current: Interpretation | null;
+  busy: boolean;
+  onQuery: (text: string) => Promise<boolean>;
 }) {
   const [text, setText] = useState("");
   const [miss, setMiss] = useState(false);
 
-  const submit = async (t: string) => {
-    const v = t.trim();
+  const submit = async () => {
+    const v = text.trim();
     if (!v || busy) return;
     setMiss(false);
-    setText("");
     const ok = await onQuery(v);
     setMiss(!ok);
+    if (ok) setText("");
   };
   const suggestions = current?.next ?? ["ベテランの熱量", "めちゃくちゃ泣ける", "土壇場の一撃"];
 
@@ -36,7 +35,7 @@ export default function QueryBar({
           </span>
         ) : null}
         {suggestions.map((s) => (
-          <button key={s} className="query-chip" onClick={() => submit(s)} disabled={busy}>
+          <button key={s} className={`query-chip${text === s ? " picked" : ""}`} onClick={() => { setText(s); setMiss(false); }} disabled={busy}>
             {s}
           </button>
         ))}
@@ -45,7 +44,7 @@ export default function QueryBar({
         className="query-form"
         onSubmit={(e) => {
           e.preventDefault();
-          submit(text);
+          submit();
         }}
       >
         <input
@@ -59,7 +58,7 @@ export default function QueryBar({
           maxLength={60}
           disabled={busy}
         />
-        <button className="query-submit" type="submit" disabled={busy}>
+        <button className="query-submit" type="submit" disabled={busy || !text.trim()}>
           {busy ? "渦が動いています" : "渦を組み替える"}
         </button>
       </form>

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MomentWithStats, VoteResponse } from "@/lib/types";
 import { getCrowd } from "@/lib/crowd";
 import { defaultDictionary, type Interpretation } from "@/lib/interpret";
-import VortexSpace, { type Phase } from "./VortexSpace";
+import VortexSpace, { type Phase, type TourState, type VortexApi } from "./VortexSpace";
 import Entrance from "./Entrance";
 import QueryBar from "./QueryBar";
 import DetailOverlay from "./DetailOverlay";
@@ -30,6 +30,9 @@ export default function MomentsApp({
   const [present, setPresent] = useState<VoteResponse | null>(null);
   const [pulses, setPulses] = useState<Record<string, number>>({});
   const [hoverTitle, setHoverTitle] = useState<string | null>(null);
+  const [tour, setTour] = useState<TourState | null>(null);
+  const [viewDirty, setViewDirty] = useState(false);
+  const vortexApi = useRef<VortexApi | null>(null);
   const [tuning, setTuning] = useState<Tuning>(DEFAULT_TUNING);
   const [tunerOpen, setTunerOpen] = useState(false);
   const activityRef = useRef(0);
@@ -196,8 +199,33 @@ export default function MomentsApp({
         soundOn={tuning.volume > 0}
         onSelect={(m) => setSelectedId(m.id)}
         onHover={(m) => setHoverTitle(m ? `${m.title} ・ 🔥${m.votes.toLocaleString()}` : null)}
+        onTour={setTour}
+        onViewDirty={setViewDirty}
+        api={vortexApi}
       />
-      {hoverTitle && !selected && <div className="vs-hover">{hoverTitle}</div>}
+      {hoverTitle && !selected && !tour && <div className="vs-hover">{hoverTitle}</div>}
+
+      {/* 腕のツアー: ラベルをタップすると、その腕の映像を順に見せる */}
+      {tour && !selected && (
+        <div className="tour" style={{ ["--c" as string]: tour.color }}>
+          <div className="tour-head">
+            <span className="tour-arm">{tour.armName}</span>
+            <span className="tour-count">{tour.index + 1} / {tour.total}</span>
+            <button className="tour-close" onClick={() => vortexApi.current?.endTour()} aria-label="ツアーを終える">×</button>
+          </div>
+          <div className="tour-title">{tour.moment.title}</div>
+          <div className="tour-meta">{tour.moment.event} ・ 🔥{tour.moment.votes.toLocaleString()}</div>
+          <div className="tour-actions">
+            <button className="tour-btn" onClick={() => vortexApi.current?.tourPrev()}>‹ 前へ</button>
+            <button className="tour-btn primary" onClick={() => setSelectedId(tour.moment.id)}>この瞬間を観て投票</button>
+            <button className="tour-btn" onClick={() => vortexApi.current?.tourNext()}>次へ ›</button>
+          </div>
+          <div className="tour-hint">← → キー / スワイプで移動、何もない所をタップで次へ</div>
+        </div>
+      )}
+      {viewDirty && !tour && !selected && phase === "space" && (
+        <button className="view-reset" onClick={() => vortexApi.current?.resetView()}>⟲ 視点を戻す</button>
+      )}
 
       <header className={`hud${phase === "entry" ? " hidden-hud" : ""}`}>
         <div className="hud-brand">
@@ -229,7 +257,7 @@ export default function MomentsApp({
       {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} /> : null}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev vortex3</div>
+      <div className="rev-tag">rev vortex4</div>
 
       {selected && (
         <DetailOverlay
