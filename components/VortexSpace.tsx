@@ -1061,7 +1061,7 @@ export default function VortexSpace({
         c.dim = damp(c.dim, phaseNow === "entry" ? 0 : c.tdim, dt, 0.6);
         if (c.stage) {
           // 舞台: カメラの少し前、視線のやや下に正対して浮かぶ
-          tmp2.set(0, portrait() ? 4 : 3.5, -24).applyQuaternion(camera.quaternion).add(cam);
+          tmp2.set(0, portrait() ? 5 : 3.5, portrait() ? -30 : -24).applyQuaternion(camera.quaternion).add(cam);
           c.pos.lerp(tmp2, 1 - Math.exp(-dt / 0.35));
           c.size = damp(c.size, portrait() ? 15 : 17, dt, 0.3);
           c.mesh.position.copy(c.pos);
