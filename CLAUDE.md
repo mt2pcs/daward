@@ -132,6 +132,42 @@ galaxy1 は「点がばらまかれただけ」で塊が読めなかった。全
 - 検証: `scratchpad/galaxy_test.mjs`（Playwright + swiftshader、`/api/thumb/**` をモックJPGで代替、
   PC 1440×900 / スマホ 390×844 の両方で 渦→地図→言葉 の各段階を撮る）。
 
+## 体験の再定義: 渦そのものがインターフェース（vortex1・2026-09-08）
+
+galaxy2 に対するユーザー判定:「よりチープ。入口の渦が安っぽい（ウルトラマンOPの墨流しのようなリアルな表現を期待）。
+入った後は宇宙風でコンテンツが見えない。自由入力に対応していない。分類（感情8種）が凡庸で楽しくない。UIが平面的で3Dの動きが
+サンプル（D-NEW-DAY: 3D空間をカメラが飛び、入力で目的地へ突っ込む）と違う。『ベテランの熱量』と入れたら渦が動いて全分類が
+再構築される体験を設計すべき」。→ 以下に全面転換した。
+
+**制作プロセス（ユーザー指示・恒常）**: 実装前に gpt-image-2（OPENAI_API_KEY は環境「main」に有り）でUI画像を生成し、
+自分でループを回して要求水準に達したものをリファレンスにしてコーディングする。生成スクリプト: `scratchpad/gen.mjs`
+（`NODE_USE_ENV_PROXY=1 node gen.mjs out.png 1536x1024 prompt.txt [ref.png...]`。Nodeのfetchはプロキシに乗せるため
+NODE_USE_ENV_PROXY=1 が必須）。採用リファレンス: 入場=写真が渦に捻れる（gen/entry1.png, entry_mid1.png）、
+メイン=渦の中をカメラが飛び、腕にAIの名前（gen/vmain1.png）、入力後=腕が作り直される（gen/vquery1.png）。
+「感情8分類の島を並べる案（gen/main1.png）」は「分類して並べただけ・2000年代のサイト」として却下。
+
+**実装（rev vortex1）**
+- `lib/vortexShader.ts`: 画面全体のフラグメントシェーダー。入場時は100本のサムネイルのモザイク（アトラス8×5）を
+  中心集中の捻り（f=exp(-(r/core)^4)、core=0.56）で渦にする。10秒かけて twist 0→9.5（e^2.4 のゆっくり立ち上がり）。
+  角度方向のぼかし＋fbmのゆらぎ（墨流し）＋ロゴパレットの帯と細い流線。入場後は uPhoto→0 で写真が溶け、色の帯だけ残る。
+  角度の継ぎ目（±π）はノイズ入力を cos/sin にし、帯の色は mod 3 で畳んで消した。
+  **rAFの最初のタイムスタンプは performance.now() より前のことがあり、t<0 で Math.pow が NaN → 全部黒になった**。t は max(0,·)。
+- `components/VortexSpace.tsx`: WebGL（背景シェーダー＋腕ごとの平たいリボン7本、加算合成）と CSS3DRenderer（100枚の
+  映像カード＝DOM、img/iframe/タイトル/🔥票数）が同じ PerspectiveCamera を共有。カードは円筒座標（θ, r, z）で漏斗状に配置
+  （R_NEAR 52 → R_FAR 14、DEPTH 120、TWIST 2.5）、腕ごとに θ の基点。近いほど大きく、目に向かって小さく。
+  組み替え時は円筒座標で減衰追従（τ0.95s）＋ θ を −0.9π ずらして渦を巻きながら移動、カメラが z=20 まで飛び込んで戻る。
+  ドラッグで回転、ホイールで奥行き、ホバーで歓声（既存エンジン）、クリックでカメラがカードへ寄って詳細。
+  ライブ再生はカメラに近い4枚（PCのみ）。縦画面は fov 74。
+- `lib/interpret.ts` + `/api/arms` + `/api/interpret`: 腕（クラスタ）はLLMが命名・割当。既定モデル gpt-5.4-mini
+  （gpt-4.1-mini は名前が凡庸、gpt-4.1 は長い。5.4-mini が「最後の花道」「老いてなお速い」など最も短く強い。約3秒/クエリ）。
+  初期状態も映像データから生成（サーバーでキャッシュ、初回のみ約8秒）。キー無し/失敗時は感情辞書にフォールバック。
+  Cloud Run へは `scripts/deploy_cloud_run.js` がセッション環境の OPENAI_API_KEY をサービスの環境変数として渡す。
+  本番で `/api/arms`, `/api/interpret` とも source=llm を確認済み。
+- 検証: `scratchpad/vortex_test2.mjs`（Playwright + swiftshader。`/api/thumb/**` は gpt-image-2 で生成した実写風の
+  コンタクトシートを40枚に切ったモック `scratchpad/thumbs/` で代替。YouTube埋め込みは空ページに差し替え）。
+  シェーダー単体は `scratchpad/harness/`（python http.server 3150 + `hshot.mjs "tag|twist=9&photo=1"`）で数秒で確認できる。
+- 旧 Galaxy.tsx / Mosaic.tsx / Vortex.tsx は未使用で残置。
+
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）
 
 - 「後で確認する」と言うときは、必ず send_later 等で実際にスケジュールする。できない場合は「できない」と言う。
