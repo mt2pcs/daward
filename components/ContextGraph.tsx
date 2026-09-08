@@ -12,7 +12,7 @@ import { buildGraph, KIND_COLOR, KIND_LABEL, type GNode, type MomentContext, typ
 
 const KINDS: NodeKind[] = ["moment", "person", "team", "competition", "motif", "emotion", "sport"];
 type Forces = { center: number; repel: number; link: number; dist: number };
-type Display = { node: number; edge: number; text: number };
+type Display = { node: number; edge: number; text: number; glow: number; flow: number };
 
 export default function ContextGraph({ moments, context }: { moments: MomentWithStats[]; context: MomentContext[] }) {
   const graph = useMemo(() => buildGraph(moments, context), [moments, context]);
@@ -20,13 +20,13 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [enabled, setEnabled] = useState<Record<NodeKind, boolean>>({ moment: true, person: true, team: true, competition: true, motif: true, emotion: true, sport: true });
   const [forces, setForces] = useState<Forces>({ center: 0.5, repel: 0.55, link: 0.5, dist: 0.45 });
-  const [display, setDisplay] = useState<Display>({ node: 0.5, edge: 0.4, text: 0.45 });
+  const [display, setDisplay] = useState<Display>({ node: 0.5, edge: 0.4, text: 0.45, glow: 0.7, flow: 0.6 });
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
   const [booted, setBooted] = useState(false);
   const [bootLines, setBootLines] = useState<string[]>([]);
-  const [stats, setStats] = useState({ alpha: 1, fps: 0 });
+  const [stats, setStats] = useState({ alpha: 1, fps: 0, lite: false });
   const [open, setOpen] = useState({ filter: true, display: true, forces: true });
   const S = useRef({ enabled, forces, display, query, selected, hovered });
   S.current = { enabled, forces, display, query, selected, hovered };
@@ -73,6 +73,29 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
     const adj: number[][] = nodes.map(() => []);
     for (const l of links) { adj[l.a].push(l.b); adj[l.b].push(l.a); }
     const cam = { x: 0, y: 0, k: 0.9 };
+    // 発光スプライト（色ごとにキャッシュ。毎フレームの createRadialGradient より桁違いに軽い）
+    const sprites = new Map<string, HTMLCanvasElement>();
+    const sprite = (color: string) => {
+      let c = sprites.get(color);
+      if (c) return c;
+      c = document.createElement("canvas"); c.width = 128; c.height = 128;
+      const g = c.getContext("2d")!;
+      const [r, gg, b] = hexToRgb(color);
+      const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+      grad.addColorStop(0, "rgba(255,255,255,1)");
+      grad.addColorStop(0.12, `rgba(${r},${gg},${b},1)`);
+      grad.addColorStop(0.3, `rgba(${r},${gg},${b},0.45)`);
+      grad.addColorStop(0.6, `rgba(${r},${gg},${b},0.1)`);
+      grad.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+      g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+      sprites.set(color, c);
+      return c;
+    };
+    // 血流: リンクごとに位相と速さ。瞬間→属性の向きに流れる（similar は瞬間どうし）
+    const L = links.length;
+    const phase = new Float32Array(L), speed = new Float32Array(L);
+    for (let i = 0; i < L; i++) { phase[i] = Math.random(); speed[i] = 0.12 + Math.random() * 0.16; }
+    let frameEma = 16, lite = false;
     let alpha = 1, alphaTarget = 0;
     let W = 0, H = 0, dpr = 1;
     const resize = () => {
@@ -173,6 +196,10 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
       raf = requestAnimationFrame(draw);
       const dt = now - lastT; lastT = now;
       fpsAcc += dt; fpsN++;
+      if (dt > 0 && dt < 500) frameEma += (dt - frameEma) * 0.05;
+      // 重いときは血流を半分・発光を小さく（自動）
+      if (!lite && frameEma > 30) lite = true; else if (lite && frameEma < 17) lite = false;
+      const time = now / 1000;
       if (alpha > 0.002 || alphaTarget > 0) step();
       if (!userMoved) fit();
       computeMatch();
@@ -211,6 +238,43 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
         ctx.lineWidth = lit ? lw * 1.6 : lw;
         ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
       }
+      // 血流: リンクの上を粒が流れる（加算合成で光る）
+      if (dsp.flow > 0.02) {
+        ctx.globalCompositeOperation = "lighter";
+        const stride = lite ? 2 : 1;
+        for (let li = 0; li < L; li += stride) {
+          const l = links[li];
+          const a = nodes[l.a], b = nodes[l.b];
+          if (!visible(a) || !visible(b)) continue;
+          const [ax, ay] = toScreen(a.x, a.y), [bx, by] = toScreen(b.x, b.y);
+          if ((ax < -30 && bx < -30) || (ax > W + 30 && bx > W + 30) || (ay < -30 && by < -30) || (ay > H + 30 && by > H + 30)) continue;
+          const lit = focus !== null && (l.a === focus || l.b === focus);
+          let al = 0.75 * dsp.flow;
+          if (focus !== null) al = lit ? 1 : 0.08;
+          if (matchSet) al *= (matchSet.has(l.a) && matchSet.has(l.b)) ? 1.3 : 0.1;
+          if (al < 0.03) continue;
+          const [cr, cg, cb] = hexToRgb(a.kind === "moment" ? b.color : a.color);
+          const p = (time * speed[li] * (0.6 + dsp.flow) + phase[li]) % 1;
+          const len = Math.hypot(bx - ax, by - ay);
+          const tail = Math.min(0.35, 26 / Math.max(1, len)); // 尾は画面上で最大26px
+          const pr = (lit ? 2.6 : 1.7) * Math.min(1.4, 0.7 + cam.k * 0.4);
+          for (let k = 0; k < 4; k++) {
+            const t = p - (k * tail) / 3;
+            if (t < 0) continue;
+            const x = ax + (bx - ax) * t, y = ay + (by - ay) * t;
+            const f = 1 - k / 4;
+            ctx.fillStyle = `rgba(${cr},${cg},${cb},${al * f * f})`;
+            ctx.beginPath(); ctx.arc(x, y, pr * (0.5 + 0.5 * f), 0, Math.PI * 2); ctx.fill();
+          }
+          if (lit || (!lite && a.kind !== "moment" && b.kind !== "moment")) {
+            // 先頭の白い芯
+            const x = ax + (bx - ax) * p, y = ay + (by - ay) * p;
+            ctx.fillStyle = `rgba(255,255,255,${al * 0.8})`;
+            ctx.beginPath(); ctx.arc(x, y, pr * 0.45, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+        ctx.globalCompositeOperation = "source-over";
+      }
       // ノード
       const textK = 0.45 + dsp.text * 1.5; // しきい値（小さいほど早く出る）。既定では全体表示でハブ（次数の大きいモチーフ・感情・競技）だけ読める
       const labelsToDraw: { x: number; y: number; t: string; a: number; c: string; big: boolean }[] = [];
@@ -224,14 +288,23 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
         if (focus !== null) a = isFocus ? 1 : isNeigh ? 0.95 : 0.13;
         if (matchSet) a *= matchSet.has(i) ? 1 : 0.12;
         const [cr, cg, cb] = hexToRgb(n.color);
-        // グロー（大きいノードほど）
-        const glow = r * (isFocus ? 3.2 : 1.9);
-        const g = ctx.createRadialGradient(sx, sy, r * 0.4, sx, sy, glow);
-        g.addColorStop(0, `rgba(${cr},${cg},${cb},${0.35 * a})`); g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(sx, sy, glow, 0, Math.PI * 2); ctx.fill();
+        // 発光: スプライトを加算合成（ハブは脈動）。重なるほど白く飽和してブルームに見える
+        const pulse = n.deg > 8 ? 1 + 0.07 * Math.sin(time * 2.1 + i * 0.7) : 1;
+        const gl = dsp.glow * (lite ? 0.7 : 1) * (0.5 + 0.5 * Math.min(1, cam.k)); // 引きの視点では密集部が白飛びしないよう抑える
+        if (gl > 0.02) {
+          ctx.globalCompositeOperation = "lighter";
+          const gsz = r * (isFocus ? 9 : 4.5 + 2.5 * n.weight) * pulse * (0.5 + gl);
+          ctx.globalAlpha = a * (isFocus ? 1 : 0.55 + 0.45 * n.weight) * gl;
+          ctx.drawImage(sprite(n.color), sx - gsz, sy - gsz, gsz * 2, gsz * 2);
+          ctx.globalAlpha = 1;
+          ctx.globalCompositeOperation = "source-over";
+        }
         ctx.fillStyle = `rgba(${cr},${cg},${cb},${a})`;
-        ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fill();
-        if (n.kind === "moment") { ctx.strokeStyle = `rgba(255,255,255,${0.55 * a})`; ctx.lineWidth = 1; ctx.stroke(); }
+        ctx.beginPath(); ctx.arc(sx, sy, r * pulse, 0, Math.PI * 2); ctx.fill();
+        // 芯の白（発光の中心）
+        ctx.fillStyle = `rgba(255,255,255,${(n.kind === "moment" ? 0.85 : 0.5) * a * (0.4 + gl * 0.6)})`;
+        ctx.beginPath(); ctx.arc(sx, sy, r * pulse * 0.45, 0, Math.PI * 2); ctx.fill();
+        if (n.kind === "moment") { ctx.strokeStyle = `rgba(255,255,255,${0.55 * a})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(sx, sy, r * pulse, 0, Math.PI * 2); ctx.stroke(); }
         if (isFocus || i === selI) { ctx.strokeStyle = `rgba(235,255,0,${a})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, r + 4, 0, Math.PI * 2); ctx.stroke(); }
         // ラベル: ズームと次数のしきい値でフェード（Obsidian の text fade threshold）
         const importance = n.kind === "moment" ? 0.55 + n.weight : 0.4 + Math.sqrt(n.deg) * 0.3;
@@ -249,7 +322,7 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
         const [cr, cg, cb] = hexToRgb(l.c);
         ctx.fillStyle = `rgba(${cr},${cg},${cb},${l.a})`; ctx.fillText(t, l.x, l.y);
       }
-      if (now - statT > 400) { statT = now; setStats({ alpha, fps: fpsN ? Math.round(1000 / (fpsAcc / fpsN)) : 0 }); fpsAcc = 0; fpsN = 0; }
+      if (now - statT > 400) { statT = now; setStats({ alpha, fps: fpsN ? Math.round(1000 / (fpsAcc / fpsN)) : 0, lite }); fpsAcc = 0; fpsN = 0; }
     };
     raf = requestAnimationFrame(draw);
     // ---- 操作 ----
@@ -373,6 +446,8 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
           <Slider label="ノードの大きさ" v={display.node} on={(v) => setDisplay((d) => ({ ...d, node: v }))} />
           <Slider label="リンクの太さ" v={display.edge} on={(v) => setDisplay((d) => ({ ...d, edge: v }))} />
           <Slider label="テキストの表示しきい値" v={display.text} on={(v) => setDisplay((d) => ({ ...d, text: v }))} />
+          <Slider label="発光" v={display.glow} on={(v) => setDisplay((d) => ({ ...d, glow: v }))} />
+          <Slider label="血流（リンク上の流れ）" v={display.flow} on={(v) => setDisplay((d) => ({ ...d, flow: v }))} />
         </Section>
         <Section title="力" open={open.forces} onToggle={() => setOpen((o) => ({ ...o, forces: !o.forces }))}>
           <Slider label="中心への引力" v={forces.center} on={(v) => setForces((f) => ({ ...f, center: v }))} />
@@ -410,7 +485,7 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
         <span><b>{graph.nodes.length.toLocaleString()}</b> nodes</span>
         <span><b>{graph.links.length.toLocaleString()}</b> links</span>
         <span>layout <b>{Math.round((1 - Math.min(1, stats.alpha)) * 100)}%</b></span>
-        <span>{stats.fps} fps</span>
+        <span>{stats.fps} fps{stats.lite ? " · lite" : ""}</span>
         <span className="cg-pipe">ingest ✓ segment ✓ entity ✓ emotion ✓ motif ✓ embed ✓ cluster ✓</span>
         {hovered !== null && <span className="cg-hover">{KIND_LABEL[graph.nodes[hovered].kind]} · {graph.nodes[hovered].label}</span>}
       </footer>
