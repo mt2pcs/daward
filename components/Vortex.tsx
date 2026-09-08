@@ -163,7 +163,7 @@ export default function Vortex({
       // 中心の核
       ctx.globalCompositeOperation = "lighter";
       const pulse = 0.7 + 0.3 * Math.sin(now * 0.004);
-      const coreR = R * (burst ? 0.12 + bt * 1.4 : 0.075) * pulse;
+      const coreR = Math.max(0.5, R * (burst ? 0.12 + bt * 1.4 : 0.075) * pulse);
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
       g.addColorStop(0, burst ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)");
       g.addColorStop(0.3, "rgba(235,255,0,0.3)");

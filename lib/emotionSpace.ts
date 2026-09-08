@@ -18,7 +18,7 @@ export const EMOTION_COLORS: Record<Emotion, string> = {
   気迫: "#ff2e63",
 };
 
-export const CLUSTER_RADIUS = 62;
+export const CLUSTER_RADIUS = 78;
 
 // 8つの星団中心: 環状に配置し、上下に交互にずらす（どの角度から見ても重なりにくい）
 export function clusterCenters(): Vec3[] {
@@ -26,7 +26,7 @@ export function clusterCenters(): Vec3[] {
   const out: Vec3[] = [];
   for (let i = 0; i < n; i++) {
     const th = (i / n) * Math.PI * 2 + 0.35;
-    const y = (i % 2 === 0 ? 1 : -1) * 16 + (i % 4 < 2 ? 4 : -4);
+    const y = (i % 2 === 0 ? 1 : -1) * 21 + (i % 4 < 2 ? 5 : -5);
     out.push([
       Math.cos(th) * CLUSTER_RADIUS,
       y,
