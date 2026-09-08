@@ -207,16 +207,20 @@ export default function MomentsApp({
 
       {/* 腕のツアー: ラベルをタップすると、その腕の映像を順に見せる */}
       {tour && !selected && (
-        <div className="tour" style={{ ["--c" as string]: tour.color }}>
-          <button className="tour-nav" onClick={() => vortexApi.current?.tourPrev()} aria-label="前へ">‹</button>
-          <div className="tour-body">
-            <div className="tour-line1"><span className="tour-arm">{tour.armName}</span><span className="tour-count">{tour.index + 1}/{tour.total}</span></div>
-            <div className="tour-title">{tour.moment.title} <span className="tour-votes">🔥{tour.moment.votes.toLocaleString()}</span></div>
+        <>
+          <button className="tour-side left" onClick={() => vortexApi.current?.tourPrev()} aria-label="前へ">‹</button>
+          <button className="tour-side right" onClick={() => vortexApi.current?.tourNext()} aria-label="次へ">›</button>
+          <div className="tour" style={{ ["--c" as string]: tour.color }}>
+            <div className="tour-arm"><span>{tour.armName}</span></div>
+            <div className="tour-count">{String(tour.index + 1).padStart(2, "0")} <em>/ {tour.total}</em></div>
+            <div className="tour-title">{tour.moment.title}</div>
+            <div className="tour-meta">{tour.moment.event} ・ {tour.moment.year}</div>
+            <div className="tour-actions">
+              <button className="tour-vote" onClick={() => setSelectedId(tour.moment.id)}>🔥 {tour.moment.votes.toLocaleString()} ｜ この瞬間を観て投票</button>
+              <button className="tour-close" onClick={() => vortexApi.current?.endTour()}>ツアーを終える</button>
+            </div>
           </div>
-          <button className="tour-vote" onClick={() => setSelectedId(tour.moment.id)}>観て投票</button>
-          <button className="tour-nav" onClick={() => vortexApi.current?.tourNext()} aria-label="次へ">›</button>
-          <button className="tour-close" onClick={() => vortexApi.current?.endTour()} aria-label="ツアーを終える">×</button>
-        </div>
+        </>
       )}
       {viewDirty && !tour && !selected && phase === "space" && (
         <button className="view-reset" onClick={() => vortexApi.current?.resetView()}>⟲ 視点を戻す</button>

@@ -380,7 +380,7 @@ export default function VortexSpace({
           float r = length(p);
           c *= 0.05 + 0.95 * smoothstep(0.98, 0.3, r);
           c *= uDim;
-          c = c / (1.0 + c * 0.3);
+          c = c / (1.0 + c * 0.55);
           c += vec3(1.0, 0.98, 0.9) * uBurst * exp(-r * 3.0);
           gl_FragColor = vec4(c, 1.0);
         }`,
@@ -794,14 +794,21 @@ export default function VortexSpace({
     // ---- 腕のツアー（ラベルをタップ → その腕の映像を順に見せる）----
     let tour: { arm: number; ids: string[]; idx: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
     let tourSpinTarget = 0;
+    // 主役の位置 → カメラの置き場所と視線（軸寄りから主役を正面に、奥に渦の目）
+    const tourPose = (p: THREE.Vector3) => ({
+      to: new THREE.Vector3(p.x * 0.2, p.y * 0.2 + 5, p.z + 38),
+      look: p.clone().lerp(new THREE.Vector3(0, 0, EYE_Z), 0.04),
+    });
     const tourGo = (i: number) => {
       if (!tour || !currentArms) return;
       tour.idx = (i + tour.ids.length) % tour.ids.length;
       const c = cards.get(tour.ids[tour.idx]);
       if (!c) return;
-      for (const o of Array.from(cards.values())) { if (o.stage) { o.stage = false; o.tro = -18; } }
-      c.stage = true; // ツアーの主役: レーンからさらに内側へ出て、大きく明るく
+      for (const o of Array.from(cards.values())) { if (o.stage) { o.stage = false; o.tro = -18; o.mat.depthTest = true; o.mesh.renderOrder = 0; } }
+      c.stage = true; // ツアーの主役: レーンからさらに内側へ出て、大きく明るく、何にも隠れない
       c.tro = -26;
+      c.mat.depthTest = false;
+      c.mesh.renderOrder = 10;
       // カメラが腕に沿って滑り、そのカードの前（漏斗の内側）で止まる。視線はカードの少し奥＝渦の目の方向
       const p = c.pos.clone();
       const axisPt = new THREE.Vector3(0, 0, p.z);
@@ -821,6 +828,7 @@ export default function VortexSpace({
     let tourSaved: { c: Card; ts: number; tro: number; tsize: number }[] = [];
     const startTour = (armIdx: number) => {
       if (!currentArms || !currentArms.arms[armIdx]) return;
+      if (pendingNow || releaseTimer) return; // 吸い込み・登場の最中はツアーを始めない（目標値が壊れる）
       if (tour?.timer) clearTimeout(tour.timer);
       if (tour) restoreTourCards();
       const ids = currentArms.arms[armIdx].ids.filter((id) => cards.has(id));
@@ -846,7 +854,7 @@ export default function VortexSpace({
       tour = null;
       restoreTourCards();
       smat.uniforms.uFocus.value = -1;
-      for (const o of Array.from(cards.values())) o.stage = false;
+      for (const o of Array.from(cards.values())) { o.stage = false; o.mat.depthTest = true; o.mesh.renderOrder = 0; }
       st.onTour?.(null);
       flyingTo = null;
       camFree = false;
@@ -998,7 +1006,7 @@ export default function VortexSpace({
       if (!dragging) dragSpin += dragVel;
       if (tour && !dragging) dragSpin = damp(dragSpin, tourSpinTarget, dt, 0.5);
       spinBoost = damp(spinBoost, 0, dt, 1.4);
-      spin += dt * (0.035 + spinBoost * 0.6);
+      if (!tour) spin += dt * (0.035 + spinBoost * 0.6); // ツアー中は渦の自転を止める（主役が流れて行かない）
       const spinAll = spin + dragSpin;
       flow = damp(flow, flowTarget, dt, 1.0);
       hot = damp(hot, hotTarget, dt, 0.8);
@@ -1012,7 +1020,8 @@ export default function VortexSpace({
       else strength = 55 + 110 * loosen + spinBoost * 80;
       fluid.params.strength = strength;
       fluid.params.pull = 3 + loosen * 6;
-      fluid.params.dyeDissipation = photoTarget === 0 && photo > 0.05 ? 1.6 : 0.015;
+      // 入場直後は写真を溶かす。以後はインクが溜まって白飛びしないよう、常に少しずつ薄れる
+      fluid.params.dyeDissipation = photoTarget === 0 && photo > 0.05 ? 1.6 : phaseNow === "entry" ? 0.015 : 0.12;
       photo = damp(photo, photoTarget, dt, 0.5);
       let acc = Math.min(dt, maxSubsteps / 60);
       while (acc > 1e-4) { const h = Math.min(acc, 1 / 60); fluid.step(h); acc -= h; }
@@ -1072,6 +1081,14 @@ export default function VortexSpace({
         camera.position.lerpVectors(camTween.from, camTween.to, e);
         camLook.lerpVectors(camTween.lookFrom, camTween.lookTo, e);
         if (k >= 1) { const th = camTween.then; camTween = null; th?.(); }
+      } else if (tour && !flyingTo) {
+        // ツアー中（移動が終わった後）: 主役の現在位置を追い続ける（ドラッグや揺れで外れない）
+        const sc = tour.idx >= 0 ? cards.get(tour.ids[tour.idx]) : undefined;
+        if (sc) {
+          const pose = tourPose(sc.pos);
+          camera.position.lerp(pose.to, 1 - Math.exp(-dt / 0.5));
+          camLook.lerp(pose.look, 1 - Math.exp(-dt / 0.5));
+        }
       } else if (camFree) {
         if (phaseNow === "entry") {
           camera.position.set(Math.sin(t * 0.15) * 4 + parallax.x * 10, 4 + Math.sin(t * 0.11) * 2 - parallax.y * 6, 96 - Math.min(14, t * 1.0));
@@ -1103,7 +1120,12 @@ export default function VortexSpace({
         posOf(c.base, c.s, c.ro, c.aj, spinAll, c.pos);
         c.pos.y += Math.sin(t * 0.8 + c.base * 3) * 0.5;
         c.mesh.position.copy(c.pos);
-        orient(c.mesh, c.pos, c.base, c.s, c.ro, c.aj, spinAll, c === flying || c.stage ? 1 : c.inArm ? 0.6 : 0.4);
+        if (tour && tour.ids.includes(c.id)) {
+          c.mesh.up.set(0, 1, 0);
+          c.mesh.lookAt(cam); // ツアー中の腕は正立してカメラを向く（傾き・横倒しで読めなくならない）
+        } else {
+          orient(c.mesh, c.pos, c.base, c.s, c.ro, c.aj, spinAll, c === flying || c.stage ? 1 : c.inArm ? 0.6 : 0.4);
+        }
         c.mesh.scale.setScalar(c.size);
         const dist = c.pos.distanceTo(cam);
         const fog = Math.max(0.2, Math.min(1, 1 - (dist - 30) / 170));
