@@ -1702,9 +1702,15 @@ textarea {
 }
 .entrance-brand {
   position: absolute;
-  left: 4vw;
-  top: 5vh;
-  animation: rise-in 0.8s ease;
+  left: 50%;
+  top: 6vh;
+  transform: translateX(-50%);
+  text-align: center;
+  width: max-content;
+  max-width: 92vw;
+}
+.entrance-brand > * {
+  animation: rise-in 0.8s ease; /* 中央寄せの transform と競合しないよう、子要素側で動かす */
 }
 .entrance .entry-title {
   margin-top: 8px;

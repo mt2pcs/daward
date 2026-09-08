@@ -260,7 +260,7 @@ export default function MomentsApp({
       {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} /> : null}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev vortex4h</div>
+      <div className="rev-tag">rev vortex5</div>
 
       {selected && (
         <DetailOverlay

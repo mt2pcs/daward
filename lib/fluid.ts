@@ -364,7 +364,7 @@ export class FluidSim {
   }
 
   step(dtRaw: number, strengthScale = 1) {
-    const dt = Math.min(dtRaw, 1 / 40);
+    const dt = Math.min(dtRaw, 1 / 30);
     this.time += dt;
     const p = this.params;
     const st = this.simTexel();
