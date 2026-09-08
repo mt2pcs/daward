@@ -29,6 +29,7 @@ export default function MomentsApp({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [present, setPresent] = useState<VoteResponse | null>(null);
   const [pulses, setPulses] = useState<Record<string, number>>({});
+  const [hoverTitle, setHoverTitle] = useState<string | null>(null);
   const [tuning, setTuning] = useState<Tuning>(DEFAULT_TUNING);
   const [tunerOpen, setTunerOpen] = useState(false);
   const activityRef = useRef(0);
@@ -194,7 +195,9 @@ export default function MomentsApp({
         focusId={selectedId}
         soundOn={tuning.volume > 0}
         onSelect={(m) => setSelectedId(m.id)}
+        onHover={(m) => setHoverTitle(m ? `${m.title} ・ 🔥${m.votes.toLocaleString()}` : null)}
       />
+      {hoverTitle && !selected && <div className="vs-hover">{hoverTitle}</div>}
 
       <header className={`hud${phase === "entry" ? " hidden-hud" : ""}`}>
         <div className="hud-brand">
@@ -226,7 +229,7 @@ export default function MomentsApp({
       {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} /> : null}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev vortex2</div>
+      <div className="rev-tag">rev vortex3</div>
 
       {selected && (
         <DetailOverlay
