@@ -1166,7 +1166,7 @@ export default function VortexSpace({
       dolly = damp(dolly, dollyTarget, dt, 0.9);
       if (diving) {
         // 軸に沿って加速しながら目へ。視野が開き、視界がロールする
-        camera.position.set(Math.sin(t * 0.15) * 4 * (1 - de), 4 - 10 * de, 96 - 66 * de);
+        camera.position.set(0, -10 * de, 96 - 66 * de);
         camLook.set(0, 0, EYE_Z);
         diveRoll += dt * (0.15 + de * de * 2.6);
         camera.fov = (portrait() ? 76 : 62) + de * 40;
@@ -1204,8 +1204,9 @@ export default function VortexSpace({
         }
       } else if (camFree) {
         if (phaseNow === "entry") {
-          camera.position.set(Math.sin(t * 0.15) * 4 + parallax.x * 10, 4 + Math.sin(t * 0.11) * 2 - parallax.y * 6, 96 - Math.min(14, t * 1.0));
-          camLook.set(parallax.x * 30, -parallax.y * 20, EYE_Z);
+          // 入口は渦の目を画面中央に固定（「渦に入る」ボタンが目の中心に乗る）。カーソルの視差は無し、ゆっくり寄るだけ
+          camera.position.set(0, 0, 96 - Math.min(14, t * 1.0));
+          camLook.set(0, 0, EYE_Z);
         } else {
           // 常に前へ進みながら漂う。カーソルで視線が大きく振れる
           // 渦の内側、下の壁に近い位置から目を見上げる。カーソルで視線が大きく振れる

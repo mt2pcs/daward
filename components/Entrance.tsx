@@ -16,6 +16,9 @@ export default function Entrance({ leaving, onEnter }: { leaving: boolean; onEnt
         <button className="entry-button" onClick={onEnter}>
           渦に入る
         </button>
+      </div>
+      {/* ボタンは渦の目（画面中央）に正確に乗せる。注記とリンクは別枠でその下に置く */}
+      <div className="entrance-sub">
         <div className="entry-note">🔊 サウンドが流れます</div>
         <a className="entry-graph-link" href="/graph">CONTEXT GRAPH ↗ <small>裏側の仕組みを見る</small></a>
       </div>

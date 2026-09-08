@@ -1762,8 +1762,22 @@ textarea {
   margin-top: 14px;
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
 }
-.entrance.leaving .entrance-center {
+.entrance.leaving .entrance-center,
+.entrance.leaving .entrance-sub {
   pointer-events: none;
+}
+.entrance-sub {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 46px);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: auto;
+}
+.entrance-sub > * {
+  animation: rise-in 1.2s ease;
 }
 .vs-flash {
   position: absolute;
@@ -2033,7 +2047,7 @@ textarea {
 .hud-graph-link i { width: 7px; height: 7px; border-radius: 50%; background: #0a0a0c; box-shadow: 0 0 0 3px rgba(10,10,12,0.25); animation: cg-pulse 1.6s ease-in-out infinite; }
 .hud-graph-link:hover { transform: translateY(-1px); box-shadow: 0 0 0 6px rgba(235,255,0,0.16), 0 0 40px rgba(235,255,0,0.6); background: #fff; }
 @keyframes cg-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.5); opacity: 0.55; } }
-.entry-graph-link { margin-top: 26px; display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 0.18em; font-weight: 700; color: var(--fg); text-decoration: none; border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; padding: 9px 16px; background: rgba(0,0,0,0.45); backdrop-filter: blur(8px); text-shadow: 0 2px 12px rgba(0,0,0,0.9); }
+.entry-graph-link { margin-top: 18px; display: inline-flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 0.18em; font-weight: 700; color: var(--fg); text-decoration: none; border: 1px solid rgba(255,255,255,0.35); border-radius: 999px; padding: 9px 16px; background: rgba(0,0,0,0.45); backdrop-filter: blur(8px); text-shadow: 0 2px 12px rgba(0,0,0,0.9); }
 .entry-graph-link:hover { color: var(--yellow); border-color: var(--yellow); }
 .entry-graph-link small { font-weight: 500; letter-spacing: 0.04em; color: var(--dim); }
 @media (max-width: 760px) {
