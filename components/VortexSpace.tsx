@@ -323,6 +323,7 @@ export default function VortexSpace({
     const coarse = window.matchMedia("(pointer: coarse)").matches;
     const params = new URLSearchParams(location.search);
     const maxSubsteps = Math.max(1, Math.min(24, Number(params.get("simsteps")) || 3));
+    const dtMax = Math.max(0.02, Math.min(0.6, Number(params.get("dtmax")) || 0.05)); // 検証環境（低fps）では大きくして実時間に追従させる
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
     renderer.setPixelRatio(Math.min(coarse ? 2 : 1.5, window.devicePixelRatio || 1));
@@ -792,13 +793,15 @@ export default function VortexSpace({
     };
     // ---- 腕のツアー（ラベルをタップ → その腕の映像を順に見せる）----
     let tour: { arm: number; ids: string[]; idx: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
+    let tourSpinTarget = 0;
     const tourGo = (i: number) => {
       if (!tour || !currentArms) return;
       tour.idx = (i + tour.ids.length) % tour.ids.length;
       const c = cards.get(tour.ids[tour.idx]);
       if (!c) return;
-      for (const o of Array.from(cards.values())) o.stage = false;
-      c.stage = true; // ツアーの主役（その場で光り、少し大きくなる）
+      for (const o of Array.from(cards.values())) { if (o.stage) { o.stage = false; o.tro = -18; } }
+      c.stage = true; // ツアーの主役: レーンからさらに内側へ出て、大きく明るく
+      c.tro = -26;
       // カメラが腕に沿って滑り、そのカードの前（漏斗の内側）で止まる。視線はカードの少し奥＝渦の目の方向
       const p = c.pos.clone();
       const axisPt = new THREE.Vector3(0, 0, p.z);
@@ -815,17 +818,33 @@ export default function VortexSpace({
       if (tour.timer) clearTimeout(tour.timer);
       tour.timer = setTimeout(() => { if (tour) tourGo(tour.idx + 1); }, 4500);
     };
+    let tourSaved: { c: Card; ts: number; tro: number; tsize: number }[] = [];
     const startTour = (armIdx: number) => {
       if (!currentArms || !currentArms.arms[armIdx]) return;
       if (tour?.timer) clearTimeout(tour.timer);
-      tour = { arm: armIdx, ids: currentArms.arms[armIdx].ids.filter((id) => cards.has(id)), idx: -1, timer: null };
+      if (tour) restoreTourCards();
+      const ids = currentArms.arms[armIdx].ids.filter((id) => cards.has(id));
+      tour = { arm: armIdx, ids, idx: -1, timer: null };
       smat.uniforms.uFocus.value = armIdx;
+      // その腕の映像だけが壁から内側のレーンへ出てきて、等間隔に並ぶ（他の腕は壁に残って沈む）
+      tourSaved = ids.map((id) => { const c = cards.get(id)!; return { c, ts: c.ts, tro: c.tro, tsize: c.tsize }; });
+      ids.forEach((id, k) => {
+        const c = cards.get(id)!;
+        c.ts = 0.05 + k * (0.62 / Math.max(6, ids.length - 1));
+        c.tro = -18;
+        c.tsize = Math.max(c.tsize, 12) * 1.1;
+      });
       tourGo(0);
+    };
+    const restoreTourCards = () => {
+      for (const sv of tourSaved) { sv.c.ts = sv.ts; sv.c.tro = sv.tro; sv.c.tsize = sv.tsize; }
+      tourSaved = [];
     };
     const endTour = () => {
       if (!tour) return;
       if (tour.timer) clearTimeout(tour.timer);
       tour = null;
+      restoreTourCards();
       smat.uniforms.uFocus.value = -1;
       for (const o of Array.from(cards.values())) o.stage = false;
       st.onTour?.(null);
@@ -971,12 +990,13 @@ export default function VortexSpace({
     const camDir = new THREE.Vector3();
     const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
-      const dt = Math.min(0.05, (now - last) / 1000);
+      const dt = Math.min(dtMax, (now - last) / 1000);
       last = now;
       const t = Math.max(0, (now - t0) / 1000);
 
       dragVel *= Math.exp(-dt / 0.6);
       if (!dragging) dragSpin += dragVel;
+      if (tour && !dragging) dragSpin = damp(dragSpin, tourSpinTarget, dt, 0.5);
       spinBoost = damp(spinBoost, 0, dt, 1.4);
       spin += dt * (0.035 + spinBoost * 0.6);
       const spinAll = spin + dragSpin;
@@ -1078,7 +1098,7 @@ export default function VortexSpace({
         c.ro = damp(c.ro, c.tro + loosen * 16 * (c.inArm ? 1 : 0), dt, 0.9);
         const hovered = hoverId === c.id;
         const sizeS = c.inArm ? 1.55 - 0.8 * Math.max(0, Math.min(1, c.s)) : 1;
-        c.size = damp(c.size, c.tsize * sizeS * (hovered ? 1.2 : 1) * (c.stage ? 1.3 : 1), dt, 0.25);
+        c.size = damp(c.size, c.tsize * sizeS * (hovered ? 1.2 : 1) * (c.stage ? 1.4 : 1), dt, 0.25);
         c.dim = damp(c.dim, phaseNow === "entry" ? 0 : c.tdim, dt, 0.6);
         posOf(c.base, c.s, c.ro, c.aj, spinAll, c.pos);
         c.pos.y += Math.sin(t * 0.8 + c.base * 3) * 0.5;
@@ -1088,7 +1108,7 @@ export default function VortexSpace({
         const dist = c.pos.distanceTo(cam);
         const fog = Math.max(0.2, Math.min(1, 1 - (dist - 30) / 170));
         const inTourArm = tour ? tour.ids.includes(c.id) : true;
-        const b = c.stage ? 1.2 : (0.3 + 0.7 * fog) * (c.inArm ? 1 : 0.7) * (tour ? (inTourArm ? 0.85 : 0.35) : 1);
+        const b = c.stage ? 1.2 : (0.3 + 0.7 * fog) * (c.inArm ? 1 : 0.7) * (tour ? (inTourArm ? 0.9 : 0.22) : 1);
         if (c.mat.color.r <= 1.2) c.mat.color.setScalar(b);
         c.mat.opacity = c.dim;
         c.mesh.visible = c.dim > 0.02;
@@ -1160,7 +1180,8 @@ export default function VortexSpace({
   const armsKey = arms ? `${arms.text}|${arms.arms.map((a) => a.name).join(",")}` : "";
   const prevKey = useRef<string | null>(null);
   useEffect(() => {
-    const dramatic = prevKey.current !== null && prevKey.current !== armsKey && phase === "space";
+    // 演出は「言葉で組み替えた」ときだけ。初期の腕がAIから遅れて届いたときは静かに差し替える
+    const dramatic = prevKey.current !== null && prevKey.current !== armsKey && phase === "space" && !!arms && arms.text !== "";
     prevKey.current = armsKey;
     S.current.setArms?.(arms, dramatic);
     // eslint-disable-next-line react-hooks/exhaustive-deps

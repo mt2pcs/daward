@@ -1729,7 +1729,9 @@ textarea {
   flex-direction: column;
   align-items: center;
   pointer-events: auto;
-  animation: rise-in 1.2s ease;
+}
+.entrance-center > * {
+  animation: rise-in 1.2s ease; /* 中央寄せの transform と競合しないよう、子要素側で動かす */
 }
 .entrance .entry-button {
   margin-top: 0;
