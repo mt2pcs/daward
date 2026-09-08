@@ -795,13 +795,18 @@ export default function VortexSpace({
     let tour: { arm: number; ids: string[]; idx: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
     let tourSpinTarget = 0;
     // 主役の位置 → カメラの置き場所と視線（軸寄りから主役を正面に、奥に渦の目）
-    const tourPose = (p: THREE.Vector3) => ({
-      to: new THREE.Vector3(p.x * 0.2, p.y * 0.2 + 5, p.z + 38),
-      look: p.clone().lerp(new THREE.Vector3(0, 0, EYE_Z), 0.04),
-    });
+    // 主役は画面の右寄り（左下の見出しと重ならず、右端で切れない）に固定。奥に渦の目
+    const tourPose = (p: THREE.Vector3) => {
+      const side = portrait() ? 0 : 13;
+      return {
+        to: new THREE.Vector3(p.x - side, p.y * 0.25 + 4 + (portrait() ? 6 : 0), p.z + (portrait() ? 46 : 38)),
+        look: new THREE.Vector3(p.x - side, p.y * 0.25 + 2, p.z - 60),
+      };
+    };
     const tourGo = (i: number) => {
       if (!tour || !currentArms) return;
-      tour.idx = (i + tour.ids.length) % tour.ids.length;
+      if (i >= tour.ids.length) { endTour(); return; }
+      tour.idx = Math.max(0, i);
       const c = cards.get(tour.ids[tour.idx]);
       if (!c) return;
       for (const o of Array.from(cards.values())) { if (o.stage) { o.stage = false; o.tro = -18; o.mat.depthTest = true; o.mesh.renderOrder = 0; } }
@@ -823,7 +828,11 @@ export default function VortexSpace({
       const arm = currentArms.arms[tour.arm];
       st.onTour?.({ armName: arm.name, color: arm.color, index: tour.idx, total: tour.ids.length, moment: c.m });
       if (tour.timer) clearTimeout(tour.timer);
-      tour.timer = setTimeout(() => { if (tour) tourGo(tour.idx + 1); }, 4500);
+      tour.timer = setTimeout(() => {
+        if (!tour) return;
+        if (tour.idx + 1 < tour.ids.length) tourGo(tour.idx + 1); // 最後まで見せたら終わる（無限ループしない）
+        else endTour();
+      }, 4500);
     };
     let tourSaved: { c: Card; ts: number; tro: number; tsize: number }[] = [];
     const startTour = (armIdx: number) => {
@@ -1086,8 +1095,8 @@ export default function VortexSpace({
         const sc = tour.idx >= 0 ? cards.get(tour.ids[tour.idx]) : undefined;
         if (sc) {
           const pose = tourPose(sc.pos);
-          camera.position.lerp(pose.to, 1 - Math.exp(-dt / 0.5));
-          camLook.lerp(pose.look, 1 - Math.exp(-dt / 0.5));
+          camera.position.lerp(pose.to, 1 - Math.exp(-dt / 0.55));
+          camLook.lerp(pose.look, 1 - Math.exp(-dt / 0.55));
         }
       } else if (camFree) {
         if (phaseNow === "entry") {
