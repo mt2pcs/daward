@@ -306,6 +306,10 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
   （実件数）を流してからグラフが中心から開き、操作するまで自動フィット。下部にステータス（nodes/links/layout%/fps/pipeline）。
 - 本体HUDの TOTAL VOTES 下に「CONTEXT GRAPH ↗」、グラフ側に「← 渦へ戻る」。
 - 検証: `scratchpad/graph_test.mjs` / `graph_quick.mjs`（WebGL不要なので速い）→ `graph_sheet.png`, `graph_overview.png`。
+- graph2: **発光**＝色ごとにキャッシュした放射グラデーションのスプライトを `lighter`（加算）で描く（毎フレーム createRadialGradient
+  するより桁違いに軽い。重なるほど白く飽和してブルームに見える）。ハブは脈動。引きの視点では抑える。**血流**＝リンクごとに位相・速さを
+  持つ粒（先頭の白い芯＋4段の尾、加算合成）が瞬間→属性の向きに流れる。フォーカス中はその腕だけ明るく。フレーム時間EMAが30msを超えると
+  lite（血流を半分・発光を小さく）、17ms未満で復帰。「表示」に 発光 / 血流 スライダー。検証: `graph_glow.mjs` → `graph_glow_sheet.png`。
 
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）
 
