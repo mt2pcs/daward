@@ -382,6 +382,82 @@ export default function VortexSpace({
     });
     scene.add(new THREE.LineSegments(sgeo, smat));
 
+    // ---- 太い光の帯（リファレンスの液体状のリボン）: 漏斗の壁に沿って腕ごとに10本 ----
+    const stripe = document.createElement("canvas");
+    stripe.width = 512; stripe.height = 64;
+    const sctx = stripe.getContext("2d")!;
+    const sImg = sctx.createImageData(512, 64);
+    for (let y = 0; y < 64; y++) {
+      const prof = Math.pow(Math.sin((y / 63) * Math.PI), 1.3);
+      for (let x = 0; x < 512; x++) {
+        const u = x / 512;
+        const flowA = 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(u * Math.PI * 2 * 2.0)) * (0.5 + 0.5 * Math.sin(u * Math.PI * 2 * 5.0 + 1.3));
+        const a = Math.max(0, Math.min(255, prof * flowA * 255));
+        const k = (y * 512 + x) * 4;
+        sImg.data[k] = 255; sImg.data[k + 1] = 255; sImg.data[k + 2] = 255; sImg.data[k + 3] = a;
+      }
+    }
+    sctx.putImageData(sImg, 0, 0);
+    const stripeTex = new THREE.CanvasTexture(stripe);
+    stripeTex.wrapS = THREE.RepeatWrapping;
+    stripeTex.repeat.set(2, 1);
+    const ribbonGroup = new THREE.Group();
+    ribbonGroup.scale.y = YSQ;
+    scene.add(ribbonGroup);
+    let ribbons: THREE.Mesh[] = [];
+    let oldRibbons: THREE.Mesh[] = [];
+    const ribbonGeometry = (pts: THREE.Vector3[], halfW: number): THREE.BufferGeometry => {
+      const n = pts.length;
+      const pos = new Float32Array(n * 2 * 3);
+      const uv = new Float32Array(n * 2 * 2);
+      const idx: number[] = [];
+      const sideV = new THREE.Vector3();
+      for (let i = 0; i < n; i++) {
+        const p = pts[i];
+        sideV.set(p.x, p.y, 0).normalize().multiplyScalar(halfW);
+        pos.set([p.x - sideV.x, p.y - sideV.y, p.z, p.x + sideV.x, p.y + sideV.y, p.z], i * 6);
+        uv.set([i / (n - 1), 0, i / (n - 1), 1], i * 4);
+        if (i < n - 1) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      return g;
+    };
+    const buildRibbons = (a: Interpretation) => {
+      for (const r of oldRibbons) { ribbonGroup.remove(r); r.geometry.dispose(); (r.material as THREE.Material).dispose(); }
+      oldRibbons = ribbons;
+      for (const r of oldRibbons) r.userData.targetOpacity = 0;
+      ribbons = [];
+      const A = a.arms.length;
+      a.arms.forEach((arm, ai) => {
+        const base = (ai / A) * Math.PI * 2;
+        for (let b = 0; b < 10; b++) {
+          const off = (b - 4.5) * 0.09 + (hash(arm.name, 40 + b) - 0.5) * 0.06;
+          const roff = 2 + (hash(arm.name, b) - 0.5) * 10;
+          const pts: THREE.Vector3[] = [];
+          const N = 70;
+          for (let q = 0; q <= N; q++) {
+            const ss = -0.2 + (q / N) * 1.45;
+            const th = base + ss * TWIST + off + Math.sin(ss * 6 + b) * 0.05;
+            const rr = radiusAt(ss) + roff;
+            pts.push(new THREE.Vector3(Math.cos(th) * rr, Math.sin(th) * rr, depthAt(ss) + (b - 4.5) * 0.8));
+          }
+          const width = 0.9 + hash(arm.name, 20 + b) * 2.6;
+          const mat = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(arm.color), transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+            depthWrite: false, alphaMap: stripeTex, side: THREE.DoubleSide,
+          });
+          const mesh = new THREE.Mesh(ribbonGeometry(pts, width), mat);
+          mesh.userData.targetOpacity = 0.3 + hash(arm.name, 60 + b) * 0.35;
+          mesh.frustumCulled = false;
+          ribbonGroup.add(mesh);
+          ribbons.push(mesh);
+        }
+      });
+    };
+
     // ---- 爆発（サンプルの explosion particles）----
     const EXN = 2000;
     const exPos = new Float32Array(EXN * 3), exVel = new Float32Array(EXN * 3);
@@ -459,7 +535,7 @@ export default function VortexSpace({
     let spin = 0, spinBoost = 0, dragSpin = 0, dragVel = 0;
     let hoverId: string | null = null;
     let dragMoved = 0;
-    let dolly = 44, dollyTarget = 44;
+    let dolly = 30, dollyTarget = 30;
     let burst = 0;
     let flow = 0.05, flowTarget = 0.05;
     let hot = 0, hotTarget = 0;
@@ -475,7 +551,9 @@ export default function VortexSpace({
     let camTween: { from: THREE.Vector3; to: THREE.Vector3; lookFrom: THREE.Vector3; lookTo: THREE.Vector3; t0: number; dur: number; then?: () => void } | null = null;
     let camFree = true;
     let currentArms: Interpretation | null = null;
-    let homeZ = 44;
+    let homeZ = 30;
+    const HOME_Y = -24;
+    const LOOK_Y = 14;
     camera.position.set(0, 4, 96);
 
     const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Vector3();
@@ -512,6 +590,7 @@ export default function VortexSpace({
       const A = a ? a.arms.length : 1;
       smat.uniforms.uCount.value = A;
       const inArm = new Set<string>();
+      if (a) buildRibbons(a);
       if (a) {
         a.arms.forEach((arm, ai) => {
           const base = (ai / A) * Math.PI * 2;
@@ -522,20 +601,20 @@ export default function VortexSpace({
             const c = cards.get(id);
             if (!c) return;
             inArm.add(id);
-            const s = Math.min(1, (k + 0.5) / Math.max(n, 7));
+            const s = 0.04 + 0.72 * Math.min(1, (k + 0.5) / Math.max(n, 7)); // 目の奥には置かない（山にならない）
             c.tbase = base;
             c.ts = s;
-            c.tro = (hash(id, 5) - 0.5) * 8;
-            const sc = a.text ? 0.55 + 0.9 * (a.scores[id] ?? 0.5) : 0.75 + 0.55 * votesOf(id);
-            c.tsize = 12 * sc;
+            c.tro = -4 + (hash(id, 5) - 0.5) * 8;
+            const sc = a.text ? 0.55 + 0.65 * (a.scores[id] ?? 0.5) : 0.75 + 0.45 * votesOf(id);
+            c.tsize = 14 * sc;
             c.tdim = 1;
             if (c.color !== arm.color) { c.color = arm.color; drawCard(c.canvas, c.m, c.img, arm.color); c.tex.needsUpdate = true; }
             if (dramatic) c.base -= Math.PI * 0.9;
           });
           const lmat = new THREE.MeshBasicMaterial({ map: makeLabelTexture(arm.name, arm.color), transparent: true, depthWrite: false, side: THREE.DoubleSide, opacity: 0 });
-          const lmesh = new THREE.Mesh(new THREE.PlaneGeometry(28, 7), lmat);
+          const lmesh = new THREE.Mesh(new THREE.PlaneGeometry(30, 7.5), lmat);
           scene.add(lmesh);
-          labels.push({ mesh: lmesh, base, s: 0.3, mat: lmat });
+          labels.push({ mesh: lmesh, base, s: 0.16 + (ai % 2) * 0.12, mat: lmat });
         });
       }
       for (const c of Array.from(cards.values())) {
@@ -563,13 +642,13 @@ export default function VortexSpace({
         for (let k = 0; k < 3; k++) dropInk(130, 0.0009, 0.12, 0.4);
         // 一番熱い腕へ飛び込む（サンプルの focusOnStar）
         if (a) {
-          const target = posOf(armBase[0], 0.42, 0, 0, spin + dragSpin, new THREE.Vector3());
-          const from = posOf(armBase[0], 0.02, -14, 0, spin + dragSpin, new THREE.Vector3());
-          from.z += 6;
+          // 渦の軸に沿って奥へ飛び込む（壁のカードに衝突しない）。視線は第1の腕のラベルへ
+          const target = posOf(armBase[0], 0.45, -6, 0.3, spin + dragSpin, new THREE.Vector3());
+          const from = new THREE.Vector3(0, -6, -34);
           camFree = false;
           camTween = { from: camera.position.clone(), to: from, lookFrom: camLook.clone(), lookTo: target, t0: performance.now(), dur: 2000, then: () => {
             // 目へ視線を戻しながら基準位置へ
-            camTween = { from: camera.position.clone(), to: new THREE.Vector3(0, 4, homeZ), lookFrom: camLook.clone(), lookTo: new THREE.Vector3(0, 0, EYE_Z), t0: performance.now(), dur: 2600, then: () => { camFree = true; } };
+            camTween = { from: camera.position.clone(), to: new THREE.Vector3(0, HOME_Y, homeZ), lookFrom: camLook.clone(), lookTo: new THREE.Vector3(0, LOOK_Y, EYE_Z), t0: performance.now(), dur: 2600, then: () => { camFree = true; } };
           } };
         }
       } else if (mix >= 1) {
@@ -591,8 +670,8 @@ export default function VortexSpace({
         for (const c of Array.from(cards.values())) { c.s = 1.06; c.size = 1; }
         applyArms(currentArms, false);
         camFree = false;
-        camTween = { from: camera.position.clone(), to: new THREE.Vector3(0, 4, homeZ), lookFrom: camLook.clone(), lookTo: new THREE.Vector3(0, 0, EYE_Z), t0: performance.now(), dur: 2800, then: () => { camFree = true; } };
-        for (let k = 0; k < 10; k++) dropInk(120, 0.0012, 0.1, 0.5);
+        camTween = { from: camera.position.clone(), to: new THREE.Vector3(0, HOME_Y, homeZ), lookFrom: camLook.clone(), lookTo: new THREE.Vector3(0, LOOK_Y, EYE_Z), t0: performance.now(), dur: 2800, then: () => { camFree = true; } };
+        for (let k = 0; k < 6; k++) dropInk(90, 0.001, 0.1, 0.45);
       }
     };
     st.setPhase = setPhase;
@@ -634,7 +713,7 @@ export default function VortexSpace({
         if (c && flyingTo !== c) flyTo(c);
       } else if (!camFree) {
         flyingTo = null;
-        camTween = { from: camera.position.clone(), to: new THREE.Vector3(0, 4, dolly), lookFrom: camLook.clone(), lookTo: new THREE.Vector3(0, 0, EYE_Z), t0: performance.now(), dur: 1200, then: () => { camFree = true; } };
+        camTween = { from: camera.position.clone(), to: new THREE.Vector3(0, HOME_Y, dolly), lookFrom: camLook.clone(), lookTo: new THREE.Vector3(0, LOOK_Y, EYE_Z), t0: performance.now(), dur: 1200, then: () => { camFree = true; } };
       }
     };
     st.setFocus = setFocus;
@@ -699,7 +778,7 @@ export default function VortexSpace({
       const c = pick(e.clientX, e.clientY);
       if (c) flyTo(c, () => st.onSelect(c.m));
     };
-    const onWheel = (e: WheelEvent) => { dollyTarget = Math.max(6, Math.min(80, dollyTarget + e.deltaY * 0.04)); };
+    const onWheel = (e: WheelEvent) => { dollyTarget = Math.max(-40, Math.min(60, dollyTarget + e.deltaY * 0.05)); };
     host.addEventListener("pointerdown", onDown);
     window.addEventListener("pointermove", onMove);
     host.addEventListener("pointerup", onUp);
@@ -750,7 +829,7 @@ export default function VortexSpace({
       }
       eyeMat.uniforms.uDye.value = fluid.dyeTexture;
       eyeMat.uniforms.uBurst.value = burst;
-      eyeMat.uniforms.uDim.value = phaseNow === "entry" ? 1 : 0.9 + 0.5 * hot;
+      eyeMat.uniforms.uDim.value = phaseNow === "entry" ? 1 : 0.7 + 0.3 * hot;
       if (atlasDirty) { atlasTex.needsUpdate = true; atlasDirty = false; if (t < 6 && phaseNow === "entry") fluid.fillMosaic(atlasTex, [GRID[0], GRID[1]], [0.3, 0.16875]); }
       eye.rotation.z = spinAll * 0.15;
 
@@ -762,7 +841,13 @@ export default function VortexSpace({
       smat.uniforms.uHot.value = hot;
       smat.uniforms.uSpin.value = spinAll;
       smat.uniforms.uLoosen.value = loosen;
-      smat.uniforms.uAlpha.value = phaseNow === "entry" ? 0.12 : 0.55;
+      smat.uniforms.uAlpha.value = phaseNow === "entry" ? 0.12 : 0.7;
+
+      // 太い帯: 流れ、組み替え時は前の色が消えて新しい色が現れる
+      ribbonGroup.rotation.z = spinAll;
+      stripeTex.offset.x -= dt * (0.18 + flow * 1.2 + hot * 0.4);
+      for (const rb of ribbons) { const m = rb.material as THREE.MeshBasicMaterial; m.opacity = damp(m.opacity, (rb.userData.targetOpacity as number) * (phaseNow === "entry" ? 0 : 1) * (1 + hot * 0.5), dt, 0.9); }
+      for (const rb of oldRibbons) { const m = rb.material as THREE.MeshBasicMaterial; m.opacity = damp(m.opacity, 0, dt, 0.6); }
 
       // 爆発
       if (exAge < 2.5) {
@@ -795,8 +880,9 @@ export default function VortexSpace({
           camLook.set(parallax.x * 30, -parallax.y * 20, EYE_Z);
         } else {
           // 常に前へ進みながら漂う。カーソルで視線が大きく振れる
-          camera.position.set(Math.sin(t * 0.12) * 5 + parallax.x * 9, 4 + Math.sin(t * 0.1) * 2.5 - parallax.y * 6, dolly);
-          camLook.set(parallax.x * 46, -parallax.y * 30, EYE_Z + 60);
+          // 渦の内側、下の壁に近い位置から目を見上げる。カーソルで視線が大きく振れる
+          camera.position.set(Math.sin(t * 0.12) * 5 + parallax.x * 8, HOME_Y + Math.sin(t * 0.1) * 2.5 - parallax.y * 5, dolly);
+          camLook.set(parallax.x * 50, LOOK_Y - parallax.y * 34, EYE_Z + 40);
         }
       }
       camera.lookAt(camLook);
@@ -829,8 +915,8 @@ export default function VortexSpace({
         c.mesh.visible = c.dim > 0.02;
       }
       for (const l of labels) {
-        posOf(l.base, l.s, 12, 0.3, spinAll, l.mesh.position);
-        orient(l.mesh, l.mesh.position, l.base, l.s, 12, 0.3, spinAll, 0.75);
+        posOf(l.base, l.s, -2, 0.3, spinAll, l.mesh.position);
+        l.mesh.lookAt(cam); // ラベルは常に読める向き（壁に沿わせると横倒しになる）
         l.mat.opacity = damp(l.mat.opacity, phaseNow === "entry" || pendingNow ? 0 : 0.95, dt, 0.6);
       }
       if (wordMesh) {
