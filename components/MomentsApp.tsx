@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MomentWithStats, VoteResponse } from "@/lib/types";
 import { getCrowd } from "@/lib/crowd";
+import { sfx } from "@/lib/sfx";
 import { defaultDictionary, type Interpretation } from "@/lib/interpret";
 import VortexSpace, { type Phase, type TourState, type VortexApi } from "./VortexSpace";
 import Entrance from "./Entrance";
@@ -52,6 +53,7 @@ export default function MomentsApp({
   const [leaving, setLeaving] = useState(false);
   const enter = useCallback(() => {
     getCrowd().start();
+    sfx.start();
     setLeaving(true);
     setPhase("space");
   }, []);
@@ -71,6 +73,7 @@ export default function MomentsApp({
 
   useEffect(() => {
     getCrowd().setVolume(tuning.volume / 100);
+    sfx.setVolume(tuning.volume / 100);
   }, [tuning.volume]);
 
   const updateTuning = useCallback((t: Tuning) => {
@@ -182,6 +185,7 @@ export default function MomentsApp({
       setSelectedId(null);
       registerPulse(res.moment.id);
       getCrowd().swell(1); // 自分の一票が一番大きな歓声を生む
+      sfx.hit();
       setPresent(res);
     },
     [registerPulse]

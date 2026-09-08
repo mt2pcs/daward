@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { getCrowd } from "@/lib/crowd";
+import { sfx } from "@/lib/sfx";
 import { FluidSim, INK_COLORS } from "@/lib/fluid";
 import type { Interpretation } from "@/lib/interpret";
 import type { MomentWithStats } from "@/lib/types";
@@ -139,6 +140,7 @@ interface Label {
   pos: THREE.Vector3; // 現在位置（中央での登場→腕の位置へ滑る）
   centerAt: number; // 中央に立てている間の位置（reveal中）
   born: number;
+  stamped?: boolean;
 }
 export interface VortexApi {
   tourNext: () => void;
@@ -716,6 +718,7 @@ export default function VortexSpace({
           flow = 0.45;
           loosenTarget = 0;
           flash(0.55);
+          sfx.boom();
         explode(new THREE.Vector3(0, 0, -60), a ? a.arms[0].color : 0xebff00);
         for (let k = 0; k < 3; k++) dropInk(130, 0.0009, 0.12, 0.4);
         // 一番熱い腕へ飛び込む（サンプルの focusOnStar）
@@ -742,6 +745,7 @@ export default function VortexSpace({
       phaseNow = p;
       if (p === "space") {
         // 入場: 渦の目へ飛び込む。写真は溶け、カードが腕の流れに乗って周りに現れる
+        sfx.enter();
         flash(0.7);
         photoTarget = 0;
         spinBoost = 0.8;
@@ -766,6 +770,7 @@ export default function VortexSpace({
         wordTarget = 1;
         hotTarget = 1;
         flowTarget = 0.3;
+        sfx.suction();
         loosenTarget = 0;
         spinBoost = 1.0;
         endTour();
@@ -776,6 +781,7 @@ export default function VortexSpace({
         hotTarget = 0;
         flowTarget = 0.05;
         loosenTarget = 0;
+        sfx.stopSuction();
       }
     };
     st.setPending = setPending;
@@ -787,6 +793,7 @@ export default function VortexSpace({
       const to = p.clone().add(dir.multiplyScalar(c.size * (portrait() ? 1.25 : 1.0)));
       camFree = false;
       flash(0.3);
+      sfx.whoosh(1);
       explode(p, c.color);
       camTween = { from: camera.position.clone(), to, lookFrom: camLook.clone(), lookTo: p, t0: performance.now(), dur: 1400, then };
       getCrowd().swell(0.5);
@@ -826,6 +833,7 @@ export default function VortexSpace({
       camTween = null;
       spinBoost = 0;
       getCrowd().swell(0.35);
+      sfx.swish();
       const arm = currentArms.arms[tour.arm];
       st.onTour?.({ armName: arm.name, color: arm.color, index: tour.idx, total: tour.ids.length, moment: c.m });
       if (tour.timer) clearTimeout(tour.timer);
@@ -872,6 +880,7 @@ export default function VortexSpace({
     };
     const resetView = () => {
       endTour();
+      sfx.whoosh(0.6);
       dragSpin = 0; dragVel = 0;
       dollyTarget = 30;
       flyingTo = null;
@@ -954,7 +963,7 @@ export default function VortexSpace({
         const c = pick(e.clientX, e.clientY);
         const id = c ? c.id : null;
         const overLabel = !c && pickLabel(e.clientX, e.clientY) !== null;
-        if (id !== hoverId) { hoverId = id; st.onHover?.(c ? c.m : null); }
+        if (id !== hoverId) { hoverId = id; st.onHover?.(c ? c.m : null); if (c) sfx.blip(); }
         renderer.domElement.style.cursor = c || overLabel ? "pointer" : "grab";
       }
     };
@@ -1155,6 +1164,7 @@ export default function VortexSpace({
       }
       for (const l of labels) {
         const born = now >= l.born;
+        if (born && !l.stamped) { l.stamped = true; if (l.centerAt >= 0) sfx.stamp(); }
         if (l.centerAt >= 0) {
           // 登場: 画面中央に一枚ずつ、縦に並んで立つ
           const nL = labels.length;
