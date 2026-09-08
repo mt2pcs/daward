@@ -66,6 +66,7 @@ uniform vec3 uColor[8];
 uniform vec3 uColorP[8];
 uniform float uSpin;
 uniform float uLoosen;
+uniform float uFocus; // ツアー中の腕（-1=無し）
 varying vec3 vColor;
 varying float vAlpha;
 const float R_NEAR = ${R_NEAR.toFixed(1)};
@@ -99,7 +100,8 @@ void main() {
   vColor = mix(colP, col, m);
   vColor = mix(vColor, vec3(1.0, 0.98, 0.9), uHot * 0.65);
   float edge = smoothstep(-0.18, 0.02, s) * smoothstep(1.1, 0.9, s);
-  vAlpha = edge * (0.25 + 0.75 * aBright) * uAlpha * (1.0 + uHot * 0.8);
+  float focusK = uFocus < 0.0 ? 1.0 : (abs(ai - uFocus) < 0.5 ? 1.7 : 0.25);
+  vAlpha = edge * (0.25 + 0.75 * aBright) * uAlpha * (1.0 + uHot * 0.8) * focusK;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }
 `;
@@ -427,7 +429,7 @@ export default function VortexSpace({
       uniforms: {
         uTime: { value: 0 }, uFlow: { value: 0.05 }, uMix: { value: 1 }, uSwirl: { value: 0 }, uHot: { value: 0 }, uAlpha: { value: 0.35 },
         uCount: { value: 1 }, uCountP: { value: 1 }, uBase: { value: armBase }, uBaseP: { value: armBaseP },
-        uColor: { value: armColor }, uColorP: { value: armColorP }, uSpin: { value: 0 }, uLoosen: { value: 0 },
+        uColor: { value: armColor }, uColorP: { value: armColorP }, uSpin: { value: 0 }, uLoosen: { value: 0 }, uFocus: { value: -1 },
       },
       transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending,
     });
@@ -502,6 +504,7 @@ export default function VortexSpace({
           });
           const mesh = new THREE.Mesh(ribbonGeometry(pts, width), mat);
           mesh.userData.targetOpacity = 0.3 + hash(arm.name, 60 + b) * 0.35;
+          mesh.userData.arm = ai;
           mesh.frustumCulled = false;
           ribbonGroup.add(mesh);
           ribbons.push(mesh);
@@ -795,26 +798,40 @@ export default function VortexSpace({
       const c = cards.get(tour.ids[tour.idx]);
       if (!c) return;
       for (const o of Array.from(cards.values())) o.stage = false;
-      c.stage = true;
-      flash(0.12);
+      c.stage = true; // ツアーの主役（その場で光り、少し大きくなる）
+      // カメラが腕に沿って滑り、そのカードの前（漏斗の内側）で止まる。視線はカードの少し奥＝渦の目の方向
+      const p = c.pos.clone();
+      const axisPt = new THREE.Vector3(0, 0, p.z);
+      const inward = axisPt.sub(p).normalize();
+      // 漏斗の内側（軸寄り）から、そのカードを画面中央やや左下に。背景は壁の帯と渦の目
+      const to = p.clone().add(inward.multiplyScalar(c.size * 2.2)).add(new THREE.Vector3(0, 0, 14));
+      const look = p.clone().lerp(new THREE.Vector3(0, 0, EYE_Z), 0.3).add(new THREE.Vector3(0, -c.size * 0.55, 0)); // カードは左中段、視界の大半は渦の奥
+      camFree = false;
+      flyingTo = null;
+      camTween = { from: camera.position.clone(), to, lookFrom: camLook.clone(), lookTo: look, t0: performance.now(), dur: 1500 };
       getCrowd().swell(0.35);
       const arm = currentArms.arms[tour.arm];
       st.onTour?.({ armName: arm.name, color: arm.color, index: tour.idx, total: tour.ids.length, moment: c.m });
       if (tour.timer) clearTimeout(tour.timer);
-      tour.timer = setTimeout(() => { if (tour) tourGo(tour.idx + 1); }, 4200);
+      tour.timer = setTimeout(() => { if (tour) tourGo(tour.idx + 1); }, 4500);
     };
     const startTour = (armIdx: number) => {
       if (!currentArms || !currentArms.arms[armIdx]) return;
       if (tour?.timer) clearTimeout(tour.timer);
       tour = { arm: armIdx, ids: currentArms.arms[armIdx].ids.filter((id) => cards.has(id)), idx: -1, timer: null };
+      smat.uniforms.uFocus.value = armIdx;
       tourGo(0);
     };
     const endTour = () => {
       if (!tour) return;
       if (tour.timer) clearTimeout(tour.timer);
       tour = null;
+      smat.uniforms.uFocus.value = -1;
       for (const o of Array.from(cards.values())) o.stage = false;
       st.onTour?.(null);
+      flyingTo = null;
+      camFree = false;
+      camTween = { from: camera.position.clone(), to: new THREE.Vector3(0, HOME_Y, dolly), lookFrom: camLook.clone(), lookTo: new THREE.Vector3(0, LOOK_Y, EYE_Z), t0: performance.now(), dur: 1400, then: () => { camFree = true; } };
     };
     const resetView = () => {
       endTour();
@@ -1003,7 +1020,11 @@ export default function VortexSpace({
       // 太い帯: 流れ、組み替え時は前の色が消えて新しい色が現れる
       ribbonGroup.rotation.z = spinAll;
       stripeTex.offset.x -= dt * (0.18 + flow * 1.2 + hot * 0.4);
-      for (const rb of ribbons) { const m = rb.material as THREE.MeshBasicMaterial; m.opacity = damp(m.opacity, (rb.userData.targetOpacity as number) * (phaseNow === "entry" ? 0 : 1) * (1 + hot * 0.5), dt, 0.9); }
+      for (const rb of ribbons) {
+        const m = rb.material as THREE.MeshBasicMaterial;
+        const fk = tour ? (rb.userData.arm === tour.arm ? 1.8 : 0.3) : 1;
+        m.opacity = damp(m.opacity, (rb.userData.targetOpacity as number) * (phaseNow === "entry" ? 0 : 1) * (1 + hot * 0.5) * fk, dt, 0.9);
+      }
       for (const rb of oldRibbons) { const m = rb.material as THREE.MeshBasicMaterial; m.opacity = damp(m.opacity, 0, dt, 0.6); }
 
       // 爆発
@@ -1048,7 +1069,7 @@ export default function VortexSpace({
       const cam = camera.position;
       const flying = flyingTo;
       for (const c of Array.from(cards.values())) {
-        if (phaseNow === "space" && c.inArm && c !== flying) {
+        if (phaseNow === "space" && c.inArm && c !== flying && !tour) {
           c.ts -= dt * flow * 0.4;
           if (c.ts < S_MIN) { c.ts += S_MAX - S_MIN; c.s = c.ts; c.size = 1; }
         }
@@ -1057,30 +1078,18 @@ export default function VortexSpace({
         c.ro = damp(c.ro, c.tro + loosen * 16 * (c.inArm ? 1 : 0), dt, 0.9);
         const hovered = hoverId === c.id;
         const sizeS = c.inArm ? 1.55 - 0.8 * Math.max(0, Math.min(1, c.s)) : 1;
-        c.size = damp(c.size, c.tsize * sizeS * (hovered ? 1.2 : 1), dt, 0.25);
+        c.size = damp(c.size, c.tsize * sizeS * (hovered ? 1.2 : 1) * (c.stage ? 1.3 : 1), dt, 0.25);
         c.dim = damp(c.dim, phaseNow === "entry" ? 0 : c.tdim, dt, 0.6);
-        if (c.stage) {
-          // 舞台: カメラの少し前、視線のやや下に正対して浮かぶ
-          tmp2.set(0, portrait() ? 5 : 3.5, portrait() ? -30 : -24).applyQuaternion(camera.quaternion).add(cam);
-          c.pos.lerp(tmp2, 1 - Math.exp(-dt / 0.35));
-          c.size = damp(c.size, portrait() ? 15 : 17, dt, 0.3);
-          c.mesh.position.copy(c.pos);
-          c.mesh.lookAt(cam);
-          c.mesh.scale.setScalar(c.size);
-          c.mat.color.setScalar(1);
-          c.mat.opacity = damp(c.mat.opacity, 1, dt, 0.3);
-          c.mesh.visible = true;
-          continue;
-        }
         posOf(c.base, c.s, c.ro, c.aj, spinAll, c.pos);
         c.pos.y += Math.sin(t * 0.8 + c.base * 3) * 0.5;
         c.mesh.position.copy(c.pos);
-        orient(c.mesh, c.pos, c.base, c.s, c.ro, c.aj, spinAll, c === flying ? 1 : c.inArm ? 0.6 : 0.4);
+        orient(c.mesh, c.pos, c.base, c.s, c.ro, c.aj, spinAll, c === flying || c.stage ? 1 : c.inArm ? 0.6 : 0.4);
         c.mesh.scale.setScalar(c.size);
         const dist = c.pos.distanceTo(cam);
         const fog = Math.max(0.2, Math.min(1, 1 - (dist - 30) / 170));
-        const b = (0.3 + 0.7 * fog) * (c.inArm ? 1 : 0.7) * (tour ? 0.55 : 1);
-        if (c.mat.color.r <= 1.01) c.mat.color.setScalar(b);
+        const inTourArm = tour ? tour.ids.includes(c.id) : true;
+        const b = c.stage ? 1.2 : (0.3 + 0.7 * fog) * (c.inArm ? 1 : 0.7) * (tour ? (inTourArm ? 0.85 : 0.35) : 1);
+        if (c.mat.color.r <= 1.2) c.mat.color.setScalar(b);
         c.mat.opacity = c.dim;
         c.mesh.visible = c.dim > 0.02;
       }

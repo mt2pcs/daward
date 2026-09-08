@@ -208,19 +208,14 @@ export default function MomentsApp({
       {/* 腕のツアー: ラベルをタップすると、その腕の映像を順に見せる */}
       {tour && !selected && (
         <div className="tour" style={{ ["--c" as string]: tour.color }}>
-          <div className="tour-head">
-            <span className="tour-arm">{tour.armName}</span>
-            <span className="tour-count">{tour.index + 1} / {tour.total}</span>
-            <button className="tour-close" onClick={() => vortexApi.current?.endTour()} aria-label="ツアーを終える">×</button>
+          <button className="tour-nav" onClick={() => vortexApi.current?.tourPrev()} aria-label="前へ">‹</button>
+          <div className="tour-body">
+            <div className="tour-line1"><span className="tour-arm">{tour.armName}</span><span className="tour-count">{tour.index + 1}/{tour.total}</span></div>
+            <div className="tour-title">{tour.moment.title} <span className="tour-votes">🔥{tour.moment.votes.toLocaleString()}</span></div>
           </div>
-          <div className="tour-title">{tour.moment.title}</div>
-          <div className="tour-meta">{tour.moment.event} ・ 🔥{tour.moment.votes.toLocaleString()}</div>
-          <div className="tour-actions">
-            <button className="tour-btn" onClick={() => vortexApi.current?.tourPrev()}>‹ 前へ</button>
-            <button className="tour-btn primary" onClick={() => setSelectedId(tour.moment.id)}>この瞬間を観て投票</button>
-            <button className="tour-btn" onClick={() => vortexApi.current?.tourNext()}>次へ ›</button>
-          </div>
-          <div className="tour-hint">← → キー / スワイプで移動、何もない所をタップで次へ</div>
+          <button className="tour-vote" onClick={() => setSelectedId(tour.moment.id)}>観て投票</button>
+          <button className="tour-nav" onClick={() => vortexApi.current?.tourNext()} aria-label="次へ">›</button>
+          <button className="tour-close" onClick={() => vortexApi.current?.endTour()} aria-label="ツアーを終える">×</button>
         </div>
       )}
       {viewDirty && !tour && !selected && phase === "space" && (
