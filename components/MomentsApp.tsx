@@ -92,9 +92,9 @@ export default function MomentsApp({
 
   // 言葉で渦を組み替える（LLMが腕を作り直す）
   const [query, setQuery] = useState<Interpretation | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
   const applyQuery = useCallback(async (text: string) => {
-    setBusy(true);
+    setPending(text); // 押した瞬間から渦が動き出す（解釈中の演出）
     try {
       const r = await fetch("/api/interpret", {
         method: "POST",
@@ -110,10 +110,9 @@ export default function MomentsApp({
     } catch {
       return false;
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   }, []);
-  const resetQuery = useCallback(() => setQuery(null), []);
   const arms = query ?? baseArms;
 
   const registerPulse = useCallback((momentId: string) => {
@@ -189,6 +188,7 @@ export default function MomentsApp({
       <VortexSpace
         moments={moments}
         arms={arms}
+        pendingText={pending}
         pulses={pulses}
         phase={phase}
         focusId={selectedId}
@@ -213,7 +213,7 @@ export default function MomentsApp({
       </header>
 
       {phase === "space" && (
-        <QueryBar active={query} busy={busy} onQuery={applyQuery} onReset={resetQuery} />
+        <QueryBar current={query ?? baseArms} busy={pending !== null} onQuery={applyQuery} />
       )}
 
       <Tuner
@@ -226,7 +226,7 @@ export default function MomentsApp({
       {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} /> : null}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev vortex1</div>
+      <div className="rev-tag">rev vortex2</div>
 
       {selected && (
         <DetailOverlay

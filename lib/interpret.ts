@@ -20,6 +20,7 @@ export interface Interpretation {
   vec: number[]; // 8軸（EMOTIONS順、0..1）
   arms: Arm[];
   scores: Record<string, number>; // momentId → 0..1（腕に入らなかったものは無い）
+  next: string[]; // 次に入れたくなる言葉（3つ）
   source: "llm" | "dictionary";
 }
 
@@ -93,7 +94,7 @@ export function defaultDictionary(moments: Moment[]): Interpretation {
   const scores: Record<string, number> = {};
   for (const m of moments) scores[m.id] = m.intensity ?? 0.6;
   const vec = new Array(EMOTIONS.length).fill(0.5);
-  return { text: "", theme: "熱狂", primary: "歓喜", vec, arms, scores, source: "dictionary" };
+  return { text: "", theme: "熱狂", primary: "歓喜", vec, arms, scores, next: ["ベテランの熱量", "めちゃくちゃ泣ける", "土壇場の一撃"], source: "dictionary" };
 }
 
 export function interpretDictionary(text: string, moments: Moment[]): Interpretation | null {
@@ -116,7 +117,7 @@ export function interpretDictionary(text: string, moments: Moment[]): Interpreta
     }))
     .filter((a) => a.ids.length > 0);
   if (arms.length === 0) return null;
-  return { text, theme: r.primary, primary: r.primary, vec: r.vec, arms, scores, source: "dictionary" };
+  return { text, theme: r.primary, primary: r.primary, vec: r.vec, arms, scores, next: ["日本中が沸いた夜", "若き才能の覚醒", "最後の花道"], source: "dictionary" };
 }
 
 // ---- LLM ----
@@ -151,6 +152,11 @@ async function chatJSON(system: string, user: string): Promise<Record<string, un
   } finally {
     clearTimeout(timer);
   }
+}
+
+function nextOf(raw: unknown): string[] {
+  const out = Array.isArray(raw) ? raw.filter((x) => typeof x === "string" && x.trim()).map((x) => String(x).trim().slice(0, 14)).slice(0, 3) : [];
+  return out.length ? out : ["ベテランの熱量", "めちゃくちゃ泣ける", "土壇場の一撃"];
 }
 
 interface RawArm {
@@ -203,7 +209,7 @@ async function interpretLLM(text: string, moments: Moment[]): Promise<Interpreta
   const armsRes = toArms(parsed.arms, moments, 36);
   if (!primary || !vec || !armsRes) return null;
   const theme = String(parsed.theme || primary).slice(0, 4);
-  return { text, theme, primary, vec, arms: armsRes.arms, scores: armsRes.scores, source: "llm" };
+  return { text, theme, primary, vec, arms: armsRes.arms, scores: armsRes.scores, next: nextOf(parsed.next), source: "llm" };
 }
 
 async function defaultLLM(moments: Moment[]): Promise<Interpretation | null> {
@@ -214,7 +220,8 @@ async function defaultLLM(moments: Moment[]): Promise<Interpretation | null> {
   「歓喜」「感動」のような感情の単語1つや、競技名だけの名前は禁止。
 - 100本すべてをどれか1つの腕に入れる（重複なし）。各腕の中は熱狂度の高い順に並べ、s は 0.3〜1.0 の熱狂度。
 出力はJSONのみ:
-{"arms":[{"name":"...","picks":[{"id":"M001","s":0.9},...]},...]}`;
+{"arms":[{"name":"...","picks":[{"id":"M001","s":0.9},...]},...],
+ "next":["<この渦を見た人が最初に入れたくなる言葉を3つ。気分・テーマ・競技などバラバラの切り口で、4〜10文字>", "...", "..."]}`;
   const user = `映像一覧（id|タイトル|競技|大会|年|感情|説明）:\n${catalogue(moments)}`;
   const parsed = await chatJSON(sys, user);
   const armsRes = toArms(parsed.arms, moments, 100);
@@ -228,5 +235,5 @@ async function defaultLLM(moments: Moment[]): Promise<Interpretation | null> {
     }
   }
   const vec = new Array(EMOTIONS.length).fill(0.5);
-  return { text: "", theme: "熱狂", primary: "歓喜", vec, arms: armsRes.arms, scores: armsRes.scores, source: "llm" };
+  return { text: "", theme: "熱狂", primary: "歓喜", vec, arms: armsRes.arms, scores: armsRes.scores, next: nextOf(parsed.next), source: "llm" };
 }
