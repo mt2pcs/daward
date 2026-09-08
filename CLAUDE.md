@@ -254,6 +254,15 @@ enter=入場（風切り＋低い唸り）/ whoosh=カメラ移動・視点リ�
 suction=送信中の吸い込み（結果が来るまで持続、`stopSuction`）/ stamp=ラベルが立つ / boom=再配置 / hit=投票。
 検証: `window.__sfx.played` に再生回数が入る（`tour_test.mjs` で確認）。
 
+**「音ならない」の真因（2026-09-08・vortex4h）**: 呼ばれてはいた（played は増える）が、OfflineAudioContext で実測すると
+RMS −45dB（歓声 crowd.ogg は −17.6dB）。exponentialRamp で 0.0001 へ落とす包絡は100msで消え、帯域通過ノイズは
+ゲイン補正が無いと −35dB。歓声の下に完全に埋もれていた。→ 立ち上がり→保持→setTargetAtTime 減衰、ノイズはゲイン2〜3.5、
+bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / 本体 −12〜−18dB に揃えた。
+**音は必ず数値で検証する**: `scratchpad/harness/sfx_off.mjs`（各SEの dB）、`sfx_wav.mjs`（全SEを1本のWAVに並べ、
+`sfx_env_sheet.png` の包絡図と mp3 をユーザーに渡す）。`lib/sfx.ts` の `attachContextForTest` はそのための差し込み口。
+実ブラウザ相当の in-app 測定は `sfx_probe2.mjs`（master のアナライザ RMS。swiftshader ではメインスレッドが1秒以上止まるため
+短いSEはサンプルに掛からない＝0でも無音とは限らない。長いSE（enter/boom）で判定する）。
+
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）
 
 - 「後で確認する」と言うときは、必ず send_later 等で実際にスケジュールする。できない場合は「できない」と言う。
