@@ -266,7 +266,7 @@ export default function MomentsApp({
       {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} visual={visual} /> : null}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev {burst ? "burst2" : "graph2d"}</div>
+      <div className="rev-tag">rev {burst ? "burst3" : "graph2d"}</div>
 
       {selected && (
         <DetailOverlay

@@ -329,11 +329,15 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
 - ルート: `app/burst/page.tsx`（検証用）。本番は `VISUAL_MODE=burst` の別サービス。デプロイ:
   `SERVICE=e-mooments-burst VISUAL_MODE=burst node scripts/deploy_cloud_run.js`（`scripts/deploy_cloud_run.js` が SERVICE / VISUAL_MODE を受ける）。
   グラフページの戻りボタンは `?from=burst` で「炸裂へ戻る」。
-- **入口は変化させる（ユーザー指摘: 最初から細長い破片では意味が分からない・スカスカ）**: 最初は 8×5 のサムネのモザイク（タイル 22×22、
-  画面いっぱい）。1.2秒後から8秒かけて、中心のタイルから順に（遅延 ∝ 中心距離）自分の方向へ飛び出して尖った破片に変形する
-  （`morphShards`: 開始形＝矩形、終了形＝放射の破片。頂点と UV を進行 k（pow 2.2）で補間。UV は終了で1コマの中央帯だけになる）。
-  ロゴ色の破片 48 枚は k 0.3〜0.8 で裏から現れる。破片は幅 2.6〜6.6 / 0.8〜4.0 で口（s −0.3）まで伸ばし、黒の隙間を少なく。
-  吸い込みが始まったら k を dt×1.6 で加速（一気に飛ばすと不連続）。検証: `burst_entry_test.mjs` → `burst_entry_sheet.png`。
+- **入口（burst3・確定）**: ユーザー判定「サムネの素材をべた貼りした背景は美しくない」「タイルが伸びて破片になる変化は素人パワポ」
+  「スカスカ」。→ 3Dの破片メッシュは廃止し、**渦版の流体と同じ位置づけの全画面フラグメントシェーダー `BURST_FRAG`（放射状の裂け目）**。
+  サムネのモザイクを 112 本の不均等な楔（くさび）に分け、進行 k（1秒後から10秒、中心から外へ伝播）で楔ごとに違う速さで外へ流し
+  引き伸ばす。楔の種類: 30% はロゴ色のベタ（長さをばらつかせ外側は黒）、20% は黒、残りは写真のまま（明るさ差だけ）。
+  楔の縁は色の光で縁取り。最初から k≥0.03 でわずかに裂けた構図にし「べた貼り」に見せない。常にゆっくり外へ流れ続ける。
+  空間では uPhoto→0 で写真が消え色の筋だけ（トンネルの奥の背景）。吸い込みは渦版と同じ uZoom/uRot/迫り。DAZN フレームは別メッシュ
+  （目の6手前、`frame`、枠の外は透明、空間で 0.5 倍）。**GLSL の予約語 `flat` を変数名にして全黒になった**（コンパイルエラーは
+  console.error なので pageerror では拾えない。テストは console も拾う）。検証: `burst_entry_test.mjs`（`__vs.dbg().t` で実時刻）→
+  `burst_entry_sheet2.png`、通しは `burst_test.mjs` → `burst_sheet3.png`。
 - リファレンス: `scratchpad/gen/burst_entry1.png`, `burst_main1.png`（gpt-image-2）。検証: `scratchpad/burst_test.mjs` → `burst_sheet2.png`。
 
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）

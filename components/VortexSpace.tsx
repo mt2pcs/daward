@@ -108,6 +108,79 @@ void main() {
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }
 `;
+// 炸裂の目: 放射状の裂け目（詳細は eye の生成箇所のコメント）
+const BURST_FRAG = `
+precision highp float;
+varying vec2 vUv;
+uniform sampler2D uAtlas;
+uniform float uK;
+uniform float uTime;
+uniform float uZoom;
+uniform float uRot;
+uniform float uDim;
+uniform float uBurst;
+uniform float uPhoto;
+uniform vec3 uPal[8];
+const float ASPECT = 1.6;
+float hash(float n) { return fract(sin(n * 127.1 + 311.7) * 43758.5453); }
+vec3 palette(float h) { int i = int(floor(h * 7.999)); for (int k = 0; k < 8; k++) { if (k == i) return uPal[k]; } return uPal[0]; }
+vec3 photoAt(vec2 c) {
+  vec2 uv = vec2(c.x / ASPECT + 0.5, c.y + 0.5);
+  if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) return vec3(0.0);
+  return texture2D(uAtlas, uv).rgb;
+}
+void main() {
+  // q: 元の板の中心座標（板は2倍。入口の画面は q∈[-0.5,0.5]）。回転と拡大はテクスチャ側で
+  vec2 q = (vUv - 0.5) * 2.0;
+  float cs = cos(uRot), sn = sin(uRot);
+  q = vec2(q.x * cs - q.y * sn, q.x * sn + q.y * cs) / uZoom;
+  vec2 c = vec2(q.x * ASPECT, q.y);
+  float r = length(c);
+  float th = atan(c.y, c.x);
+  // 不均等な楔: 均等分割を波で歪めて幅をばらつかせる
+  float w = (th / 6.2831853 + 0.5) * 112.0;
+  float wj = w + 0.45 * sin(w * 1.7) + 0.35 * sin(w * 0.53) + 0.25 * sin(w * 0.21);
+  float id = floor(wj);
+  float f = fract(wj);
+  float h1 = hash(id), h2 = hash(id + 57.0), h3 = hash(id + 113.0), h4 = hash(id + 201.0);
+  // 進行は中心から外へ伝わる（楔ごとに少し違う）
+  float k = clamp(uK * 1.5 - r * 0.55 * (0.6 + 0.8 * h4), 0.0, 1.0);
+  k = k * k * (3.0 - 2.0 * k);
+  float kg = max(k, 0.03); // 最初からわずかに楔に裂けた構図（ベタ貼りのモザイクには見せない）
+  float speed = 0.5 + h1 * 1.3;
+  float stretch = 0.3 + h2 * 1.1;
+  // 半径の写像: 中心の絵が外へ流れ、楔ごとに引き伸ばされる（写真が分かる程度）。常にゆっくり外へ流れ続ける
+  float rs = r / (1.0 + kg * stretch) - kg * speed * 0.10 - uTime * (0.002 + 0.008 * kg * (0.5 + h1));
+  rs = max(rs, 0.0);
+  vec2 dir = c / max(r, 1e-4);
+  // 半径方向のブラー（筋）: ごく少し
+  vec3 col = vec3(0.0);
+  float spread = 0.001 + kg * 0.005 * stretch;
+  for (int i = 0; i < 8; i++) { float o = (float(i) - 3.5) / 3.5 * spread; col += photoAt(dir * max(rs + o, 0.0)); }
+  col /= 8.0;
+  vec3 pal = palette(h3);
+  // 空間では写真が消えて色の筋だけ残る
+  col = mix(pal * (0.35 + 0.4 * h4) * (0.6 + 0.4 * sin(rs * 60.0 + h1 * 9.0)), col, uPhoto);
+  // 楔の種類: ロゴ色のベタ（鮮やか、長さはばらつき外側は黒） / 黒 / 写真のまま（明るさ差だけ）
+  vec3 solid = pal * (0.9 + 0.3 * h4);
+  float rEnd = 0.3 + hash(id + 307.0) * 0.8; // ベタの破片の長さ
+  if (h2 < 0.3) col = mix(col, mix(solid, vec3(0.01), smoothstep(rEnd - 0.04, rEnd + 0.04, r)), k);
+  else if (h2 < 0.5) col = mix(col, vec3(0.01), k * 0.95);
+  else col = col * (1.0 + 0.2 * k);
+  col *= 0.88 + 0.24 * h4; // 楔ごとの明るさ差（最初から楔が読める）
+  // 楔の縁は色の光で縁取る。中心近くは楔に沿って光る
+  float edge = 1.0 - smoothstep(0.0, 0.03, min(f, 1.0 - f));
+  col += pal * edge * (0.12 + k * (0.5 + 0.6 * h1));
+  col += pal * k * 0.35 * h2 * smoothstep(0.55, 0.05, r);
+  // 中心（フレームの内側）は黒へ。周辺は落とす
+  col *= mix(1.0, smoothstep(0.08, 0.26, r), 0.5 + 0.5 * k);
+  col *= 0.1 + 0.9 * smoothstep(1.25, 0.5, r);
+  col *= uDim;
+  col = col / (1.0 + col * 0.25);
+  col += vec3(1.0, 0.98, 0.9) * uBurst * exp(-r * 3.0);
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
 const STREAM_FRAG = `
 precision highp float;
 varying vec3 vColor;
@@ -429,12 +502,13 @@ export default function VortexSpace({
     frameCanvas.width = 512; frameCanvas.height = 512;
     {
       const g = frameCanvas.getContext("2d")!;
-      g.fillStyle = "#000"; g.fillRect(0, 0, 512, 512);
+      g.clearRect(0, 0, 512, 512);
       const m = 64, w = 22, notch = 26;
+      const outer = () => { g.moveTo(m, m); g.lineTo(512 - m, m); g.lineTo(512 - m, 256 - notch); g.lineTo(512 - m - notch * 0.9, 256); g.lineTo(512 - m, 256 + notch); g.lineTo(512 - m, 512 - m);
+        g.lineTo(m, 512 - m); g.lineTo(m, 256 + notch); g.lineTo(m + notch * 0.9, 256); g.lineTo(m, 256 - notch); g.closePath(); };
+      g.fillStyle = "#000"; g.beginPath(); outer(); g.fill(); // 枠の内側は黒（ロゴの黒い正方形）。外は透明
       g.fillStyle = "#fff";
-      g.beginPath();
-      g.moveTo(m, m); g.lineTo(512 - m, m); g.lineTo(512 - m, 256 - notch); g.lineTo(512 - m - notch * 0.9, 256); g.lineTo(512 - m, 256 + notch); g.lineTo(512 - m, 512 - m);
-      g.lineTo(m, 512 - m); g.lineTo(m, 256 + notch); g.lineTo(m + notch * 0.9, 256); g.lineTo(m, 256 - notch); g.closePath();
+      g.beginPath(); outer();
       const mi = m + w;
       g.moveTo(mi, mi); g.lineTo(mi, 256 - notch); g.lineTo(mi + notch * 0.9, 256); g.lineTo(mi, 256 + notch); g.lineTo(mi, 512 - mi);
       g.lineTo(512 - mi, 512 - mi); g.lineTo(512 - mi, 256 + notch); g.lineTo(512 - mi - notch * 0.9, 256); g.lineTo(512 - mi, 256 - notch); g.lineTo(512 - mi, mi); g.closePath();
@@ -443,16 +517,27 @@ export default function VortexSpace({
     const frameTex = new THREE.CanvasTexture(frameCanvas);
     frameTex.colorSpace = THREE.SRGBColorSpace;
     const FRAME_SIZE = 210; // 枠線は板の75%＝約158ユニット。入口（距離約290）で幅約300px、ボタンが中に収まる
-    const eye = burstMode
-      ? new THREE.Mesh(new THREE.PlaneGeometry(FRAME_SIZE, FRAME_SIZE), new THREE.MeshBasicMaterial({ map: frameTex }))
-      : new THREE.Mesh(new THREE.PlaneGeometry(EYE_H * eyeAspect * 2, EYE_H * 2), eyeMat);
+    // 炸裂の目: 画面全体のフラグメントシェーダー「放射状の裂け目」。渦版の流体の板と同じ大きさ・同じ動かし方（uZoom / uRot / 迫り）。
+    // サムネのモザイクが、中心から外へ向かって不均等な楔（くさび）に裂け、楔ごとに違う速さで外へ流れて引き伸ばされ、
+    // 一部の楔はロゴ色のベタに、一部は黒に、楔の縁は色の光で縁取られる＝ロゴの「黒地から放射する破片」になる。
+    const burstMat = new THREE.ShaderMaterial({
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: BURST_FRAG,
+      uniforms: {
+        uAtlas: { value: atlasTex }, uK: { value: 0 }, uTime: { value: 0 }, uZoom: { value: 1 }, uRot: { value: 0 }, uDim: { value: 1 }, uBurst: { value: 0 }, uPhoto: { value: 1 },
+        uPal: { value: ARM_COLORS.map((c) => new THREE.Color(c)) },
+      },
+      depthWrite: true,
+    });
+    const eye = new THREE.Mesh(new THREE.PlaneGeometry(EYE_H * eyeAspect * 2, EYE_H * 2), burstMode ? burstMat : eyeMat);
     eye.position.set(0, 0, EYE_Z);
     scene.add(eye);
-    if (burstMode) {
-      const back = new THREE.Mesh(new THREE.PlaneGeometry(EYE_H * 4, EYE_H * 4), new THREE.MeshBasicMaterial({ color: 0x000000 }));
-      back.position.set(0, 0, EYE_Z - 2);
-      scene.add(back);
-    }
+    // DAZN のフレーム（炸裂のみ）: 目の少し手前。入口でボタンがこの枠の中に乗る。空間では 0.5 倍で消失点
+    const frame = new THREE.Mesh(new THREE.PlaneGeometry(FRAME_SIZE, FRAME_SIZE), new THREE.MeshBasicMaterial({ map: frameTex, transparent: true, depthWrite: false }));
+    frame.position.set(0, 0, EYE_Z + 6);
+    frame.visible = burstMode;
+    scene.add(frame);
+    let burstK = 0, burstPhoto = 1; // 入口の炸裂の進行 0→1 / 写真→色だけ
     const dropInk = (strength: number, radius: number, rMin = 0.1, rMax = 0.4) => {
       if (burstMode) return;
       const ang = Math.random() * Math.PI * 2;
@@ -523,11 +608,6 @@ export default function VortexSpace({
     scene.add(ribbonGroup);
     let ribbons: THREE.Mesh[] = [];
     let oldRibbons: THREE.Mesh[] = [];
-    // 炸裂の入口: 写真の破片（アトラスの1コマを細長い帯に切って放射状に）。入場で脇を流れ、空間では消える
-    const shardGroup = new THREE.Group();
-    scene.add(shardGroup);
-    const photoShards: THREE.Mesh[] = [];
-    let shardAlpha = burstMode ? 1 : 0;
     // tangential=true: 幅を接線方向（壁に沿って横）に取る。放射状の直線の破片は半径方向に幅を取ると軸から見て真横（線）になって見えない
     const ribbonGeometry = (pts: THREE.Vector3[], halfW: number, taper?: (t: number) => number, tangential = false, sideDir?: THREE.Vector3): THREE.BufferGeometry => {
       const n = pts.length;
@@ -566,62 +646,6 @@ export default function VortexSpace({
       mesh.frustumCulled = false;
       return mesh;
     };
-    // 入口の変化: 最初は 8×5 のサムネのモザイク（画面いっぱい）。中心のタイルから順に、自分の方向へ飛び出して尖った破片になり
-    // 放射になる（渦版の「写真が捻れて溶ける」に相当）。各タイルは開始形（矩形）と終了形（放射の破片）の頂点を持ち、進行 k で補間する。
-    // ロゴ色の破片 26 枚はその裏から現れる。
-    const TILE_W = 22; // 8 列で 176（入口カメラ距離 ~90・fov62・16:10 で画面幅 ≈ 173）
-    const morphShards: { mesh: THREE.Mesh; p0: Float32Array; p1: Float32Array; uv0: Float32Array; uv1: Float32Array; delay: number; k: number }[] = [];
-    let burstK = 0; // 入口の炸裂の進行 0→1
-    if (burstMode) {
-      const NS = GRID[0] * GRID[1], NC = 48; // 写真40 + 色48。ロゴのように黒の隙間が少ない密度
-      const tileH = 110 / GRID[1]; // 画面高（入口カメラ距離 ~90・fov62 で約108）を 5 行で覆う
-      for (let i = 0; i < NS + NC; i++) {
-        const isPhoto = i < NS;
-        let mat: THREE.MeshBasicMaterial;
-        if (isPhoto) {
-          const cx = i % GRID[0], cy = Math.floor(i / GRID[0]);
-          const tex = atlasTex.clone();
-          tex.needsUpdate = true;
-          tex.repeat.set(1 / GRID[0], 1 / GRID[1]);
-          tex.offset.set(cx / GRID[0], (GRID[1] - 1 - cy) / GRID[1]);
-          mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 1, depthWrite: false, side: THREE.DoubleSide });
-          // 開始形: モザイクのタイル（矩形、横向きに N 分割）
-          const tx = (cx - (GRID[0] - 1) / 2) * TILE_W, ty = ((GRID[1] - 1) / 2 - cy) * tileH;
-          const pts0: THREE.Vector3[] = [];
-          for (let q = 0; q <= SHARD_N; q++) pts0.push(new THREE.Vector3(tx - TILE_W / 2 + (q / SHARD_N) * TILE_W, ty, 0));
-          const g0 = ribbonGeometry(pts0, tileH / 2, undefined, false, new THREE.Vector3(0, 1, 0));
-          // 終了形: タイルの方向へ飛び出した破片（中心に近いタイルほど先端が奥＝中心近くまで）
-          const ang = Math.atan2(ty, tx);
-          const d = Math.min(1, Math.hypot(tx, ty) / 95);
-          const width = 2.6 + hash("shardW", i) * 4.0;
-          const g1 = ribbonGeometry(shardPoints(ang, (hash("shardA", i) - 0.5) * 0.1, (hash("shardR", i) - 0.5) * 10, (hash("shardZ", i) - 0.5) * 6, 0.5 - d * 0.22, -0.3 + hash("shardM", i) * 0.2, YSQ), width, (t) => Math.pow(t, 0.75), true);
-          // 終了形の UV: 1コマの中央の帯だけを見せる（細くなった分、絵を縦に潰さない）
-          const bandH = 0.42 + (hash("shard", i) - 0.5) * 0.2;
-          const uv1 = (g1.getAttribute("uv") as THREE.BufferAttribute).array as Float32Array;
-          for (let v = 0; v < uv1.length / 2; v++) uv1[v * 2 + 1] = uv1[v * 2 + 1] < 0.5 ? 0.5 - bandH / 2 : 0.5 + bandH / 2;
-          const mesh = new THREE.Mesh(g0, mat);
-          mesh.frustumCulled = false;
-          mesh.userData.op = 1;
-          mesh.userData.phase = hash("shardP", i) * Math.PI * 2;
-          morphShards.push({ mesh, p0: (g0.getAttribute("position") as THREE.BufferAttribute).array.slice() as Float32Array, p1: (g1.getAttribute("position") as THREE.BufferAttribute).array as Float32Array, uv0: (g0.getAttribute("uv") as THREE.BufferAttribute).array.slice() as Float32Array, uv1, delay: d * 0.45, k: -1 });
-          shardGroup.add(mesh);
-          photoShards.push(mesh);
-        } else {
-          const col = new THREE.Color(ARM_COLORS[i % ARM_COLORS.length]);
-          if (hash("shardC", i) < 0.3) col.lerp(new THREE.Color("#ffffff"), 0.3);
-          mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
-          const base = i * 2.399963 + (hash("shardA", i) - 0.5) * 0.2; // 黄金角で散らす
-          const width = 0.8 + hash("shardW", i) * 3.2;
-          const mesh = new THREE.Mesh(ribbonGeometry(shardPoints(base, 0, (hash("shardR", i) - 0.5) * 10, (hash("shardZ", i) - 0.5) * 6 - 1, 0.3 + hash("shardT", i) * 0.24, -0.3 + hash("shardM", i) * 0.22, YSQ), width, (t) => Math.pow(t, 0.75), true), mat);
-          mesh.frustumCulled = false;
-          mesh.userData.op = 0.9;
-          mesh.userData.color = true;
-          mesh.userData.phase = hash("shardP", i) * Math.PI * 2;
-          shardGroup.add(mesh);
-          photoShards.push(mesh);
-        }
-      }
-    }
     const buildRibbons = (a: Interpretation) => {
       for (const r of oldRibbons) { ribbonGroup.remove(r); r.geometry.dispose(); (r.material as THREE.Material).dispose(); }
       oldRibbons = ribbons;
@@ -1099,7 +1123,7 @@ export default function VortexSpace({
         const th = sc ? sc.tbase + sc.ts * twist + sc.aj + spin + dragSpin : null;
         return { t: performance.now(), cx: camera.position.x, cy: camera.position.y, cz: camera.position.z, lz: camLook.z, sx: sc?.pos.x ?? null, sy: sc?.pos.y ?? null, sz: sc?.pos.z ?? null, idx: tour?.idx ?? -1, th, spin, dragSpin, tourSpinTarget, base: sc?.base ?? null, tbase: sc?.tbase ?? null, ts: sc?.ts ?? null, s: sc?.s ?? null, ro: sc?.ro ?? null };
       },
-      dbg: () => ({ diving, eyeZ: eye.position.z, zoom: eyeMat.uniforms.uZoom.value, dim: eyeMat.uniforms.uDim.value, diss: fluid.params.dyeDissipation, strength: fluid.params.strength, pull: fluid.params.pull, fov: camera.fov, roll: diveRoll, eyeSpin, tier, frameMs, dimOp: dimMat.opacity, dimVis: dimQuad.visible, hot, phase: phaseNow }),
+      dbg: () => ({ t: (performance.now() - t0) / 1000, diving, eyeZ: eye.position.z, zoom: eyeMat.uniforms.uZoom.value, dim: eyeMat.uniforms.uDim.value, diss: fluid.params.dyeDissipation, strength: fluid.params.strength, pull: fluid.params.pull, fov: camera.fov, roll: diveRoll, eyeSpin, tier, frameMs, dimOp: dimMat.opacity, dimVis: dimQuad.visible, hot, phase: phaseNow }),
       labelAt: (i: number) => {
         const l = labels[i];
         if (!l) return null;
@@ -1268,33 +1292,18 @@ export default function VortexSpace({
       if (atlasDirty) { atlasTex.needsUpdate = true; atlasDirty = false; if (t < 6 && phaseNow === "entry") fluid.fillMosaic(atlasTex, [GRID[0], GRID[1]], [0.3, 0.16875]); }
       eyeMat.uniforms.uRot.value = spinAll * 0.15 + eyeSpin;
       } else {
-        // 炸裂: フレームが迫ってくる。空間では小さく（トンネルの奥の消失点）
+        // 炸裂: 目（裂け目のシェーダー）とフレームが迫ってくる。空間ではフレームは小さく（トンネルの奥の消失点）
         eye.position.z = EYE_Z + de * 150;
+        frame.position.z = eye.position.z + 6;
         const fs = phaseNow === "entry" || diving ? 1 : 0.5;
-        eye.scale.setScalar(damp(eye.scale.x, fs, dt, 0.8));
-        if (atlasDirty) { atlasTex.needsUpdate = true; atlasDirty = false; for (const sh of photoShards) { const mp = (sh.material as THREE.MeshBasicMaterial).map; if (mp) mp.needsUpdate = true; } }
-        // 炸裂の進行: 1.2秒待って約8秒かけて（渦版の10秒の捻りに相当）。吸い込みが始まったら即完了
-        burstK = diving ? Math.min(1, burstK + dt * 1.6) : Math.max(0, Math.min(1, (t - 1.2) / 8)); // 早く押されたら吸い込みの中で一気に（ただし連続的に）炸裂させる
-        shardGroup.rotation.z = spinAll + burstK * t * 0.02; // モザイクの間は回さない
-        for (const ms of morphShards) {
-          const kk = Math.pow(Math.max(0, Math.min(1, (burstK - ms.delay) / (1 - ms.delay))), 2.2);
-          if (Math.abs(kk - ms.k) < 1e-4) continue;
-          ms.k = kk;
-          const pos = ms.mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
-          const uv = ms.mesh.geometry.getAttribute("uv") as THREE.BufferAttribute;
-          const pa = pos.array as Float32Array, ua = uv.array as Float32Array;
-          for (let j = 0; j < pa.length; j++) pa[j] = ms.p0[j] + (ms.p1[j] - ms.p0[j]) * kk;
-          for (let j = 0; j < ua.length; j++) ua[j] = ms.uv0[j] + (ms.uv1[j] - ms.uv0[j]) * kk;
-          pos.needsUpdate = true; uv.needsUpdate = true;
-        }
-        shardAlpha = damp(shardAlpha, phaseNow === "entry" || diving ? 1 : 0, dt, 0.7);
-        const colorIn = Math.max(0, Math.min(1, (burstK - 0.3) / 0.5)); // 色の破片は炸裂が進んでから裏から現れる
-        for (const sh of photoShards) {
-          const m = sh.material as THREE.MeshBasicMaterial;
-          const shimmer = 0.85 + 0.15 * Math.sin(t * 0.9 + (sh.userData.phase as number));
-          m.opacity = shardAlpha * (sh.userData.op as number) * (sh.userData.color ? colorIn * shimmer : 1 - (1 - shimmer) * burstK);
-          sh.visible = m.opacity > 0.01;
-        }
+        frame.scale.setScalar(damp(frame.scale.x, fs, dt, 0.8));
+        if (atlasDirty) { atlasTex.needsUpdate = true; atlasDirty = false; }
+        // 炸裂の進行: 0.8秒待って約8.5秒かけて中心から外へ裂ける（渦版の「写真が捻れて溶ける」に相当）。吸い込みが始まったら加速して裂き切る
+        burstK = diving ? Math.min(1, burstK + dt * 1.6) : Math.max(0, Math.min(1, (t - 1.0) / 10));
+        burstPhoto = damp(burstPhoto, phaseNow === "entry" || diving ? 1 : 0, dt, 0.9);
+        const u = burstMat.uniforms;
+        u.uK.value = burstK; u.uTime.value = t; u.uZoom.value = 1 + de * 1.9; u.uRot.value = spinAll * 0.15 + eyeSpin * 0.25;
+        u.uDim.value = phaseNow === "entry" || diving ? 1 : 0.7 + 0.3 * hot; u.uBurst.value = burst; u.uPhoto.value = burstPhoto;
       }
 
       // 粒子
