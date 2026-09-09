@@ -1937,7 +1937,7 @@ textarea {
 .view-reset {
   position: fixed;
   right: 18px;
-  top: 96px;
+  top: 150px; /* HUD右上の TOTAL VOTES + CONTEXT GRAPH ボタン（〜110px）の下 */
   z-index: 26;
   padding: 10px 16px;
   border-radius: 999px;
