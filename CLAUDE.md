@@ -329,7 +329,12 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
 - ルート: `app/burst/page.tsx`（検証用）。本番は `VISUAL_MODE=burst` の別サービス。デプロイ:
   `SERVICE=e-mooments-burst VISUAL_MODE=burst node scripts/deploy_cloud_run.js`（`scripts/deploy_cloud_run.js` が SERVICE / VISUAL_MODE を受ける）。
   グラフページの戻りボタンは `?from=burst` で「炸裂へ戻る」。
-- リファレンス: `scratchpad/gen/burst_entry1.png`, `burst_main1.png`（gpt-image-2）。検証: `scratchpad/burst_test.mjs` → `burst_sheet.png`。
+- **入口は変化させる（ユーザー指摘: 最初から細長い破片では意味が分からない・スカスカ）**: 最初は 8×5 のサムネのモザイク（タイル 22×22、
+  画面いっぱい）。1.2秒後から8秒かけて、中心のタイルから順に（遅延 ∝ 中心距離）自分の方向へ飛び出して尖った破片に変形する
+  （`morphShards`: 開始形＝矩形、終了形＝放射の破片。頂点と UV を進行 k（pow 2.2）で補間。UV は終了で1コマの中央帯だけになる）。
+  ロゴ色の破片 48 枚は k 0.3〜0.8 で裏から現れる。破片は幅 2.6〜6.6 / 0.8〜4.0 で口（s −0.3）まで伸ばし、黒の隙間を少なく。
+  吸い込みが始まったら k を dt×1.6 で加速（一気に飛ばすと不連続）。検証: `burst_entry_test.mjs` → `burst_entry_sheet.png`。
+- リファレンス: `scratchpad/gen/burst_entry1.png`, `burst_main1.png`（gpt-image-2）。検証: `scratchpad/burst_test.mjs` → `burst_sheet2.png`。
 
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）
 

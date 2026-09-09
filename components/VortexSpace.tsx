@@ -525,12 +525,11 @@ export default function VortexSpace({
     let oldRibbons: THREE.Mesh[] = [];
     // 炸裂の入口: 写真の破片（アトラスの1コマを細長い帯に切って放射状に）。入場で脇を流れ、空間では消える
     const shardGroup = new THREE.Group();
-    shardGroup.scale.y = YSQ;
     scene.add(shardGroup);
     const photoShards: THREE.Mesh[] = [];
     let shardAlpha = burstMode ? 1 : 0;
     // tangential=true: 幅を接線方向（壁に沿って横）に取る。放射状の直線の破片は半径方向に幅を取ると軸から見て真横（線）になって見えない
-    const ribbonGeometry = (pts: THREE.Vector3[], halfW: number, taper?: (t: number) => number, tangential = false): THREE.BufferGeometry => {
+    const ribbonGeometry = (pts: THREE.Vector3[], halfW: number, taper?: (t: number) => number, tangential = false, sideDir?: THREE.Vector3): THREE.BufferGeometry => {
       const n = pts.length;
       const pos = new Float32Array(n * 2 * 3);
       const uv = new Float32Array(n * 2 * 2);
@@ -538,7 +537,7 @@ export default function VortexSpace({
       const sideV = new THREE.Vector3();
       for (let i = 0; i < n; i++) {
         const p = pts[i];
-        if (tangential) sideV.set(-p.y, p.x, 0); else sideV.set(p.x, p.y, 0);
+        if (sideDir) sideV.copy(sideDir); else if (tangential) sideV.set(-p.y, p.x, 0); else sideV.set(p.x, p.y, 0);
         sideV.normalize().multiplyScalar(halfW * (taper ? taper(i / (n - 1)) : 1));
         pos.set([p.x - sideV.x, p.y - sideV.y, p.z, p.x + sideV.x, p.y + sideV.y, p.z], i * 6);
         uv.set([i / (n - 1), 0, i / (n - 1), 1], i * 4);
@@ -551,47 +550,76 @@ export default function VortexSpace({
       return g;
     };
     // 炸裂の破片: 中心へ向かって尖る平らな三角形（ロゴの放射）。中心側 sTip → 口側 sMouth
-    const shardMesh = (base: number, off: number, roff: number, width: number, zOff: number, mat: THREE.Material, sTip = 0.4, sMouth = -0.3) => {
+    const SHARD_N = 24;
+    const shardPoints = (base: number, off: number, roff: number, zOff: number, sTip: number, sMouth: number, ysq = 1) => {
       const pts: THREE.Vector3[] = [];
-      const N = 24;
-      for (let q = 0; q <= N; q++) {
-        const ss = sTip + (q / N) * (sMouth - sTip);
+      for (let q = 0; q <= SHARD_N; q++) {
+        const ss = sTip + (q / SHARD_N) * (sMouth - sTip);
         const th = base + off;
         const rr = radiusAt(ss) + roff;
-        pts.push(new THREE.Vector3(Math.cos(th) * rr, Math.sin(th) * rr, depthAt(ss) + zOff));
+        pts.push(new THREE.Vector3(Math.cos(th) * rr, Math.sin(th) * rr * ysq, depthAt(ss) + zOff));
       }
-      const mesh = new THREE.Mesh(ribbonGeometry(pts, width, (t) => Math.pow(t, 0.75), true), mat);
+      return pts;
+    };
+    const shardMesh = (base: number, off: number, roff: number, width: number, zOff: number, mat: THREE.Material, sTip = 0.4, sMouth = -0.3) => {
+      const mesh = new THREE.Mesh(ribbonGeometry(shardPoints(base, off, roff, zOff, sTip, sMouth), width, (t) => Math.pow(t, 0.75), true), mat);
       mesh.frustumCulled = false;
       return mesh;
     };
+    // 入口の変化: 最初は 8×5 のサムネのモザイク（画面いっぱい）。中心のタイルから順に、自分の方向へ飛び出して尖った破片になり
+    // 放射になる（渦版の「写真が捻れて溶ける」に相当）。各タイルは開始形（矩形）と終了形（放射の破片）の頂点を持ち、進行 k で補間する。
+    // ロゴ色の破片 26 枚はその裏から現れる。
+    const TILE_W = 22; // 8 列で 176（入口カメラ距離 ~90・fov62・16:10 で画面幅 ≈ 173）
+    const morphShards: { mesh: THREE.Mesh; p0: Float32Array; p1: Float32Array; uv0: Float32Array; uv1: Float32Array; delay: number; k: number }[] = [];
+    let burstK = 0; // 入口の炸裂の進行 0→1
     if (burstMode) {
-      // 写真の破片 40 枚 ＋ ロゴ色の平らな破片 26 枚。間に黒が残る密度（ロゴと同じく黒地に放射）
-      const NS = 40, NC = 26;
+      const NS = GRID[0] * GRID[1], NC = 48; // 写真40 + 色48。ロゴのように黒の隙間が少ない密度
+      const tileH = 110 / GRID[1]; // 画面高（入口カメラ距離 ~90・fov62 で約108）を 5 行で覆う
       for (let i = 0; i < NS + NC; i++) {
         const isPhoto = i < NS;
         let mat: THREE.MeshBasicMaterial;
         if (isPhoto) {
-          const cell = i % (GRID[0] * GRID[1]);
-          const cx = cell % GRID[0], cy = Math.floor(cell / GRID[0]);
+          const cx = i % GRID[0], cy = Math.floor(i / GRID[0]);
           const tex = atlasTex.clone();
           tex.needsUpdate = true;
-          // 1コマの中央の細い横帯を、破片の長軸に沿って貼る
+          tex.repeat.set(1 / GRID[0], 1 / GRID[1]);
+          tex.offset.set(cx / GRID[0], (GRID[1] - 1 - cy) / GRID[1]);
+          mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 1, depthWrite: false, side: THREE.DoubleSide });
+          // 開始形: モザイクのタイル（矩形、横向きに N 分割）
+          const tx = (cx - (GRID[0] - 1) / 2) * TILE_W, ty = ((GRID[1] - 1) / 2 - cy) * tileH;
+          const pts0: THREE.Vector3[] = [];
+          for (let q = 0; q <= SHARD_N; q++) pts0.push(new THREE.Vector3(tx - TILE_W / 2 + (q / SHARD_N) * TILE_W, ty, 0));
+          const g0 = ribbonGeometry(pts0, tileH / 2, undefined, false, new THREE.Vector3(0, 1, 0));
+          // 終了形: タイルの方向へ飛び出した破片（中心に近いタイルほど先端が奥＝中心近くまで）
+          const ang = Math.atan2(ty, tx);
+          const d = Math.min(1, Math.hypot(tx, ty) / 95);
+          const width = 2.6 + hash("shardW", i) * 4.0;
+          const g1 = ribbonGeometry(shardPoints(ang, (hash("shardA", i) - 0.5) * 0.1, (hash("shardR", i) - 0.5) * 10, (hash("shardZ", i) - 0.5) * 6, 0.5 - d * 0.22, -0.3 + hash("shardM", i) * 0.2, YSQ), width, (t) => Math.pow(t, 0.75), true);
+          // 終了形の UV: 1コマの中央の帯だけを見せる（細くなった分、絵を縦に潰さない）
           const bandH = 0.42 + (hash("shard", i) - 0.5) * 0.2;
-          tex.repeat.set(1 / GRID[0], bandH / GRID[1]);
-          tex.offset.set(cx / GRID[0], (GRID[1] - 1 - cy + (1 - bandH) * 0.5) / GRID[1]);
-          mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide });
+          const uv1 = (g1.getAttribute("uv") as THREE.BufferAttribute).array as Float32Array;
+          for (let v = 0; v < uv1.length / 2; v++) uv1[v * 2 + 1] = uv1[v * 2 + 1] < 0.5 ? 0.5 - bandH / 2 : 0.5 + bandH / 2;
+          const mesh = new THREE.Mesh(g0, mat);
+          mesh.frustumCulled = false;
+          mesh.userData.op = 1;
+          mesh.userData.phase = hash("shardP", i) * Math.PI * 2;
+          morphShards.push({ mesh, p0: (g0.getAttribute("position") as THREE.BufferAttribute).array.slice() as Float32Array, p1: (g1.getAttribute("position") as THREE.BufferAttribute).array as Float32Array, uv0: (g0.getAttribute("uv") as THREE.BufferAttribute).array.slice() as Float32Array, uv1, delay: d * 0.45, k: -1 });
+          shardGroup.add(mesh);
+          photoShards.push(mesh);
         } else {
           const col = new THREE.Color(ARM_COLORS[i % ARM_COLORS.length]);
           if (hash("shardC", i) < 0.3) col.lerp(new THREE.Color("#ffffff"), 0.3);
-          mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
+          mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+          const base = i * 2.399963 + (hash("shardA", i) - 0.5) * 0.2; // 黄金角で散らす
+          const width = 0.8 + hash("shardW", i) * 3.2;
+          const mesh = new THREE.Mesh(ribbonGeometry(shardPoints(base, 0, (hash("shardR", i) - 0.5) * 10, (hash("shardZ", i) - 0.5) * 6 - 1, 0.3 + hash("shardT", i) * 0.24, -0.3 + hash("shardM", i) * 0.22, YSQ), width, (t) => Math.pow(t, 0.75), true), mat);
+          mesh.frustumCulled = false;
+          mesh.userData.op = 0.9;
+          mesh.userData.color = true;
+          mesh.userData.phase = hash("shardP", i) * Math.PI * 2;
+          shardGroup.add(mesh);
+          photoShards.push(mesh);
         }
-        const base = (i / (NS + NC)) * Math.PI * 2 * 7.3 + (hash("shardA", i) - 0.5) * 0.2; // 黄金角風に散らす
-        const width = isPhoto ? 1.6 + hash("shardW", i) * 3.6 : 0.6 + hash("shardW", i) * 2.4;
-        const mesh = shardMesh(base, 0, (hash("shardR", i) - 0.5) * 10, width, (hash("shardZ", i) - 0.5) * 6, mat, 0.28 + hash("shardT", i) * 0.24, -0.16 + hash("shardM", i) * 0.22);
-        mesh.userData.phase = hash("shardP", i) * Math.PI * 2;
-        mesh.userData.op = isPhoto ? 0.95 : 0.9;
-        shardGroup.add(mesh);
-        photoShards.push(mesh);
       }
     }
     const buildRibbons = (a: Interpretation) => {
@@ -1245,11 +1273,26 @@ export default function VortexSpace({
         const fs = phaseNow === "entry" || diving ? 1 : 0.5;
         eye.scale.setScalar(damp(eye.scale.x, fs, dt, 0.8));
         if (atlasDirty) { atlasTex.needsUpdate = true; atlasDirty = false; for (const sh of photoShards) { const mp = (sh.material as THREE.MeshBasicMaterial).map; if (mp) mp.needsUpdate = true; } }
-        shardGroup.rotation.z = spinAll + t * 0.02;
+        // 炸裂の進行: 1.2秒待って約8秒かけて（渦版の10秒の捻りに相当）。吸い込みが始まったら即完了
+        burstK = diving ? Math.min(1, burstK + dt * 1.6) : Math.max(0, Math.min(1, (t - 1.2) / 8)); // 早く押されたら吸い込みの中で一気に（ただし連続的に）炸裂させる
+        shardGroup.rotation.z = spinAll + burstK * t * 0.02; // モザイクの間は回さない
+        for (const ms of morphShards) {
+          const kk = Math.pow(Math.max(0, Math.min(1, (burstK - ms.delay) / (1 - ms.delay))), 2.2);
+          if (Math.abs(kk - ms.k) < 1e-4) continue;
+          ms.k = kk;
+          const pos = ms.mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
+          const uv = ms.mesh.geometry.getAttribute("uv") as THREE.BufferAttribute;
+          const pa = pos.array as Float32Array, ua = uv.array as Float32Array;
+          for (let j = 0; j < pa.length; j++) pa[j] = ms.p0[j] + (ms.p1[j] - ms.p0[j]) * kk;
+          for (let j = 0; j < ua.length; j++) ua[j] = ms.uv0[j] + (ms.uv1[j] - ms.uv0[j]) * kk;
+          pos.needsUpdate = true; uv.needsUpdate = true;
+        }
         shardAlpha = damp(shardAlpha, phaseNow === "entry" || diving ? 1 : 0, dt, 0.7);
+        const colorIn = Math.max(0, Math.min(1, (burstK - 0.3) / 0.5)); // 色の破片は炸裂が進んでから裏から現れる
         for (const sh of photoShards) {
           const m = sh.material as THREE.MeshBasicMaterial;
-          m.opacity = shardAlpha * (sh.userData.op as number) * (0.85 + 0.15 * Math.sin(t * 0.9 + (sh.userData.phase as number)));
+          const shimmer = 0.85 + 0.15 * Math.sin(t * 0.9 + (sh.userData.phase as number));
+          m.opacity = shardAlpha * (sh.userData.op as number) * (sh.userData.color ? colorIn * shimmer : 1 - (1 - shimmer) * burstK);
           sh.visible = m.opacity > 0.01;
         }
       }
