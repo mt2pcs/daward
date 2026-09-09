@@ -172,8 +172,10 @@ void main() {
   float edge = 1.0 - smoothstep(0.0, 0.03, min(f, 1.0 - f));
   col += pal * edge * (0.12 + k * (0.5 + 0.6 * h1));
   col += pal * k * 0.35 * h2 * smoothstep(0.55, 0.05, r);
-  // 中心（フレームの内側）は黒へ。周辺は落とす
-  col *= mix(1.0, smoothstep(0.08, 0.26, r), 0.5 + 0.5 * k);
+  // 中心は奥へ落ちる穴（黒ベタではなく、収束しながら暗くなる）。穴の縁は楔の光が集まって明るい
+  float hole = smoothstep(0.0, 0.34, r);
+  col *= mix(1.0, hole * hole, 0.6 + 0.3 * k);
+  col += pal * (0.35 + 0.4 * k) * h1 * smoothstep(0.34, 0.16, r) * smoothstep(0.04, 0.12, r) * edge;
   col *= 0.1 + 0.9 * smoothstep(1.25, 0.5, r);
   col *= uDim;
   col = col / (1.0 + col * 0.25);
@@ -506,7 +508,8 @@ export default function VortexSpace({
       const m = 64, w = 22, notch = 26;
       const outer = () => { g.moveTo(m, m); g.lineTo(512 - m, m); g.lineTo(512 - m, 256 - notch); g.lineTo(512 - m - notch * 0.9, 256); g.lineTo(512 - m, 256 + notch); g.lineTo(512 - m, 512 - m);
         g.lineTo(m, 512 - m); g.lineTo(m, 256 + notch); g.lineTo(m + notch * 0.9, 256); g.lineTo(m, 256 - notch); g.closePath(); };
-      g.fillStyle = "#000"; g.beginPath(); outer(); g.fill(); // 枠の内側は黒（ロゴの黒い正方形）。外は透明
+      // 枠線だけ（内側は塗らない＝奥へ抜ける穴）。枠の周りに柔らかい影を落として板から浮かせる
+      g.save(); g.shadowColor = "rgba(0,0,0,0.9)"; g.shadowBlur = 28; g.fillStyle = "rgba(0,0,0,0.001)"; g.beginPath(); outer(); g.fill(); g.restore();
       g.fillStyle = "#fff";
       g.beginPath(); outer();
       const mi = m + w;
@@ -1314,7 +1317,7 @@ export default function VortexSpace({
       smat.uniforms.uHot.value = hot;
       smat.uniforms.uSpin.value = spinAll;
       smat.uniforms.uLoosen.value = loosen;
-      smat.uniforms.uAlpha.value = phaseNow === "entry" ? 0.12 : diving ? 0.12 + de * 0.9 : 0.7;
+      smat.uniforms.uAlpha.value = phaseNow === "entry" ? (burstMode ? 0.5 : 0.12) : diving ? (burstMode ? 0.5 : 0.12) + de * 0.9 : 0.7;
 
       // 太い帯: 流れ、組み替え時は前の色が消えて新しい色が現れる
       ribbonGroup.rotation.z = spinAll;
@@ -1322,7 +1325,8 @@ export default function VortexSpace({
       for (const rb of ribbons) {
         const m = rb.material as THREE.MeshBasicMaterial;
         const fk = tour ? (rb.userData.arm === tour.arm ? 1.8 : 0.3) : 1;
-        m.opacity = damp(m.opacity, (rb.userData.targetOpacity as number) * (phaseNow === "entry" || diving ? 0 : 1) * (1 + hot * 0.5) * fk, dt, 0.9);
+        const entryK = phaseNow === "entry" || diving ? (burstMode ? 0.55 * (0.4 + 0.6 * burstK) : 0) : 1; // 炸裂は入口でも3Dの破片を見せる（中心へ収束する遠近）
+        m.opacity = damp(m.opacity, (rb.userData.targetOpacity as number) * entryK * (1 + hot * 0.5) * fk, dt, 0.9);
       }
       for (const rb of oldRibbons) { const m = rb.material as THREE.MeshBasicMaterial; m.opacity = damp(m.opacity, 0, dt, 0.6); }
 

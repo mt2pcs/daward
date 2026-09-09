@@ -338,6 +338,9 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
   （目の6手前、`frame`、枠の外は透明、空間で 0.5 倍）。**GLSL の予約語 `flat` を変数名にして全黒になった**（コンパイルエラーは
   console.error なので pageerror では拾えない。テストは console も拾う）。検証: `burst_entry_test.mjs`（`__vs.dbg().t` で実時刻）→
   `burst_entry_sheet2.png`、通しは `burst_test.mjs` → `burst_sheet3.png`。
+  burst4: ユーザー判定「中心が黒塗りで変・立体感が無い」→ フレームは枠線だけ（内側を塗らない、周りに影）、シェーダーの中心は
+  黒ベタでなく `hole*hole` で奥へ落ちる穴にし穴の縁に楔の光を集める。入口でも 8万本の光の筋（uAlpha 0.5）と腕の3D破片
+  （opacity 0.55×(0.4+0.6k)）を出し、中心へ収束する遠近で奥行きを作る。
 - リファレンス: `scratchpad/gen/burst_entry1.png`, `burst_main1.png`（gpt-image-2）。検証: `scratchpad/burst_test.mjs` → `burst_sheet2.png`。
 
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）
