@@ -8,10 +8,12 @@ export default function QueryBar({
   current,
   busy,
   onQuery,
+  visual = "vortex",
 }: {
   current: Interpretation | null;
   busy: boolean;
   onQuery: (text: string) => Promise<boolean>;
+  visual?: "vortex" | "burst";
 }) {
   const [text, setText] = useState("");
   const [miss, setMiss] = useState(false);
@@ -54,12 +56,12 @@ export default function QueryBar({
             setText(e.target.value);
             setMiss(false);
           }}
-          placeholder={busy ? "渦を読んでいます…" : current?.text ? "次は、どんな熱狂を観たい？" : "いま、どんな熱狂を観たい？"}
+          placeholder={busy ? (visual === "burst" ? "光線を読んでいます…" : "渦を読んでいます…") : current?.text ? "次は、どんな熱狂を観たい？" : "いま、どんな熱狂を観たい？"}
           maxLength={60}
           disabled={busy}
         />
         <button className="query-submit" type="submit" disabled={busy || !text.trim()}>
-          {busy ? "渦が動いています" : "渦を組み替える"}
+          {busy ? (visual === "burst" ? "光線が動いています" : "渦が動いています") : visual === "burst" ? "炸裂を組み替える" : "渦を組み替える"}
         </button>
       </form>
       {miss && <div className="query-miss">その言葉に合う瞬間が見つかりませんでした。別の言い方で試してください</div>}

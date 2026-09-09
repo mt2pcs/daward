@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { getCrowd } from "@/lib/crowd";
 import { sfx } from "@/lib/sfx";
 import { FluidSim, INK_COLORS } from "@/lib/fluid";
-import type { Interpretation } from "@/lib/interpret";
+import { ARM_COLORS, type Interpretation } from "@/lib/interpret";
 import type { MomentWithStats } from "@/lib/types";
 
 // 熱狂の渦（vortex3）— ひとつの3D空間。
@@ -17,6 +17,7 @@ import type { MomentWithStats } from "@/lib/types";
 //   - 言葉 → 粒子が白熱して速くなり、言葉が目に浮かぶ → 解釈が届くと全粒子とカードが新しい腕の色・位置へ流れ直し、爆発と閃光、カメラが飛び込む
 
 export type Phase = "entry" | "space";
+export type Visual = "vortex" | "burst"; // vortex=熱狂の渦（螺旋・流体の目） burst=熱狂の炸裂（直線の放射・DAZNフレーム）
 
 const R_NEAR = 56;
 const R_FAR = 10;
@@ -46,7 +47,7 @@ function damp(cur: number, tgt: number, dt: number, tau: number): number {
 }
 
 // ---- 粒子（光の筋）: 位置は毎フレームGPUが計算する ----
-const STREAM_VERT = `
+const streamVert = (twist: number) => `
 attribute float aSeed;
 attribute float aS0;
 attribute float aR;
@@ -74,7 +75,7 @@ varying float vAlpha;
 const float R_NEAR = ${R_NEAR.toFixed(1)};
 const float R_FAR = ${R_FAR.toFixed(1)};
 const float DEPTH = ${DEPTH.toFixed(1)};
-const float TWIST = ${TWIST.toFixed(2)};
+const float TWIST = ${twist.toFixed(2)};
 const float YSQ = ${YSQ.toFixed(2)};
 float radiusAt(float s) {
   float c = clamp(s, 0.0, 1.0);
@@ -279,8 +280,10 @@ export default function VortexSpace({
   onTour,
   onViewDirty,
   api,
+  visual = "vortex",
 }: {
   moments: MomentWithStats[];
+  visual?: Visual;
   arms: Interpretation | null;
   pendingText: string | null;
   pulses: Record<string, number>;
@@ -333,6 +336,10 @@ export default function VortexSpace({
     const autoQuality = qualityParam === null;
     let frameMs = 16, tierAt = 0, frameNo = 0, fluidAcc = 0;
     const diveMs = Number(params.get("dive")) || DIVE_MS; // 検証環境では長くして各段階を撮る
+    // 見せ方のモード。burst は幾何が「捻り0＝中心からの直線」になり、リボンは平らな尖った破片、目はDAZNのフレーム、流体は使わない
+    const burstMode = visual === "burst";
+    const twist = burstMode ? 0 : TWIST;
+    const spinK = burstMode ? 0 : 1; // 炸裂は自転しない（ツアーの回転は別）
     const dtMax = Math.max(0.02, Math.min(0.6, Number(params.get("dtmax")) || 0.05)); // 検証環境（低fps）では大きくして実時間に追従させる
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
@@ -417,10 +424,37 @@ export default function VortexSpace({
       depthWrite: true,
     });
     const EYE_H = 340;
-    const eye = new THREE.Mesh(new THREE.PlaneGeometry(EYE_H * eyeAspect * 2, EYE_H * 2), eyeMat);
+    // 炸裂モードの目: DAZN のフレーム（黒い正方形に白い枠、左右中央に内向きの切れ込み）。入口ではボタンがこの枠の中に乗る
+    const frameCanvas = document.createElement("canvas");
+    frameCanvas.width = 512; frameCanvas.height = 512;
+    {
+      const g = frameCanvas.getContext("2d")!;
+      g.fillStyle = "#000"; g.fillRect(0, 0, 512, 512);
+      const m = 64, w = 22, notch = 26;
+      g.fillStyle = "#fff";
+      g.beginPath();
+      g.moveTo(m, m); g.lineTo(512 - m, m); g.lineTo(512 - m, 256 - notch); g.lineTo(512 - m - notch * 0.9, 256); g.lineTo(512 - m, 256 + notch); g.lineTo(512 - m, 512 - m);
+      g.lineTo(m, 512 - m); g.lineTo(m, 256 + notch); g.lineTo(m + notch * 0.9, 256); g.lineTo(m, 256 - notch); g.closePath();
+      const mi = m + w;
+      g.moveTo(mi, mi); g.lineTo(mi, 256 - notch); g.lineTo(mi + notch * 0.9, 256); g.lineTo(mi, 256 + notch); g.lineTo(mi, 512 - mi);
+      g.lineTo(512 - mi, 512 - mi); g.lineTo(512 - mi, 256 + notch); g.lineTo(512 - mi - notch * 0.9, 256); g.lineTo(512 - mi, 256 - notch); g.lineTo(512 - mi, mi); g.closePath();
+      g.fill("evenodd");
+    }
+    const frameTex = new THREE.CanvasTexture(frameCanvas);
+    frameTex.colorSpace = THREE.SRGBColorSpace;
+    const FRAME_SIZE = 210; // 枠線は板の75%＝約158ユニット。入口（距離約290）で幅約300px、ボタンが中に収まる
+    const eye = burstMode
+      ? new THREE.Mesh(new THREE.PlaneGeometry(FRAME_SIZE, FRAME_SIZE), new THREE.MeshBasicMaterial({ map: frameTex }))
+      : new THREE.Mesh(new THREE.PlaneGeometry(EYE_H * eyeAspect * 2, EYE_H * 2), eyeMat);
     eye.position.set(0, 0, EYE_Z);
     scene.add(eye);
+    if (burstMode) {
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(EYE_H * 4, EYE_H * 4), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+      back.position.set(0, 0, EYE_Z - 2);
+      scene.add(back);
+    }
     const dropInk = (strength: number, radius: number, rMin = 0.1, rMax = 0.4) => {
+      if (burstMode) return;
       const ang = Math.random() * Math.PI * 2;
       const rr = rMin + Math.random() * (rMax - rMin);
       const x = 0.5 + (Math.cos(ang) * rr) / eyeAspect, y = 0.5 + Math.sin(ang) * rr;
@@ -454,7 +488,7 @@ export default function VortexSpace({
     const armColor = Array.from({ length: MAX_ARMS }, () => new THREE.Color(0.5, 0.5, 0.5));
     const armColorP = Array.from({ length: MAX_ARMS }, () => new THREE.Color(0.5, 0.5, 0.5));
     const smat = new THREE.ShaderMaterial({
-      vertexShader: STREAM_VERT,
+      vertexShader: streamVert(twist),
       fragmentShader: STREAM_FRAG,
       uniforms: {
         uTime: { value: 0 }, uFlow: { value: 0.05 }, uMix: { value: 1 }, uSwirl: { value: 0 }, uHot: { value: 0 }, uAlpha: { value: 0.35 },
@@ -489,7 +523,14 @@ export default function VortexSpace({
     scene.add(ribbonGroup);
     let ribbons: THREE.Mesh[] = [];
     let oldRibbons: THREE.Mesh[] = [];
-    const ribbonGeometry = (pts: THREE.Vector3[], halfW: number): THREE.BufferGeometry => {
+    // 炸裂の入口: 写真の破片（アトラスの1コマを細長い帯に切って放射状に）。入場で脇を流れ、空間では消える
+    const shardGroup = new THREE.Group();
+    shardGroup.scale.y = YSQ;
+    scene.add(shardGroup);
+    const photoShards: THREE.Mesh[] = [];
+    let shardAlpha = burstMode ? 1 : 0;
+    // tangential=true: 幅を接線方向（壁に沿って横）に取る。放射状の直線の破片は半径方向に幅を取ると軸から見て真横（線）になって見えない
+    const ribbonGeometry = (pts: THREE.Vector3[], halfW: number, taper?: (t: number) => number, tangential = false): THREE.BufferGeometry => {
       const n = pts.length;
       const pos = new Float32Array(n * 2 * 3);
       const uv = new Float32Array(n * 2 * 2);
@@ -497,7 +538,8 @@ export default function VortexSpace({
       const sideV = new THREE.Vector3();
       for (let i = 0; i < n; i++) {
         const p = pts[i];
-        sideV.set(p.x, p.y, 0).normalize().multiplyScalar(halfW);
+        if (tangential) sideV.set(-p.y, p.x, 0); else sideV.set(p.x, p.y, 0);
+        sideV.normalize().multiplyScalar(halfW * (taper ? taper(i / (n - 1)) : 1));
         pos.set([p.x - sideV.x, p.y - sideV.y, p.z, p.x + sideV.x, p.y + sideV.y, p.z], i * 6);
         uv.set([i / (n - 1), 0, i / (n - 1), 1], i * 4);
         if (i < n - 1) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
@@ -508,12 +550,79 @@ export default function VortexSpace({
       g.setIndex(idx);
       return g;
     };
+    // 炸裂の破片: 中心へ向かって尖る平らな三角形（ロゴの放射）。中心側 sTip → 口側 sMouth
+    const shardMesh = (base: number, off: number, roff: number, width: number, zOff: number, mat: THREE.Material, sTip = 0.4, sMouth = -0.3) => {
+      const pts: THREE.Vector3[] = [];
+      const N = 24;
+      for (let q = 0; q <= N; q++) {
+        const ss = sTip + (q / N) * (sMouth - sTip);
+        const th = base + off;
+        const rr = radiusAt(ss) + roff;
+        pts.push(new THREE.Vector3(Math.cos(th) * rr, Math.sin(th) * rr, depthAt(ss) + zOff));
+      }
+      const mesh = new THREE.Mesh(ribbonGeometry(pts, width, (t) => Math.pow(t, 0.75), true), mat);
+      mesh.frustumCulled = false;
+      return mesh;
+    };
+    if (burstMode) {
+      // 写真の破片 40 枚 ＋ ロゴ色の平らな破片 26 枚。間に黒が残る密度（ロゴと同じく黒地に放射）
+      const NS = 40, NC = 26;
+      for (let i = 0; i < NS + NC; i++) {
+        const isPhoto = i < NS;
+        let mat: THREE.MeshBasicMaterial;
+        if (isPhoto) {
+          const cell = i % (GRID[0] * GRID[1]);
+          const cx = cell % GRID[0], cy = Math.floor(cell / GRID[0]);
+          const tex = atlasTex.clone();
+          tex.needsUpdate = true;
+          // 1コマの中央の細い横帯を、破片の長軸に沿って貼る
+          const bandH = 0.42 + (hash("shard", i) - 0.5) * 0.2;
+          tex.repeat.set(1 / GRID[0], bandH / GRID[1]);
+          tex.offset.set(cx / GRID[0], (GRID[1] - 1 - cy + (1 - bandH) * 0.5) / GRID[1]);
+          mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide });
+        } else {
+          const col = new THREE.Color(ARM_COLORS[i % ARM_COLORS.length]);
+          if (hash("shardC", i) < 0.3) col.lerp(new THREE.Color("#ffffff"), 0.3);
+          mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide });
+        }
+        const base = (i / (NS + NC)) * Math.PI * 2 * 7.3 + (hash("shardA", i) - 0.5) * 0.2; // 黄金角風に散らす
+        const width = isPhoto ? 1.6 + hash("shardW", i) * 3.6 : 0.6 + hash("shardW", i) * 2.4;
+        const mesh = shardMesh(base, 0, (hash("shardR", i) - 0.5) * 10, width, (hash("shardZ", i) - 0.5) * 6, mat, 0.28 + hash("shardT", i) * 0.24, -0.16 + hash("shardM", i) * 0.22);
+        mesh.userData.phase = hash("shardP", i) * Math.PI * 2;
+        mesh.userData.op = isPhoto ? 0.95 : 0.9;
+        shardGroup.add(mesh);
+        photoShards.push(mesh);
+      }
+    }
     const buildRibbons = (a: Interpretation) => {
       for (const r of oldRibbons) { ribbonGroup.remove(r); r.geometry.dispose(); (r.material as THREE.Material).dispose(); }
       oldRibbons = ribbons;
       for (const r of oldRibbons) r.userData.targetOpacity = 0;
       ribbons = [];
       const A = a.arms.length;
+      if (burstMode) {
+        // 腕ごとに 8 枚の平らな破片。色は腕の色を中心に白寄り／暗めのバリエーション、透け重なりでロゴの層を作る
+        a.arms.forEach((arm, ai) => {
+          const base = (ai / A) * Math.PI * 2;
+          for (let b = 0; b < 8; b++) {
+            const off = (b - 3.5) * 0.11 + (hash(arm.name, 40 + b) - 0.5) * 0.08;
+            const roff = 1 + (hash(arm.name, b) - 0.5) * 8;
+            const width = 0.8 + hash(arm.name, 20 + b) * 3.4;
+            const col = new THREE.Color(arm.color);
+            const tint = hash(arm.name, 80 + b);
+            if (tint < 0.3) col.lerp(new THREE.Color("#ffffff"), 0.35); else if (tint > 0.75) col.multiplyScalar(0.55);
+            const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
+            const mesh = shardMesh(base, off, roff, width, (b - 3.5) * 0.9, mat, 0.5 + hash(arm.name, 100 + b) * 0.3, -0.35 + hash(arm.name, 120 + b) * 0.2);
+            mesh.userData.targetOpacity = 0.55 + hash(arm.name, 60 + b) * 0.4;
+            mesh.userData.arm = ai;
+            mesh.userData.b = b;
+            mesh.visible = tier < 3 || b % 2 === 0;
+            ribbonGroup.add(mesh);
+            ribbons.push(mesh);
+          }
+        });
+        return;
+      }
       a.arms.forEach((arm, ai) => {
         const base = (ai / A) * Math.PI * 2;
         for (let b = 0; b < 10; b++) {
@@ -523,7 +632,7 @@ export default function VortexSpace({
           const N = 70;
           for (let q = 0; q <= N; q++) {
             const ss = -0.2 + (q / N) * 1.45;
-            const th = base + ss * TWIST + off + Math.sin(ss * 6 + b) * 0.05;
+            const th = base + ss * twist + off + Math.sin(ss * 6 + b) * 0.05;
             const rr = radiusAt(ss) + roff;
             pts.push(new THREE.Vector3(Math.cos(th) * rr, Math.sin(th) * rr, depthAt(ss) + (b - 4.5) * 0.8));
           }
@@ -648,7 +757,7 @@ export default function VortexSpace({
     const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Vector3();
     const mat4 = new THREE.Matrix4();
     const posOf = (base: number, s: number, ro: number, aj: number, spinAll: number, out: THREE.Vector3) => {
-      const th = base + s * TWIST + aj + spinAll;
+      const th = base + s * twist + aj + spinAll;
       const r = radiusAt(s) + ro;
       return out.set(Math.cos(th) * r, Math.sin(th) * r * YSQ, depthAt(s));
     };
@@ -656,7 +765,7 @@ export default function VortexSpace({
       posOf(base, s - 0.02, ro, aj, spinAll, tmp2);
       const T = tmp2.sub(pos).normalize();
       const toCam = tmp.subVectors(camera.position, pos).normalize();
-      const th = base + s * TWIST + aj + spinAll;
+      const th = base + s * twist + aj + spinAll;
       const outward = tmp3.set(Math.cos(th) * 0.7, Math.sin(th) * 0.7, 0.75).normalize();
       const normal = outward.multiplyScalar(1 - faceMix).add(toCam.multiplyScalar(faceMix)).normalize();
       const right = T.sub(normal.clone().multiplyScalar(T.dot(normal))).normalize();
@@ -726,7 +835,7 @@ export default function VortexSpace({
           c.tro = 34 + hash(c.id, 4) * 20;
           c.tsize = 6.5;
           c.tdim = a && a.text ? 0.3 : 0.6;
-          if (dramatic) c.base -= Math.PI * 0.5;
+          if (dramatic && !burstMode) c.base -= Math.PI * 0.5;
         }
       }
       if (dramatic) {
@@ -737,13 +846,13 @@ export default function VortexSpace({
         spinBoost = 1.4;
         releaseTimer = setTimeout(() => {
           releaseTimer = null;
-          for (const pt of pendingTargets) { pt.c.tbase = pt.base; pt.c.ts = pt.s; pt.c.tro = pt.ro; pt.c.tsize = pt.size; pt.c.s = 1.1; pt.c.base = pt.base - Math.PI * 0.9; }
+          for (const pt of pendingTargets) { pt.c.tbase = pt.base; pt.c.ts = pt.s; pt.c.tro = pt.ro; pt.c.tsize = pt.size; pt.c.s = 1.1; pt.c.base = pt.base - (burstMode ? 0 : Math.PI * 0.9); }
           for (const l of labels) l.centerAt = -1;
           if (a) buildRibbons(a);
           hotTarget = 0;
           flowTarget = 0.05;
           mix = 0;
-          swirl = Math.PI * 0.9;
+          swirl = burstMode ? 0 : Math.PI * 0.9;
           spinBoost = 1.2;
           burst = 0.9;
           hot = 1.2;
@@ -855,7 +964,7 @@ export default function VortexSpace({
       c.mat.depthTest = false;
       c.mesh.renderOrder = 10;
       // 渦そのものが最短方向に回って、主役を手前下（カメラの側）へ運ぶ。角度は目標値で計算する
-      const thNow = c.tbase + c.ts * TWIST + c.aj + spin + dragSpin;
+      const thNow = c.tbase + c.ts * twist + c.aj + spin + dragSpin;
       const want = -Math.PI / 2 - 0.35;
       let d = want - thNow;
       d = Math.atan2(Math.sin(d), Math.cos(d));
@@ -959,7 +1068,7 @@ export default function VortexSpace({
     (window as unknown as { __vs?: unknown }).__vs = {
       cam: () => {
         const sc = tour && tour.idx >= 0 ? cards.get(tour.ids[tour.idx]) : undefined;
-        const th = sc ? sc.tbase + sc.ts * TWIST + sc.aj + spin + dragSpin : null;
+        const th = sc ? sc.tbase + sc.ts * twist + sc.aj + spin + dragSpin : null;
         return { t: performance.now(), cx: camera.position.x, cy: camera.position.y, cz: camera.position.z, lz: camLook.z, sx: sc?.pos.x ?? null, sy: sc?.pos.y ?? null, sz: sc?.pos.z ?? null, idx: tour?.idx ?? -1, th, spin, dragSpin, tourSpinTarget, base: sc?.base ?? null, tbase: sc?.tbase ?? null, ts: sc?.ts ?? null, s: sc?.s ?? null, ro: sc?.ro ?? null };
       },
       dbg: () => ({ diving, eyeZ: eye.position.z, zoom: eyeMat.uniforms.uZoom.value, dim: eyeMat.uniforms.uDim.value, diss: fluid.params.dyeDissipation, strength: fluid.params.strength, pull: fluid.params.pull, fov: camera.fov, roll: diveRoll, eyeSpin, tier, frameMs, dimOp: dimMat.opacity, dimVis: dimQuad.visible, hot, phase: phaseNow }),
@@ -1086,7 +1195,7 @@ export default function VortexSpace({
       if (!dragging) dragSpin += dragVel;
       if (tour && !dragging) dragSpin = damp(dragSpin, tourSpinTarget, dt, 0.5);
       spinBoost = damp(spinBoost, 0, dt, 1.4);
-      if (!tour) spin += dt * (0.035 + spinBoost * 0.6); // ツアー中は渦の自転を止める（主役が流れて行かない）
+      if (!tour) spin += dt * (0.035 + spinBoost * 0.6) * spinK; // ツアー中は渦の自転を止める（主役が流れて行かない）
       const spinAll = spin + dragSpin;
       flow = damp(flow, flowTarget, dt, 1.0);
       hot = damp(hot, hotTarget, dt, 0.8);
@@ -1100,6 +1209,7 @@ export default function VortexSpace({
       const de = Math.pow(dk, 2.4); // 吸い込みの進み（加速）
       if (phaseNow === "entry") { const e = Math.min(1, t / 9); strength = 115 * Math.pow(e, 1.5) + 10 * Math.sin(t * 0.5) * e; }
       else strength = 55 + 110 * loosen + spinBoost * 80 + de * 260;
+      if (!burstMode) {
       fluid.params.strength = strength;
       fluid.params.pull = 3 + loosen * 6 + de * 12;
       // 目は入口では画面いっぱいの主役（圧力反復18）、空間では遠景（12で十分）
@@ -1129,6 +1239,20 @@ export default function VortexSpace({
       eye.position.z = EYE_Z + de * 150; // 目が迫ってくる
       if (atlasDirty) { atlasTex.needsUpdate = true; atlasDirty = false; if (t < 6 && phaseNow === "entry") fluid.fillMosaic(atlasTex, [GRID[0], GRID[1]], [0.3, 0.16875]); }
       eyeMat.uniforms.uRot.value = spinAll * 0.15 + eyeSpin;
+      } else {
+        // 炸裂: フレームが迫ってくる。空間では小さく（トンネルの奥の消失点）
+        eye.position.z = EYE_Z + de * 150;
+        const fs = phaseNow === "entry" || diving ? 1 : 0.5;
+        eye.scale.setScalar(damp(eye.scale.x, fs, dt, 0.8));
+        if (atlasDirty) { atlasTex.needsUpdate = true; atlasDirty = false; for (const sh of photoShards) { const mp = (sh.material as THREE.MeshBasicMaterial).map; if (mp) mp.needsUpdate = true; } }
+        shardGroup.rotation.z = spinAll + t * 0.02;
+        shardAlpha = damp(shardAlpha, phaseNow === "entry" || diving ? 1 : 0, dt, 0.7);
+        for (const sh of photoShards) {
+          const m = sh.material as THREE.MeshBasicMaterial;
+          m.opacity = shardAlpha * (sh.userData.op as number) * (0.85 + 0.15 * Math.sin(t * 0.9 + (sh.userData.phase as number)));
+          sh.visible = m.opacity > 0.01;
+        }
+      }
 
       // 粒子
       smat.uniforms.uTime.value = t;
@@ -1168,14 +1292,14 @@ export default function VortexSpace({
         // 軸に沿って加速しながら目へ。視野が開き、視界がロールする
         camera.position.set(0, -10 * de, 96 - 66 * de);
         camLook.set(0, 0, EYE_Z);
-        diveRoll += dt * (0.15 + de * de * 2.6);
+        diveRoll += dt * (0.15 + de * de * 2.6) * (burstMode ? 0.4 : 1); // 炸裂ではフレームが回り過ぎないよう控えめに
         camera.fov = (portrait() ? 76 : 62) + de * 40;
         camera.updateProjectionMatrix();
         if (dk >= 1) {
           // 通り抜けた: 閃光の裏で目を元の奥へ戻し、漏斗の内側の基準視点へ落ち着く
           diving = false; diveRoll = 0; eyeSpin = 0;
           flash(1.0); sfx.boom(); burst = 1.2;
-          eye.position.z = EYE_Z; eyeMat.uniforms.uZoom.value = 1;
+          eye.position.z = EYE_Z; if (!burstMode) eyeMat.uniforms.uZoom.value = 1;
           camera.fov = portrait() ? 76 : 62; camera.updateProjectionMatrix();
           camera.position.set(0, -6, 30); camLook.set(0, 0, EYE_Z);
           hotTarget = 0; flowTarget = 0.05;

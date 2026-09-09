@@ -7,7 +7,8 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const REGION = 'asia-northeast1';
-const SERVICE = 'e-mooments';
+// SERVICE=e-mooments-burst VISUAL_MODE=burst node scripts/deploy_cloud_run.js → 別サービス（別URL）に「熱狂の炸裂」版を出す
+const SERVICE = process.env.SERVICE || 'e-mooments';
 const AR_REPO = 'cloud-run-source-deploy';
 const TARBALL = path.join(__dirname, 'source.tar.gz');
 
@@ -202,6 +203,7 @@ async function main() {
         env: [
           ...(process.env.OPENAI_API_KEY ? [{ name: 'OPENAI_API_KEY', value: process.env.OPENAI_API_KEY }] : []),
           ...(process.env.OPENAI_MODEL ? [{ name: 'OPENAI_MODEL', value: process.env.OPENAI_MODEL }] : []),
+          ...(process.env.VISUAL_MODE ? [{ name: 'VISUAL_MODE', value: process.env.VISUAL_MODE }] : []),
         ],
       }],
     },

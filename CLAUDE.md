@@ -313,6 +313,24 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
   持つ粒（先頭の白い芯＋4段の尾、加算合成）が瞬間→属性の向きに流れる。フォーカス中はその腕だけ明るく。フレーム時間EMAが30msを超えると
   lite（血流を半分・発光を小さく）、17ms未満で復帰。「表示」に 発光 / 血流 スライダー。検証: `graph_glow.mjs` → `graph_glow_sheet.png`。
 
+### 熱狂の炸裂（burst・2026-09-09）— DAZN AWARDS 2026 ロゴ（放射・直線）に合わせた別バージョン
+
+ロゴは渦ではなく「黒い正方形（DAZNのフレーム）から直線の破片が放射する」バースト。ユーザーは渦版も気に入っているため
+**渦版はそのまま残し、見せ方だけ違う炸裂版を別URL（別 Cloud Run サービス）で出す**。上書きデプロイ禁止。
+
+- 名前: 「熱狂の炸裂」。入口コピー「100の瞬間が、熱狂の炸裂になる。」ボタン「中心へ飛び込む」。送信「炸裂を組み替える」。
+- 実装は `VortexSpace` の `visual` prop（"vortex" | "burst"）。機能・データ・操作は完全に共通で、burst では:
+  捻り0（`twist`＝直線の放射。粒子シェーダーも `streamVert(twist)`）、自転なし、組み替えの螺旋（−0.9π）なし、流体は使わない、
+  目＝DAZNフレーム（Canvas で描いた白枠＋切れ込み、`FRAME_SIZE` 210、入口でボタンがこの枠の中に乗る。空間では 0.5 倍で消失点）、
+  リボン＝平らな尖った破片（`shardMesh`、腕ごと8枚、通常合成、白寄り/暗めの色差）、入口＝写真の破片40＋ロゴ色の破片26が放射
+  （`photoShards`、アトラスの1コマの中央帯を長軸に貼る。入場で脇を流れ、空間で消える）。
+- **落とし穴**: 破片の幅を半径方向に取ると、直線の放射は軸（カメラ）から見て真横＝線になって見えない。`ribbonGeometry(..., tangential=true)`
+  で接線方向に幅を取る（渦版は捻りで斜めになるので見えていただけ）。色破片は map が無いので atlas 更新ループで null ガード。
+- ルート: `app/burst/page.tsx`（検証用）。本番は `VISUAL_MODE=burst` の別サービス。デプロイ:
+  `SERVICE=e-mooments-burst VISUAL_MODE=burst node scripts/deploy_cloud_run.js`（`scripts/deploy_cloud_run.js` が SERVICE / VISUAL_MODE を受ける）。
+  グラフページの戻りボタンは `?from=burst` で「炸裂へ戻る」。
+- リファレンス: `scratchpad/gen/burst_entry1.png`, `burst_main1.png`（gpt-image-2）。検証: `scratchpad/burst_test.mjs` → `burst_sheet.png`。
+
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）
 
 - 「後で確認する」と言うときは、必ず send_later 等で実際にスケジュールする。できない場合は「できない」と言う。

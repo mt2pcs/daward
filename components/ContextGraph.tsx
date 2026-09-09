@@ -25,6 +25,8 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
   const [selected, setSelected] = useState<number | null>(null);
   const [hovered, setHovered] = useState<number | null>(null);
   const [booted, setBooted] = useState(false);
+  const [fromBurst, setFromBurst] = useState(false);
+  useEffect(() => { setFromBurst(new URLSearchParams(location.search).get("from") === "burst"); }, []);
   const [bootLines, setBootLines] = useState<string[]>([]);
   const [stats, setStats] = useState({ alpha: 1, fps: 0, lite: false });
   const [open, setOpen] = useState({ filter: true, display: true, forces: true });
@@ -425,7 +427,7 @@ export default function ContextGraph({ moments, context }: { moments: MomentWith
           <h1>CONTEXT <em>GRAPH</em></h1>
           <div className="cg-sub">100の瞬間を、人物・チーム・大会・モチーフ・感情に分解して繋ぎ直した地図。渦の腕はこの上で組み替えられる。</div>
         </div>
-        <a className="cg-back" href="/">← 渦へ戻る</a>
+        <a className="cg-back" href="/">← {fromBurst ? "炸裂へ戻る" : "渦へ戻る"}</a>
       </header>
 
       <aside className="cg-panel cg-left">

@@ -6,6 +6,7 @@ import { getCrowd } from "@/lib/crowd";
 import { sfx } from "@/lib/sfx";
 import { defaultDictionary, type Interpretation } from "@/lib/interpret";
 import VortexSpace, { type Phase, type TourState, type VortexApi } from "./VortexSpace";
+import type { Visual } from "@/components/VortexSpace";
 import Entrance from "./Entrance";
 import QueryBar from "./QueryBar";
 import DetailOverlay from "./DetailOverlay";
@@ -23,9 +24,12 @@ import Tuner, {
 //   → カードに触れて投票 → あなたの言葉から編んだフィルム
 export default function MomentsApp({
   initialMoments,
+  visual = "vortex",
 }: {
   initialMoments: MomentWithStats[];
+  visual?: Visual; // vortex=熱狂の渦 / burst=熱狂の炸裂（見せ方だけが違い、機能は同じ）
 }) {
+  const burst = visual === "burst";
   const [moments, setMoments] = useState(initialMoments);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [present, setPresent] = useState<VoteResponse | null>(null);
@@ -194,6 +198,7 @@ export default function MomentsApp({
   return (
     <div className="stage">
       <VortexSpace
+        visual={visual}
         moments={moments}
         arms={arms}
         pendingText={pending}
@@ -237,18 +242,18 @@ export default function MomentsApp({
             É M<em>OO</em>MENTS <em>100</em>
           </h1>
           <div className="hud-hint">
-            100の瞬間が渦を巻く。言葉で渦を組み替え、心が動いた瞬間に投票しよう。
+            {burst ? "100の瞬間が炸裂する。言葉で光線を組み替え、心が動いた瞬間に投票しよう。" : "100の瞬間が渦を巻く。言葉で渦を組み替え、心が動いた瞬間に投票しよう。"}
           </div>
         </div>
         <div className="hud-right">
           <div className="hud-total">{totalVotes.toLocaleString()}</div>
           <div className="hud-total-label">TOTAL VOTES</div>
-          <a className="hud-graph-link" href="/graph" title="裏側の文脈グラフを見る"><i />CONTEXT GRAPH ↗</a>
+          <a className="hud-graph-link" href={burst ? "/graph?from=burst" : "/graph"} title="裏側の文脈グラフを見る"><i />CONTEXT GRAPH ↗</a>
         </div>
       </header>
 
       {phase === "space" && (
-        <QueryBar current={query ?? baseArms} busy={pending !== null} onQuery={applyQuery} />
+        <QueryBar current={query ?? baseArms} busy={pending !== null} onQuery={applyQuery} visual={visual} />
       )}
 
       <Tuner
@@ -258,10 +263,10 @@ export default function MomentsApp({
         onChange={updateTuning}
       />
 
-      {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} /> : null}
+      {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} visual={visual} /> : null}
 
       {/* 表示中のビルドを特定するための刻印（「どの版を見ているか」の水掛け論防止） */}
-      <div className="rev-tag">rev graph2d</div>
+      <div className="rev-tag">rev {burst ? "burst1" : "graph2d"}</div>
 
       {selected && (
         <DetailOverlay
