@@ -398,6 +398,15 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
 - **動きのプロト（2026-10-14）**: 「動きのイメージが分からない」への回答として、Canvas 2D の単体 HTML `scratchpad/proto/page_template.html`
   （実素材の3秒ループ6本＋サムネを data URI で埋め込み、約4.4MB）を Artifact として公開。破片の放射→1本が開いて再生→光が次を指す→
   空間が回る→自由入力で収縮・再放射。本実装の仕様の叩き台であり、見た目は最終ではない。
+- **動きのプロト v2（2026-10-14）**: 「スマホで切れる・フレームが小さすぎて映像が見えない」への対応。開いた破片は扇が π まで
+  広がって**映像が画面全体**（cover）になり、ロゴの切れ目は細い12本の線が再生中に薄れる。文字は DOM（clamp() と safe-area）で
+  入力欄の上。光線名は**画面の長い軸の扇（縦画面は上下、横画面は左右）**に交互に置き、measureText で画面内に収まる半径へ
+  クランプ、文字ブロックと重なる名前は薄くする。光線名は画面に固定し破片だけが回る（回転に追従させると再炸裂後に中心で交差した）。
+  Artifact: https://claude.ai/artifact/STJAwJkzvLy3aiCcYHTa7L（同じ file_path で再公開すればURL維持）。テンプレは
+  `docs/proto/burst_motion_template.html`（`__ASSETS__` に assets.json を差し込んでビルド）。
+- **取り込みバッチはプロキシのポートが変わると死ぬ**（`HTTPS_PROXY` は 127.0.0.1:ポート で、コンテナの再起動等で変わる。
+  バッチが古いポートを握ったまま curl: (7) で全件 FAIL）。再開は `env HTTPS_PROXY=$HTTPS_PROXY node scripts/ingest_all.mjs ...`
+  （meta.json 済みはスキップ）。
 - 素材パイプライン実証（No.001）: 山場は1秒ごとの音量RMSの3秒窓最大で自動選択（9秒＝88:03のゴール直後の歓喜を正しく拾った）。
   出力: loop.mp4 387KB / loop.webm 332KB（480×270・3秒・無音）、detail.mp4 28MB（720p・4.5Mbps上限・54秒）、poster.webp 87KB、
   thumb.jpg 25KB、og.jpg 134KB（タイトル焼き込み）。1本あたり約110秒（54秒ソース、主に720p再エンコード）。

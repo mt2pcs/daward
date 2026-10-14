@@ -2,45 +2,46 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;900&family=Oswald:wght@500;700&display=swap">
 <style>
-/* 単一の暗い世界（キービジュアルの中）。黒・白・DAZNの差し色のみ。レイアウト: 全画面キャンバス＋下端に入力1行 */
-:root { --bg:#050506; --fg:#f3f2ee; --dim:#8d8c86; --accent:#e9ff2a; --red:#ff2d55; --mag:#ff3fb0; --blue:#2f6bff; --lime:#b8ff3c;
-  --display:"Noto Sans JP","Hiragino Sans",sans-serif; --num:"Oswald","Noto Sans JP",sans-serif; color-scheme:dark; }
+/* 単一の暗い世界。映像が主役: 開いた瞬間は映像が画面全体、放射の線が映像を切る。レイアウト: 全画面キャンバス、文字は下、入力は最下段 */
+:root { --bg:#050506; --fg:#f3f2ee; --dim:#9a9994; --accent:#e9ff2a; --display:"Noto Sans JP","Hiragino Sans",sans-serif; --num:"Oswald","Noto Sans JP",sans-serif; color-scheme:dark;
+  --gl:max(16px,env(safe-area-inset-left,0px)); --gr:max(16px,env(safe-area-inset-right,0px)); --gb:env(safe-area-inset-bottom,0px); }
 html,body{height:100%;}
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--display);overflow:hidden;}
 #c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:pointer;}
-.hud{position:fixed;left:0;right:0;top:0;padding:14px max(18px,env(safe-area-inset-right,0px)) 0 max(18px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;}
-.brand{font:700 12px/1 var(--num);letter-spacing:.28em;color:var(--dim)}
-.brand b{display:block;color:var(--fg);font-size:18px;margin-top:6px;letter-spacing:.12em}
-.mode{pointer-events:auto;display:flex;gap:8px}
-.mode button{font:500 11px/1 var(--num);letter-spacing:.14em;color:var(--fg);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);padding:9px 12px;border-radius:999px;cursor:pointer}
+.hud{position:fixed;left:0;right:0;top:0;padding:12px var(--gr) 0 var(--gl);display:flex;justify-content:space-between;align-items:center;pointer-events:none;z-index:2}
+.brand{font:700 10px/1 var(--num);letter-spacing:.26em;color:var(--dim)}
+.brand b{display:block;color:var(--fg);font-size:14px;margin-top:5px;letter-spacing:.12em}
+.mode{pointer-events:auto;display:flex;gap:6px}
+.mode button{font:500 11px/1 var(--num);letter-spacing:.12em;color:var(--fg);background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.22);padding:8px 11px;border-radius:999px;cursor:pointer;backdrop-filter:blur(6px)}
 .mode button[aria-pressed="true"]{background:var(--accent);color:#050506;border-color:var(--accent)}
 .mode button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.bar{position:fixed;left:0;right:0;bottom:0;padding:0 max(18px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:flex;gap:10px;align-items:center;justify-content:center}
-.bar form{display:flex;gap:8px;width:min(560px,100%)}
-.bar input{flex:1;min-width:0;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.22);color:var(--fg);font:400 15px/1 var(--display);padding:13px 16px;border-radius:4px;backdrop-filter:blur(8px)}
+/* 文字ブロック: 映像の上、入力の上。幅は画面に従う */
+.cap{position:fixed;left:var(--gl);right:var(--gr);bottom:calc(118px + var(--gb));pointer-events:none;z-index:2;max-width:720px}
+.cap .no{font:700 clamp(40px,11vw,96px)/.9 var(--num);letter-spacing:-.01em;color:#fff;text-shadow:0 2px 24px rgba(0,0,0,.7)}
+.cap .ti{font:900 clamp(22px,6.4vw,54px)/1.15 var(--display);color:#fff;text-shadow:0 2px 24px rgba(0,0,0,.7);margin-top:4px;text-wrap:balance}
+.cap .sh{font:400 clamp(12px,3.4vw,16px)/1.5 var(--display);color:rgba(255,255,255,.85);margin-top:8px;text-shadow:0 1px 12px rgba(0,0,0,.8)}
+.cap .nx{font:400 clamp(12px,3.4vw,15px)/1.4 var(--display);color:var(--accent);margin-top:12px;letter-spacing:.04em;opacity:0;transition:opacity .35s}
+.cap .nx.on{opacity:1}
+.cap .nx small{font:500 10px/1 var(--num);letter-spacing:.3em;margin-right:10px}
+.cap{opacity:0;transition:opacity .3s} .cap.on{opacity:1}
+.chips{position:fixed;left:var(--gl);right:var(--gr);bottom:calc(70px + var(--gb));display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;z-index:2;padding-bottom:4px}
+.chips button{flex:0 0 auto;font:400 11px/1 var(--display);color:rgba(255,255,255,.75);background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.18);padding:8px 11px;border-radius:999px;cursor:pointer;backdrop-filter:blur(6px)}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:0 var(--gr) calc(12px + var(--gb)) var(--gl);z-index:2}
+.bar form{display:flex;gap:8px;max-width:640px}
+.bar input{flex:1;min-width:0;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.22);color:var(--fg);font:400 15px/1 var(--display);padding:13px 14px;border-radius:4px;backdrop-filter:blur(8px)}
 .bar input:focus{outline:none;border-color:var(--accent)}
-.bar button{font:900 13px/1 var(--display);letter-spacing:.1em;background:var(--accent);color:#050506;border:0;padding:0 18px;border-radius:4px;cursor:pointer}
+.bar button{font:900 13px/1 var(--display);letter-spacing:.08em;background:var(--accent);color:#050506;border:0;padding:0 16px;border-radius:4px;cursor:pointer;white-space:nowrap}
 .bar button:focus-visible{outline:2px solid #fff}
-.chips{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(68px + env(safe-area-inset-bottom,0px));display:flex;gap:6px;pointer-events:auto}
-.chips button{font:400 11px/1 var(--display);color:var(--dim);background:transparent;border:1px solid rgba(255,255,255,.14);padding:7px 11px;border-radius:999px;cursor:pointer}
-.chips button:hover{color:var(--fg);border-color:rgba(255,255,255,.4)}
-.sub{position:fixed;left:0;right:0;bottom:calc(112px + env(safe-area-inset-bottom,0px));text-align:center;font:400 15px/1.4 var(--display);color:var(--fg);letter-spacing:.06em;text-shadow:0 2px 18px #000;opacity:0;transition:opacity .35s;pointer-events:none}
-.sub.on{opacity:1}
-.sub small{display:block;font:500 10px/1 var(--num);letter-spacing:.3em;color:var(--accent);margin-bottom:8px}
-.help{position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px));font:400 11px/1.6 var(--display);color:var(--dim);max-width:260px;pointer-events:none}
-@media (max-width:640px){.help{display:none}.brand b{font-size:14px}}
-@media (prefers-reduced-motion:reduce){.sub{transition:none}}
+@media (prefers-reduced-motion:reduce){.cap,.cap .nx{transition:none}}
 </style>
 <canvas id="c"></canvas>
 <div class="hud"><div class="brand">DAZN AWARDS 2026<b>100 MOMENTS</b></div>
-  <div class="mode"><button id="auto" aria-pressed="true">ダイジェスト 自動</button><button id="stop" aria-pressed="false">手動</button></div></div>
-<div class="sub" id="sub"><small>NEXT</small><span id="subt"></span></div>
-<div class="help">破片をタップで開く。開いた映像の後、光が次の1本を指して空間が回る。<br>下の言葉を送ると光線が組み替わる。</div>
+  <div class="mode"><button id="auto" aria-pressed="true">自動</button><button id="stop" aria-pressed="false">手動</button></div></div>
+<div class="cap" id="cap"><div class="no" id="cno"></div><div class="ti" id="cti"></div><div class="sh" id="csh"></div><div class="nx" id="cnx"><small>NEXT</small><span id="cnxt"></span></div></div>
 <div class="chips" id="chips"></div>
 <div class="bar"><form id="f"><input id="q" placeholder="いま、どんな熱狂を観たい？" autocomplete="off"><button type="submit">組み替える</button></form></div>
 <script>
 const ASSETS = __ASSETS__;
-// ---- 言葉 → 光線名（プロトでは2セットを固定。本番は Vertex Gemini が命名）
 const SETS = {
   default: ["王者の証明","土壇場","涙の引退","番狂わせ","新星誕生"],
   "ベテランの熱量": ["背中で語る意地","最後の舞台に燃ゆ","惜別のグラウンド","積年の夢が結実"],
@@ -49,131 +50,106 @@ const SETS = {
 };
 const REASONS = ["同じ選手が、半年後に。","同じ土壇場。相手は違う。","この涙の、三か月前。","同じスタジアムで、もう一度。","王者が、今度は挑戦者として。","同じ夜の、別の歓喜。"];
 const PAL = ["#ff2d55","#ff3fb0","#2f6bff","#b8ff3c","#ff8a3d","#e9ff2a"];
-const c = document.getElementById("c"), ctx = c.getContext("2d");
-let W=0,H=0,DPR=1,R=0;
-const resize=()=>{DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=W*DPR;c.height=H*DPR;R=Math.hypot(W,H)/2;};
+const c=document.getElementById("c"), ctx=c.getContext("2d");
+let W=0,H=0,DPR=1,R=0,CX=0,CY=0,portrait=false;
+const resize=()=>{DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=W*DPR;c.height=H*DPR;portrait=H>W;CX=W/2;CY=portrait?H*.36:H*.5;R=Math.hypot(W,H);};
 addEventListener("resize",resize);resize();
-// ---- 素材
-const imgs = ASSETS.map(a=>{const i=new Image();i.src=a.thumb;return i;});
-const vids = ASSETS.map(a=>{const v=document.createElement("video");v.src=a.loop;v.muted=true;v.loop=true;v.playsInline=true;v.preload="auto";return v;});
-// ---- 破片
-const N = 64;
+const imgs=ASSETS.map(a=>{const i=new Image();i.src=a.thumb;return i;});
+const vids=ASSETS.map(a=>{const v=document.createElement("video");v.src=a.loop;v.muted=true;v.loop=true;v.playsInline=true;v.preload="auto";return v;});
+const N=56;
 const hash=(n)=>{let x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);};
-let shards=[], rot=0, rotTarget=0, labels=[], heat=[];
-const mkShards=(seed)=>{
-  shards=[];
-  for(let i=0;i<N;i++){
-    const h1=hash(seed+i*7.3),h2=hash(seed+i*3.1+9),h3=hash(seed+i*5.7+2);
-    shards.push({a:(i/N)*Math.PI*2+(h1-.5)*.08, w:.016+h2*.04, p:h3, len:.55+hash(seed+i)*.5, photo:i%ASSETS.length, kind:h1<.18?"color":h1<.26?"dark":"photo", col:PAL[i%PAL.length], open:0, speed:.2+h2*.5});
-  }
-};
-const mkLabels=(names)=>{ labels=names.map((n,k)=>({text:n,a:(k/names.length)*Math.PI*2+.6,born:performance.now()+k*140})); heat=[labels[0].a, labels[Math.min(2,labels.length-1)].a]; };
-mkShards(1); mkLabels(SETS.default);
-// ---- 状態
-let cur=-1, phase="idle", t0=0, auto=true, burstK=1, burstDir=0, prev=-1, beam=null;
-const OPEN_A = 2.45; // 開いた破片の位置（左下）
+let shards=[],rot=0,rotTarget=0,labels=[],heat=[];
+const mkShards=(seed)=>{shards=[];for(let i=0;i<N;i++){const h1=hash(seed+i*7.3),h2=hash(seed+i*3.1+9),h3=hash(seed+i*5.7+2);shards.push({a:(i/N)*Math.PI*2+(h1-.5)*.07,w:.018+h2*.04,p:h3,len:.5+hash(seed+i)*.5,photo:i%ASSETS.length,kind:h1<.18?"color":h1<.26?"dark":"photo",col:PAL[i%PAL.length],open:0,openTarget:0,speed:.2+h2*.5});}};
+// 光線名は画面の長い軸の方向（縦画面は上下、横画面は左右の扇）に交互に置く＝文字が画面から出ない
+const mkLabels=(names)=>{const axis=portrait?Math.PI/2:0,spread=portrait?.62:.5;const half=Math.ceil(names.length/2);
+  labels=names.map((n,k)=>{const side=k%2?Math.PI:0;const j=Math.floor(k/2),cnt=k%2?names.length-half:half;const off=cnt>1?(j/(cnt-1)-.5)*2*spread:0;return{text:n,a:axis+side+off+(side?-.06:.06),born:performance.now()+k*140};});heat=[labels[0].a,labels[Math.min(2,labels.length-1)].a];};
+mkShards(1);mkLabels(SETS.default);
+let cur=-1,phase="idle",t0=0,auto=true,burstK=1,beam=null,flash=0,nextIdx=-1;
 const ease=(k)=>k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
 const norm=(a)=>Math.atan2(Math.sin(a),Math.cos(a));
+const OPEN_A = () => portrait ? Math.PI*0.5 : Math.PI*0.78; // 開く破片の向き: 縦は真下（映像が下へ開く）、横は左下
+const cap=document.getElementById("cap"), cnx=document.getElementById("cnx"), chipsEl=document.getElementById("chips");
 function openShard(i){
-  if(cur>=0){ shards[cur].openTarget=0; vids[shards[cur].photo].pause(); prev=cur; }
-  cur=i; const s=shards[i]; s.openTarget=1; s.kind="photo";
-  rotTarget = rot + norm(OPEN_A - (s.a+rot));
-  const v=vids[s.photo]; v.currentTime=0; v.play().catch(()=>{});
-  phase="open"; t0=performance.now();
-  document.getElementById("sub").classList.remove("on");
+  if(cur>=0){shards[cur].openTarget=0;vids[shards[cur].photo].pause();}
+  cur=i;const s=shards[i];s.openTarget=1;s.kind="photo";
+  rotTarget=rot+norm(OPEN_A()-(s.a+rot));
+  const v=vids[s.photo];v.currentTime=0;v.play().catch(()=>{});
+  const A=ASSETS[s.photo];document.getElementById("cno").textContent=A.no;document.getElementById("cti").textContent=A.title;document.getElementById("csh").textContent=A.short;
+  cap.classList.add("on");cnx.classList.remove("on");beam=null;
+  phase="open";t0=performance.now();
 }
-function pickNext(){ let j=(cur+7)%N; if(j===cur) j=(j+1)%N; return j; }
-function link(){ const j=pickNext(); beam={from:cur,to:j,t0:performance.now()}; const el=document.getElementById("sub"); document.getElementById("subt").textContent=REASONS[(cur+j)%REASONS.length]; el.classList.add("on"); phase="link"; t0=performance.now(); setTimeout(()=>{ if(phase==="link") openShard(j); }, 1500); }
+function pickNext(){let j=(cur+7)%N;if(j===cur)j=(j+1)%N;return j;}
+function link(){ if(cur<0)return; nextIdx=pickNext(); document.getElementById("cnxt").textContent=REASONS[(cur+nextIdx)%REASONS.length]; cnx.classList.add("on"); shards[cur].openTarget=0; beam={from:cur,to:nextIdx,t0:performance.now()}; phase="link"; t0=performance.now(); setTimeout(()=>{ if(phase==="link") openShard(nextIdx); },1400); }
 function reburst(text){
-  const names = SETS[text] || SETS[Object.keys(SETS)[1+ (text.length%3)]];
-  if(cur>=0){ vids[shards[cur].photo].pause(); shards[cur].openTarget=0; cur=-1; }
-  beam=null; document.getElementById("sub").classList.remove("on");
-  phase="collapse"; t0=performance.now(); burstDir=-1;
-  setTimeout(()=>{ mkShards(Math.random()*100); mkLabels(names); burstDir=1; phase="burst"; t0=performance.now(); flash=1; setTimeout(()=>{ phase="idle"; if(auto) setTimeout(()=>openShard(3),600); }, 900); }, 520);
+  const names=SETS[text]||SETS[Object.keys(SETS)[1+(text.length%3)]];
+  if(cur>=0){vids[shards[cur].photo].pause();shards[cur].openTarget=0;cur=-1;}
+  beam=null;cap.classList.remove("on");
+  phase="collapse";t0=performance.now();
+  setTimeout(()=>{mkShards(Math.random()*100);mkLabels(names);phase="burst";t0=performance.now();flash=1;setTimeout(()=>{phase="idle";if(auto)setTimeout(()=>openShard(3),500);},900);},520);
 }
-let flash=0;
-// ---- 描画
-function shardPoly(s,open){
-  const a=s.a+rot, w=s.w+(0.26-s.w)*open;
-  const r0=(26+s.p*R*.5)*(1-open)+60*open, r1=(r0+R*s.len*(.4+s.p))*(1-open)+R*1.4*open;
-  return {a,w,r0,r1};
-}
+// ---- 破片の形（中心 CX,CY からの楔）
+function wedge(s){const o=ease(s.open);const a=s.a+rot;const w=s.w+(Math.PI-s.w)*o;const r0=(24+s.p*R*.3)*(1-o);const r1=(r0+R*s.len*(.4+s.p))*(1-o)+R*1.2*o;return{a,w,r0,r1,o};}
+function pathWedge(a,w,r0,r1){const ax=Math.cos(a),ay=Math.sin(a),nx=-ay,ny=ax;const hw=Math.tan(Math.min(w,1.5))*r1,hw0=Math.tan(Math.min(w,1.5))*r0*.25;ctx.beginPath();if(w>=Math.PI*.98){ctx.rect(-5,-5,W+10,H+10);return;}
+  // 広い楔は扇形で描く
+  if(w>.5){ctx.moveTo(CX,CY);ctx.arc(CX,CY,r1,a-w,a+w);ctx.closePath();return;}
+  ctx.moveTo(CX+ax*r0+nx*hw0,CY+ay*r0+ny*hw0);ctx.lineTo(CX+ax*r1+nx*hw,CY+ay*r1+ny*hw);ctx.lineTo(CX+ax*r1-nx*hw,CY+ay*r1-ny*hw);ctx.lineTo(CX+ax*r0-nx*hw0,CY+ay*r0-ny*hw0);ctx.closePath();}
+function drawCover(src,alpha){const iw=src.videoWidth||src.naturalWidth||384,ih=src.videoHeight||src.naturalHeight||216;const sc=Math.max(W/iw,H/ih);const dw=iw*sc,dh=ih*sc;ctx.globalAlpha=alpha;ctx.drawImage(src,(W-dw)/2,(H-dh)/2*(portrait?.6:1),dw,dh);ctx.globalAlpha=1;}
 function drawShard(s,i){
-  const o=ease(s.open), {a,w,r0,r1}=shardPoly(s,o);
-  const x0=W/2+Math.cos(a)*r0, y0=H/2+Math.sin(a)*r0;
-  const ax=Math.cos(a), ay=Math.sin(a), nx=-ay, ny=ax;
-  const hw=Math.tan(w)*r1, hw0=Math.tan(w)*r0*0.25;
-  ctx.save(); ctx.beginPath();
-  ctx.moveTo(x0+nx*hw0,y0+ny*hw0); ctx.lineTo(W/2+ax*r1+nx*hw,H/2+ay*r1+ny*hw); ctx.lineTo(W/2+ax*r1-nx*hw,H/2+ay*r1-ny*hw); ctx.lineTo(x0-nx*hw0,y0-ny*hw0); ctx.closePath();
-  const dimk = cur>=0 && i!==cur ? 0.42 : 1;
-  if(s.kind==="color"){ ctx.fillStyle=s.col; ctx.globalAlpha=.85*dimk; ctx.fill(); }
-  else if(s.kind==="dark"){ ctx.fillStyle="#0b0b0e"; ctx.fill(); }
-  else {
-    ctx.clip();
-    const src = (o>.5 && vids[s.photo].readyState>=2) ? vids[s.photo] : imgs[s.photo];
-    const L=r1-r0, Hh=hw*2.2; // 写真を破片の長軸に沿わせる
-    ctx.translate(x0,y0); ctx.rotate(a);
-    const iw=src.videoWidth||src.naturalWidth||384, ih=src.videoHeight||src.naturalHeight||216;
-    const sc=Math.max(L/iw, Hh/ih)*(o>.5?1:1.6); const dw=iw*sc, dh=ih*sc;
-    ctx.globalAlpha=dimk;
-    ctx.drawImage(src,(L-dw)/2 - (o>.5?0:L*.15), -dh/2, dw, dh);
-    if(o<.5){ ctx.fillStyle=`rgba(0,0,0,${.25*(1-o*2)})`; ctx.fillRect(0,-dh,L,dh*2); }
+  const {a,w,r0,r1,o}=wedge(s);
+  ctx.save();pathWedge(a,w,r0,r1);
+  const dimk=cur>=0&&i!==cur?.5:1;
+  if(s.kind==="color"){ctx.fillStyle=s.col;ctx.globalAlpha=.85*dimk;ctx.fill();}
+  else if(s.kind==="dark"){ctx.fillStyle="#0b0b0e";ctx.fill();}
+  else{ctx.clip();
+    if(o>.08){ // 開く: 映像を画面いっぱいに（楔が扇のように広がって映像を現す）
+      const v=vids[s.photo];drawCover(v.readyState>=2?v:imgs[s.photo],1);
+    }else{ // 閉じている破片: 写真を長軸に沿わせる
+      const src=imgs[s.photo];const L=r1-r0,Hh=Math.tan(w)*r1*2.2;ctx.translate(CX+Math.cos(a)*r0,CY+Math.sin(a)*r0);ctx.rotate(a);
+      const iw=src.naturalWidth||384,ih=src.naturalHeight||216;const sc=Math.max(L/iw,Hh/ih)*1.5;const dw=iw*sc,dh=ih*sc;ctx.globalAlpha=dimk;ctx.drawImage(src,(L-dw)/2-L*.15,-dh/2,dw,dh);ctx.fillStyle="rgba(0,0,0,.28)";ctx.fillRect(-10,-dh,L+20,dh*2);}
   }
   ctx.restore();
-  // 開いた破片: 縁の光とタイトル
-  if(o>.02){
-    ctx.save(); ctx.globalAlpha=o;
-    ctx.translate(W/2,H/2); ctx.rotate(a);
-    ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=1.5;
-    ctx.beginPath(); ctx.moveTo(r0,-hw0); ctx.lineTo(r1,-hw); ctx.moveTo(r0,hw0); ctx.lineTo(r1,hw); ctx.stroke();
-    const A=ASSETS[s.photo]; const flip = Math.cos(a)<0;
-    ctx.translate(r0+ (r1-r0)*0.62, 0); if(flip) ctx.rotate(Math.PI);
-    ctx.textAlign="center"; ctx.fillStyle="#fff"; ctx.shadowColor="rgba(0,0,0,.8)"; ctx.shadowBlur=16;
-    ctx.font=`500 ${Math.round(Math.min(W,H)*.03)}px Oswald, sans-serif`; ctx.fillText(`No.${A.no}`,0,-Math.min(W,H)*.075);
-    ctx.font=`900 ${Math.round(Math.min(W,H)*.072)}px "Noto Sans JP", sans-serif`; ctx.fillText(A.title,0,Math.min(W,H)*.01);
-    ctx.font=`400 ${Math.round(Math.min(W,H)*.022)}px "Noto Sans JP", sans-serif`; ctx.fillStyle="rgba(255,255,255,.85)"; ctx.fillText(A.short,0,Math.min(W,H)*.055);
-    ctx.restore();
-  }
+  // 開いた映像の上に放射の線（ロゴの切れ目）
+  if(o>.3){ctx.save();const pk=phase==="open"?Math.min(1,(performance.now()-t0)/3400):0;ctx.globalAlpha=Math.min(1,(o-.3)/.5)*(.55-.3*pk);ctx.strokeStyle="#050506";ctx.lineWidth=1;ctx.beginPath();for(let k=0;k<12;k++){const ang=rot*0.3+k/12*Math.PI*2+hash(k)*.1;ctx.moveTo(CX+Math.cos(ang)*18,CY+Math.sin(ang)*18);ctx.lineTo(CX+Math.cos(ang)*R,CY+Math.sin(ang)*R);}ctx.stroke();
+    // 下の文字のための影
+    const g=ctx.createLinearGradient(0,H*.45,0,H);g.addColorStop(0,"rgba(0,0,0,0)");g.addColorStop(1,"rgba(0,0,0,.85)");ctx.fillStyle=g;ctx.globalAlpha=1;ctx.fillRect(0,0,W,H);ctx.restore();}
 }
 let last=performance.now();
 function frame(now){
   requestAnimationFrame(frame);
-  const dt=Math.min(.05,(now-last)/1000); last=now;
-  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle="#050506"; ctx.fillRect(0,0,W,H);
-  // 回転と開閉
-  rot += (rotTarget-rot)*(1-Math.exp(-dt/.45));
-  for(const s of shards){ s.openTarget=s.openTarget||0; s.open += (s.openTarget-s.open)*(1-Math.exp(-dt/.32)); s.p += dt*.012*s.speed*(1-s.open); if(s.p>1){s.p-=1;} }
-  // 収縮/再放射
-  if(phase==="collapse"){ burstK=Math.max(0,1-(now-t0)/480); } else if(phase==="burst"){ burstK=Math.min(1,(now-t0)/900); } else burstK=1;
-  const bk = phase==="collapse"? burstK : ease(burstK);
-  // 熱（投票の分布。数は出さない）
-  for(const ha of heat){ const a=ha+rot; const g=ctx.createRadialGradient(W/2+Math.cos(a)*R*.45,H/2+Math.sin(a)*R*.45,0,W/2+Math.cos(a)*R*.45,H/2+Math.sin(a)*R*.45,R*.42); g.addColorStop(0,"rgba(255,90,30,.22)"); g.addColorStop(1,"rgba(255,90,30,0)"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
-  ctx.save(); ctx.translate(W/2,H/2); ctx.scale(bk,bk); ctx.translate(-W/2,-H/2);
-  // 開いていない破片 → 開いている破片の順
-  shards.forEach((s,i)=>{ if(i!==cur) drawShard(s,i); });
-  // 光線名（大きな文字を破片に沿わせる）
-  ctx.save(); ctx.translate(W/2,H/2);
-  for(const l of labels){ const k=Math.max(0,Math.min(1,(now-l.born)/400)); if(k<=0) continue; const a=l.a+rot; const flip=Math.cos(a)<0; ctx.save(); ctx.rotate(a); ctx.translate(R*.52,0); if(flip) ctx.rotate(Math.PI); ctx.globalAlpha=(cur>=0?.55:1)*k; ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.font=`900 ${Math.round(Math.min(W,H)*.075)}px "Noto Sans JP", sans-serif`; ctx.shadowColor="#000"; ctx.shadowBlur=14; ctx.fillText(l.text,0,Math.min(W,H)*.03); ctx.restore(); }
+  const dt=Math.min(.05,(now-last)/1000);last=now;
+  ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle="#050506";ctx.fillRect(0,0,W,H);
+  rot+=(rotTarget-rot)*(1-Math.exp(-dt/.45));
+  for(const s of shards){s.open+=(s.openTarget-s.open)*(1-Math.exp(-dt/.3));s.p+=dt*.012*s.speed*(1-s.open);if(s.p>1)s.p-=1;}
+  if(phase==="collapse")burstK=Math.max(0,1-(now-t0)/480);else if(phase==="burst")burstK=Math.min(1,(now-t0)/900);else burstK=1;
+  const bk=phase==="collapse"?burstK:ease(burstK);
+  for(const ha of heat){const a=ha+rot;const x=CX+Math.cos(a)*R*.3,y=CY+Math.sin(a)*R*.3;const g=ctx.createRadialGradient(x,y,0,x,y,R*.3);g.addColorStop(0,"rgba(255,90,30,.22)");g.addColorStop(1,"rgba(255,90,30,0)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
+  ctx.save();ctx.translate(CX,CY);ctx.scale(bk,bk);ctx.translate(-CX,-CY);
+  shards.forEach((s,i)=>{if(i!==cur)drawShard(s,i);});
+  // 光線名
+  const openK=cur>=0?ease(shards[cur].open):0;
+  ctx.save();ctx.translate(CX,CY);
+  const cr=cap.classList.contains("on")?cap.getBoundingClientRect():null;const chipsTop=chipsEl.getBoundingClientRect().top-8;
+  for(const l of labels){const k=Math.max(0,Math.min(1,(now-l.born)/400));if(k<=0)continue;const a=l.a;const flip=Math.cos(a)<0;/* 光線名は画面に固定（破片だけが回る）*/ctx.font=`900 ${Math.round(Math.min(W,H)*.07)}px "Noto Sans JP", sans-serif`;const tw=ctx.measureText(l.text).width+24,th=Math.min(W,H)*.08;
+    // 画面の外へ出ない半径: 文字の両端が左右の余白と、HUDの下〜チップの上に収まる最大
+    const ca=Math.cos(a),sa=Math.sin(a);const ex=Math.abs(ca)*tw/2+Math.abs(sa)*th/2,ey=Math.abs(sa)*tw/2+Math.abs(ca)*th/2;
+    let lr=Math.min(W,H)*.42;if(ca>0)lr=Math.min(lr,(W-16-ex-CX)/ca);else if(ca<0)lr=Math.min(lr,(CX-16-ex)/-ca);
+    if(sa>0)lr=Math.min(lr,(chipsTop-ey-CY)/sa);else if(sa<0)lr=Math.min(lr,(CY-56-ey)/-sa);lr=Math.max(Math.min(W,H)*.14,lr);
+    const lx=CX+ca*lr,ly=CY+sa*lr;const hit=cr&&lx>cr.left-60&&lx<cr.right+60&&ly>cr.top-30&&ly<cr.bottom+30;ctx.save();ctx.rotate(a);ctx.translate(lr,0);if(flip)ctx.rotate(Math.PI);ctx.globalAlpha=(1-openK)*k*(hit?.12:1);ctx.fillStyle="#fff";ctx.textAlign="center";ctx.font=`900 ${Math.round(Math.min(W,H)*.07)}px "Noto Sans JP", sans-serif`;ctx.shadowColor="#000";ctx.shadowBlur=14;ctx.fillText(l.text,0,Math.min(W,H)*.028);ctx.restore();}
   ctx.restore();
-  if(cur>=0) drawShard(shards[cur],cur);
-  // 光のビーム（つながり）
-  if(beam){ const k=Math.min(1,(now-beam.t0)/700); const s1=shards[beam.from], s2=shards[beam.to]; const a1=s1.a+rot, a2=s2.a+rot; const p1=[W/2+Math.cos(a1)*R*.5,H/2+Math.sin(a1)*R*.5], p2=[W/2+Math.cos(a2)*(60+s2.p*R*.5+R*.15),H/2+Math.sin(a2)*(60+s2.p*R*.5+R*.15)]; const x=p1[0]+(p2[0]-p1[0])*ease(k), y=p1[1]+(p2[1]-p1[1])*ease(k); ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=1.2; ctx.shadowColor="#e9ff2a"; ctx.shadowBlur=18; ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(x,y); ctx.stroke(); ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(x,y,3.5,0,7); ctx.fill(); if(k>=1){ const {a,w,r0,r1}=shardPoly(s2,0); ctx.strokeStyle="#e9ff2a"; ctx.lineWidth=2; ctx.translate(W/2,H/2); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(r0,0); ctx.lineTo(r1,-Math.tan(w)*r1); ctx.lineTo(r1,Math.tan(w)*r1); ctx.closePath(); ctx.stroke(); } ctx.restore(); }
+  if(cur>=0)drawShard(shards[cur],cur);
+  if(beam){const k=Math.min(1,(now-beam.t0)/650);const s2=shards[beam.to];const a2=s2.a+rot;const r=Math.min(W,H)*.42;const x=CX+Math.cos(a2)*r*ease(k),y=CY+Math.sin(a2)*r*ease(k);ctx.save();ctx.globalCompositeOperation="lighter";ctx.strokeStyle="rgba(255,255,255,.95)";ctx.lineWidth=1.5;ctx.shadowColor="#e9ff2a";ctx.shadowBlur=22;ctx.beginPath();ctx.moveTo(CX,CY);ctx.lineTo(x,y);ctx.stroke();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(x,y,4,0,7);ctx.fill();if(k>=1){const {a,w,r0,r1}=wedge(s2);ctx.strokeStyle="#e9ff2a";ctx.lineWidth=2;pathWedge(a,w,r0,r1);ctx.stroke();}ctx.restore();}
   ctx.restore();
-  // 中心の黒い正方形（ロゴのフレーム）
-  const fs=Math.min(W,H)*.07*(.6+.4*bk); ctx.fillStyle="#050506"; ctx.fillRect(W/2-fs/2,H/2-fs/2,fs,fs); ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=2; ctx.strokeRect(W/2-fs/2,H/2-fs/2,fs,fs);
-  if(flash>0){ ctx.fillStyle=`rgba(255,255,255,${flash*.7})`; ctx.fillRect(0,0,W,H); flash-=dt*2.2; }
-  // 自動進行: 開いて3.2秒で次へ
-  if(auto && phase==="open" && now-t0>3200) link();
+  const fs=Math.min(W,H)*.06*(.6+.4*bk)*(1-openK*.6);ctx.fillStyle="#050506";ctx.fillRect(CX-fs/2,CY-fs/2,fs,fs);ctx.strokeStyle="rgba(255,255,255,.9)";ctx.lineWidth=2;ctx.strokeRect(CX-fs/2,CY-fs/2,fs,fs);
+  if(flash>0){ctx.fillStyle=`rgba(255,255,255,${flash*.7})`;ctx.fillRect(0,0,W,H);flash-=dt*2.2;}
+  if(auto&&phase==="open"&&now-t0>3400)link();
 }
 requestAnimationFrame(frame);
-// ---- 操作
-c.addEventListener("pointerdown",(e)=>{ const dx=e.clientX-W/2, dy=e.clientY-H/2; const a=Math.atan2(dy,dx); let best=-1,bd=1e9; shards.forEach((s,i)=>{ const d=Math.abs(norm(s.a+rot-a)); if(d<bd){bd=d;best=i;} }); if(best>=0 && bd<.12) openShard(best); });
-document.getElementById("auto").onclick=()=>{auto=true; setPressed(); if(phase!=="open") openShard(cur>=0?cur:3);};
-document.getElementById("stop").onclick=()=>{auto=false; setPressed();};
-function setPressed(){ document.getElementById("auto").setAttribute("aria-pressed",String(auto)); document.getElementById("stop").setAttribute("aria-pressed",String(!auto)); }
-addEventListener("keydown",(e)=>{ if(e.key==="ArrowRight") link(); });
-const chips=document.getElementById("chips"); ["ベテランの熱量","めちゃくちゃ泣ける","土壇場の一撃"].forEach(t=>{const b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=()=>{document.getElementById("q").value=t;};chips.appendChild(b);});
-document.getElementById("f").addEventListener("submit",(e)=>{e.preventDefault(); const t=document.getElementById("q").value.trim(); if(t) reburst(t);});
-// 起動: 1秒後に最初の1本を開く（無音の自動再生）
-setTimeout(()=>{ if(auto) openShard(3); }, 1200);
+c.addEventListener("pointerdown",(e)=>{ if(phase==="open"){ link(); return; } const dx=e.clientX-CX,dy=e.clientY-CY;const a=Math.atan2(dy,dx);let best=-1,bd=1e9;shards.forEach((s,i)=>{const d=Math.abs(norm(s.a+rot-a));if(d<bd){bd=d;best=i;}});if(best>=0&&bd<.14)openShard(best);});
+document.getElementById("auto").onclick=()=>{auto=true;setPressed();if(phase!=="open")openShard(cur>=0?cur:3);};
+document.getElementById("stop").onclick=()=>{auto=false;setPressed();};
+function setPressed(){document.getElementById("auto").setAttribute("aria-pressed",String(auto));document.getElementById("stop").setAttribute("aria-pressed",String(!auto));}
+addEventListener("keydown",(e)=>{if(e.key==="ArrowRight")link();});
+const chips=document.getElementById("chips");["ベテランの熱量","めちゃくちゃ泣ける","土壇場の一撃"].forEach(t=>{const b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=()=>{document.getElementById("q").value=t;};chips.appendChild(b);});
+document.getElementById("f").addEventListener("submit",(e)=>{e.preventDefault();const t=document.getElementById("q").value.trim();if(t)reburst(t);});
+setTimeout(()=>{if(auto)openShard(3);},1200);
 </script>
