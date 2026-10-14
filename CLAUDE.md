@@ -457,6 +457,25 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
   出力: loop.mp4 387KB / loop.webm 332KB（480×270・3秒・無音）、detail.mp4 28MB（720p・4.5Mbps上限・54秒）、poster.webp 87KB、
   thumb.jpg 25KB、og.jpg 134KB（タイトル焼き込み）。1本あたり約110秒（54秒ソース、主に720p再エンコード）。
 
+## 投票サイト（2026-10-14 着手・vote1）
+
+作業の順番（ユーザー指示で確定）: ①素材処理を完了 → ②投票サイトの骨格 → ③情報サイト → ④体験（炸裂）へ本番素材と意味データを接続。体験の核に先に手を付けない。
+
+- ルート: `/moments`（V-01 TOP）, `/moments/[no]`（V-02 詳細。SP 縦スワイプ全画面・PC 矢印、URL は見ている瞬間に追従、OGP は og.jpg）,
+  `/moments/[no]/vote`（V-03 確認）, `/moments/[no]/done`（V-04 完了）, `/awards`（情報サイト骨格 I-00〜）。API: `/api/v26/vote`（POST）, `/api/v26/state`。
+- データ: `data/sheet2026.json`（素材シートの写し、Dropbox リンクは除外）＋ `data/context2026.json` ＋ 取り込み済み素材 → `scripts/build_moments2026.mjs <assetsDir>`
+  → `data/moments2026.json`。競技フィルタはシート準拠（W杯/サッカー/野球/バスケ/ラグビー/ボクシング/モータースポーツ/その他）。
+- 素材配信: 公開バケット **gs://e-mooments-assets**（asia-northeast1、均一アクセス、allUsers objectViewer）。`node scripts/upload_assets.js <assetsDir>`
+  が loop.mp4/loop.webm/poster.webp/thumb.jpg/og.jpg を `m/<no>_<clip>/` にアップ（サイズ一致はスキップ）。URL は
+  `https://storage.googleapis.com/e-mooments-assets/m/001_01/thumb.jpg`。取り込みが進んだら upload → build → deploy の順で反映する。
+- 投票: 1日1回・端末ベース。Cookie `d100_device`（端末ID、90日）＋ `d100_voted`（`YYYY-MM-DD:no`、JST）。サーバー側も端末IDで当日重複を拒否（409）。
+  ストアはインメモリ（`lib/vote/store.ts`、本番は Firestore に差し替える前提で書き込み面を1か所に閉じている）。票数は公開せず `heat`（相対値）だけ API に出す。
+- 時期: `VOTE_PHASE`（pre/open/closed/result）で固定、無指定は日付（VOTE_START 11/05、VOTE_END 12/14 仮、結果 12/21）。デプロイは `VOTE_PHASE=open` を渡す。
+- 検証: `scratchpad/vote/shots.mjs`（SP 390×844 / PC 1280×800 で ルール→TOP→フィルタ→詳細→スワイプ→確認→投票→完了→投票済み表示→2回目 409 を通す）。
+  **注意**: 初回アクセスはルールモーダルが自動で開く。Playwright の `page.click("a.v26-vote")` は最初の（画面外の）スライドのリンクを掴んでスナップ
+  コンテナをスクロールさせるので、見えているスライドのリンクを座標でクリックする。
+- 本番: 炸裂サービス（e-mooments-burst）に同居。`SERVICE=e-mooments-burst VISUAL_MODE=burst VOTE_PHASE=open node scripts/deploy_cloud_run.js`。rev `vote1`。
+
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）
 
 - 「後で確認する」と言うときは、必ず send_later 等で実際にスケジュールする。できない場合は「できない」と言う。
