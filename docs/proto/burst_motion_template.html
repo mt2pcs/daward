@@ -1,0 +1,179 @@
+<title>熱狂の炸裂 モーションプロト</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;900&family=Oswald:wght@500;700&display=swap">
+<style>
+/* 単一の暗い世界（キービジュアルの中）。黒・白・DAZNの差し色のみ。レイアウト: 全画面キャンバス＋下端に入力1行 */
+:root { --bg:#050506; --fg:#f3f2ee; --dim:#8d8c86; --accent:#e9ff2a; --red:#ff2d55; --mag:#ff3fb0; --blue:#2f6bff; --lime:#b8ff3c;
+  --display:"Noto Sans JP","Hiragino Sans",sans-serif; --num:"Oswald","Noto Sans JP",sans-serif; color-scheme:dark; }
+html,body{height:100%;}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--display);overflow:hidden;}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:pointer;}
+.hud{position:fixed;left:0;right:0;top:0;padding:14px max(18px,env(safe-area-inset-right,0px)) 0 max(18px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none;}
+.brand{font:700 12px/1 var(--num);letter-spacing:.28em;color:var(--dim)}
+.brand b{display:block;color:var(--fg);font-size:18px;margin-top:6px;letter-spacing:.12em}
+.mode{pointer-events:auto;display:flex;gap:8px}
+.mode button{font:500 11px/1 var(--num);letter-spacing:.14em;color:var(--fg);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);padding:9px 12px;border-radius:999px;cursor:pointer}
+.mode button[aria-pressed="true"]{background:var(--accent);color:#050506;border-color:var(--accent)}
+.mode button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:0 max(18px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(18px,env(safe-area-inset-left,0px));display:flex;gap:10px;align-items:center;justify-content:center}
+.bar form{display:flex;gap:8px;width:min(560px,100%)}
+.bar input{flex:1;min-width:0;background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.22);color:var(--fg);font:400 15px/1 var(--display);padding:13px 16px;border-radius:4px;backdrop-filter:blur(8px)}
+.bar input:focus{outline:none;border-color:var(--accent)}
+.bar button{font:900 13px/1 var(--display);letter-spacing:.1em;background:var(--accent);color:#050506;border:0;padding:0 18px;border-radius:4px;cursor:pointer}
+.bar button:focus-visible{outline:2px solid #fff}
+.chips{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(68px + env(safe-area-inset-bottom,0px));display:flex;gap:6px;pointer-events:auto}
+.chips button{font:400 11px/1 var(--display);color:var(--dim);background:transparent;border:1px solid rgba(255,255,255,.14);padding:7px 11px;border-radius:999px;cursor:pointer}
+.chips button:hover{color:var(--fg);border-color:rgba(255,255,255,.4)}
+.sub{position:fixed;left:0;right:0;bottom:calc(112px + env(safe-area-inset-bottom,0px));text-align:center;font:400 15px/1.4 var(--display);color:var(--fg);letter-spacing:.06em;text-shadow:0 2px 18px #000;opacity:0;transition:opacity .35s;pointer-events:none}
+.sub.on{opacity:1}
+.sub small{display:block;font:500 10px/1 var(--num);letter-spacing:.3em;color:var(--accent);margin-bottom:8px}
+.help{position:fixed;left:max(18px,env(safe-area-inset-left,0px));bottom:calc(112px + env(safe-area-inset-bottom,0px));font:400 11px/1.6 var(--display);color:var(--dim);max-width:260px;pointer-events:none}
+@media (max-width:640px){.help{display:none}.brand b{font-size:14px}}
+@media (prefers-reduced-motion:reduce){.sub{transition:none}}
+</style>
+<canvas id="c"></canvas>
+<div class="hud"><div class="brand">DAZN AWARDS 2026<b>100 MOMENTS</b></div>
+  <div class="mode"><button id="auto" aria-pressed="true">ダイジェスト 自動</button><button id="stop" aria-pressed="false">手動</button></div></div>
+<div class="sub" id="sub"><small>NEXT</small><span id="subt"></span></div>
+<div class="help">破片をタップで開く。開いた映像の後、光が次の1本を指して空間が回る。<br>下の言葉を送ると光線が組み替わる。</div>
+<div class="chips" id="chips"></div>
+<div class="bar"><form id="f"><input id="q" placeholder="いま、どんな熱狂を観たい？" autocomplete="off"><button type="submit">組み替える</button></form></div>
+<script>
+const ASSETS = __ASSETS__;
+// ---- 言葉 → 光線名（プロトでは2セットを固定。本番は Vertex Gemini が命名）
+const SETS = {
+  default: ["王者の証明","土壇場","涙の引退","番狂わせ","新星誕生"],
+  "ベテランの熱量": ["背中で語る意地","最後の舞台に燃ゆ","惜別のグラウンド","積年の夢が結実"],
+  "めちゃくちゃ泣ける": ["日本中が泣いた夜","涙の花道","仲間が支えた背中"],
+  "土壇場の一撃": ["ラストプレーの奇跡","追い込まれて開いた目","ロスタイムの逆転"],
+};
+const REASONS = ["同じ選手が、半年後に。","同じ土壇場。相手は違う。","この涙の、三か月前。","同じスタジアムで、もう一度。","王者が、今度は挑戦者として。","同じ夜の、別の歓喜。"];
+const PAL = ["#ff2d55","#ff3fb0","#2f6bff","#b8ff3c","#ff8a3d","#e9ff2a"];
+const c = document.getElementById("c"), ctx = c.getContext("2d");
+let W=0,H=0,DPR=1,R=0;
+const resize=()=>{DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=W*DPR;c.height=H*DPR;R=Math.hypot(W,H)/2;};
+addEventListener("resize",resize);resize();
+// ---- 素材
+const imgs = ASSETS.map(a=>{const i=new Image();i.src=a.thumb;return i;});
+const vids = ASSETS.map(a=>{const v=document.createElement("video");v.src=a.loop;v.muted=true;v.loop=true;v.playsInline=true;v.preload="auto";return v;});
+// ---- 破片
+const N = 64;
+const hash=(n)=>{let x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);};
+let shards=[], rot=0, rotTarget=0, labels=[], heat=[];
+const mkShards=(seed)=>{
+  shards=[];
+  for(let i=0;i<N;i++){
+    const h1=hash(seed+i*7.3),h2=hash(seed+i*3.1+9),h3=hash(seed+i*5.7+2);
+    shards.push({a:(i/N)*Math.PI*2+(h1-.5)*.08, w:.016+h2*.04, p:h3, len:.55+hash(seed+i)*.5, photo:i%ASSETS.length, kind:h1<.18?"color":h1<.26?"dark":"photo", col:PAL[i%PAL.length], open:0, speed:.2+h2*.5});
+  }
+};
+const mkLabels=(names)=>{ labels=names.map((n,k)=>({text:n,a:(k/names.length)*Math.PI*2+.6,born:performance.now()+k*140})); heat=[labels[0].a, labels[Math.min(2,labels.length-1)].a]; };
+mkShards(1); mkLabels(SETS.default);
+// ---- 状態
+let cur=-1, phase="idle", t0=0, auto=true, burstK=1, burstDir=0, prev=-1, beam=null;
+const OPEN_A = 2.45; // 開いた破片の位置（左下）
+const ease=(k)=>k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+const norm=(a)=>Math.atan2(Math.sin(a),Math.cos(a));
+function openShard(i){
+  if(cur>=0){ shards[cur].openTarget=0; vids[shards[cur].photo].pause(); prev=cur; }
+  cur=i; const s=shards[i]; s.openTarget=1; s.kind="photo";
+  rotTarget = rot + norm(OPEN_A - (s.a+rot));
+  const v=vids[s.photo]; v.currentTime=0; v.play().catch(()=>{});
+  phase="open"; t0=performance.now();
+  document.getElementById("sub").classList.remove("on");
+}
+function pickNext(){ let j=(cur+7)%N; if(j===cur) j=(j+1)%N; return j; }
+function link(){ const j=pickNext(); beam={from:cur,to:j,t0:performance.now()}; const el=document.getElementById("sub"); document.getElementById("subt").textContent=REASONS[(cur+j)%REASONS.length]; el.classList.add("on"); phase="link"; t0=performance.now(); setTimeout(()=>{ if(phase==="link") openShard(j); }, 1500); }
+function reburst(text){
+  const names = SETS[text] || SETS[Object.keys(SETS)[1+ (text.length%3)]];
+  if(cur>=0){ vids[shards[cur].photo].pause(); shards[cur].openTarget=0; cur=-1; }
+  beam=null; document.getElementById("sub").classList.remove("on");
+  phase="collapse"; t0=performance.now(); burstDir=-1;
+  setTimeout(()=>{ mkShards(Math.random()*100); mkLabels(names); burstDir=1; phase="burst"; t0=performance.now(); flash=1; setTimeout(()=>{ phase="idle"; if(auto) setTimeout(()=>openShard(3),600); }, 900); }, 520);
+}
+let flash=0;
+// ---- 描画
+function shardPoly(s,open){
+  const a=s.a+rot, w=s.w+(0.26-s.w)*open;
+  const r0=(26+s.p*R*.5)*(1-open)+60*open, r1=(r0+R*s.len*(.4+s.p))*(1-open)+R*1.4*open;
+  return {a,w,r0,r1};
+}
+function drawShard(s,i){
+  const o=ease(s.open), {a,w,r0,r1}=shardPoly(s,o);
+  const x0=W/2+Math.cos(a)*r0, y0=H/2+Math.sin(a)*r0;
+  const ax=Math.cos(a), ay=Math.sin(a), nx=-ay, ny=ax;
+  const hw=Math.tan(w)*r1, hw0=Math.tan(w)*r0*0.25;
+  ctx.save(); ctx.beginPath();
+  ctx.moveTo(x0+nx*hw0,y0+ny*hw0); ctx.lineTo(W/2+ax*r1+nx*hw,H/2+ay*r1+ny*hw); ctx.lineTo(W/2+ax*r1-nx*hw,H/2+ay*r1-ny*hw); ctx.lineTo(x0-nx*hw0,y0-ny*hw0); ctx.closePath();
+  const dimk = cur>=0 && i!==cur ? 0.42 : 1;
+  if(s.kind==="color"){ ctx.fillStyle=s.col; ctx.globalAlpha=.85*dimk; ctx.fill(); }
+  else if(s.kind==="dark"){ ctx.fillStyle="#0b0b0e"; ctx.fill(); }
+  else {
+    ctx.clip();
+    const src = (o>.5 && vids[s.photo].readyState>=2) ? vids[s.photo] : imgs[s.photo];
+    const L=r1-r0, Hh=hw*2.2; // 写真を破片の長軸に沿わせる
+    ctx.translate(x0,y0); ctx.rotate(a);
+    const iw=src.videoWidth||src.naturalWidth||384, ih=src.videoHeight||src.naturalHeight||216;
+    const sc=Math.max(L/iw, Hh/ih)*(o>.5?1:1.6); const dw=iw*sc, dh=ih*sc;
+    ctx.globalAlpha=dimk;
+    ctx.drawImage(src,(L-dw)/2 - (o>.5?0:L*.15), -dh/2, dw, dh);
+    if(o<.5){ ctx.fillStyle=`rgba(0,0,0,${.25*(1-o*2)})`; ctx.fillRect(0,-dh,L,dh*2); }
+  }
+  ctx.restore();
+  // 開いた破片: 縁の光とタイトル
+  if(o>.02){
+    ctx.save(); ctx.globalAlpha=o;
+    ctx.translate(W/2,H/2); ctx.rotate(a);
+    ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(r0,-hw0); ctx.lineTo(r1,-hw); ctx.moveTo(r0,hw0); ctx.lineTo(r1,hw); ctx.stroke();
+    const A=ASSETS[s.photo]; const flip = Math.cos(a)<0;
+    ctx.translate(r0+ (r1-r0)*0.62, 0); if(flip) ctx.rotate(Math.PI);
+    ctx.textAlign="center"; ctx.fillStyle="#fff"; ctx.shadowColor="rgba(0,0,0,.8)"; ctx.shadowBlur=16;
+    ctx.font=`500 ${Math.round(Math.min(W,H)*.03)}px Oswald, sans-serif`; ctx.fillText(`No.${A.no}`,0,-Math.min(W,H)*.075);
+    ctx.font=`900 ${Math.round(Math.min(W,H)*.072)}px "Noto Sans JP", sans-serif`; ctx.fillText(A.title,0,Math.min(W,H)*.01);
+    ctx.font=`400 ${Math.round(Math.min(W,H)*.022)}px "Noto Sans JP", sans-serif`; ctx.fillStyle="rgba(255,255,255,.85)"; ctx.fillText(A.short,0,Math.min(W,H)*.055);
+    ctx.restore();
+  }
+}
+let last=performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(.05,(now-last)/1000); last=now;
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle="#050506"; ctx.fillRect(0,0,W,H);
+  // 回転と開閉
+  rot += (rotTarget-rot)*(1-Math.exp(-dt/.45));
+  for(const s of shards){ s.openTarget=s.openTarget||0; s.open += (s.openTarget-s.open)*(1-Math.exp(-dt/.32)); s.p += dt*.012*s.speed*(1-s.open); if(s.p>1){s.p-=1;} }
+  // 収縮/再放射
+  if(phase==="collapse"){ burstK=Math.max(0,1-(now-t0)/480); } else if(phase==="burst"){ burstK=Math.min(1,(now-t0)/900); } else burstK=1;
+  const bk = phase==="collapse"? burstK : ease(burstK);
+  // 熱（投票の分布。数は出さない）
+  for(const ha of heat){ const a=ha+rot; const g=ctx.createRadialGradient(W/2+Math.cos(a)*R*.45,H/2+Math.sin(a)*R*.45,0,W/2+Math.cos(a)*R*.45,H/2+Math.sin(a)*R*.45,R*.42); g.addColorStop(0,"rgba(255,90,30,.22)"); g.addColorStop(1,"rgba(255,90,30,0)"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
+  ctx.save(); ctx.translate(W/2,H/2); ctx.scale(bk,bk); ctx.translate(-W/2,-H/2);
+  // 開いていない破片 → 開いている破片の順
+  shards.forEach((s,i)=>{ if(i!==cur) drawShard(s,i); });
+  // 光線名（大きな文字を破片に沿わせる）
+  ctx.save(); ctx.translate(W/2,H/2);
+  for(const l of labels){ const k=Math.max(0,Math.min(1,(now-l.born)/400)); if(k<=0) continue; const a=l.a+rot; const flip=Math.cos(a)<0; ctx.save(); ctx.rotate(a); ctx.translate(R*.52,0); if(flip) ctx.rotate(Math.PI); ctx.globalAlpha=(cur>=0?.55:1)*k; ctx.fillStyle="#fff"; ctx.textAlign="center"; ctx.font=`900 ${Math.round(Math.min(W,H)*.075)}px "Noto Sans JP", sans-serif`; ctx.shadowColor="#000"; ctx.shadowBlur=14; ctx.fillText(l.text,0,Math.min(W,H)*.03); ctx.restore(); }
+  ctx.restore();
+  if(cur>=0) drawShard(shards[cur],cur);
+  // 光のビーム（つながり）
+  if(beam){ const k=Math.min(1,(now-beam.t0)/700); const s1=shards[beam.from], s2=shards[beam.to]; const a1=s1.a+rot, a2=s2.a+rot; const p1=[W/2+Math.cos(a1)*R*.5,H/2+Math.sin(a1)*R*.5], p2=[W/2+Math.cos(a2)*(60+s2.p*R*.5+R*.15),H/2+Math.sin(a2)*(60+s2.p*R*.5+R*.15)]; const x=p1[0]+(p2[0]-p1[0])*ease(k), y=p1[1]+(p2[1]-p1[1])*ease(k); ctx.save(); ctx.globalCompositeOperation="lighter"; ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=1.2; ctx.shadowColor="#e9ff2a"; ctx.shadowBlur=18; ctx.beginPath(); ctx.moveTo(p1[0],p1[1]); ctx.lineTo(x,y); ctx.stroke(); ctx.fillStyle="#fff"; ctx.beginPath(); ctx.arc(x,y,3.5,0,7); ctx.fill(); if(k>=1){ const {a,w,r0,r1}=shardPoly(s2,0); ctx.strokeStyle="#e9ff2a"; ctx.lineWidth=2; ctx.translate(W/2,H/2); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(r0,0); ctx.lineTo(r1,-Math.tan(w)*r1); ctx.lineTo(r1,Math.tan(w)*r1); ctx.closePath(); ctx.stroke(); } ctx.restore(); }
+  ctx.restore();
+  // 中心の黒い正方形（ロゴのフレーム）
+  const fs=Math.min(W,H)*.07*(.6+.4*bk); ctx.fillStyle="#050506"; ctx.fillRect(W/2-fs/2,H/2-fs/2,fs,fs); ctx.strokeStyle="rgba(255,255,255,.9)"; ctx.lineWidth=2; ctx.strokeRect(W/2-fs/2,H/2-fs/2,fs,fs);
+  if(flash>0){ ctx.fillStyle=`rgba(255,255,255,${flash*.7})`; ctx.fillRect(0,0,W,H); flash-=dt*2.2; }
+  // 自動進行: 開いて3.2秒で次へ
+  if(auto && phase==="open" && now-t0>3200) link();
+}
+requestAnimationFrame(frame);
+// ---- 操作
+c.addEventListener("pointerdown",(e)=>{ const dx=e.clientX-W/2, dy=e.clientY-H/2; const a=Math.atan2(dy,dx); let best=-1,bd=1e9; shards.forEach((s,i)=>{ const d=Math.abs(norm(s.a+rot-a)); if(d<bd){bd=d;best=i;} }); if(best>=0 && bd<.12) openShard(best); });
+document.getElementById("auto").onclick=()=>{auto=true; setPressed(); if(phase!=="open") openShard(cur>=0?cur:3);};
+document.getElementById("stop").onclick=()=>{auto=false; setPressed();};
+function setPressed(){ document.getElementById("auto").setAttribute("aria-pressed",String(auto)); document.getElementById("stop").setAttribute("aria-pressed",String(!auto)); }
+addEventListener("keydown",(e)=>{ if(e.key==="ArrowRight") link(); });
+const chips=document.getElementById("chips"); ["ベテランの熱量","めちゃくちゃ泣ける","土壇場の一撃"].forEach(t=>{const b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=()=>{document.getElementById("q").value=t;};chips.appendChild(b);});
+document.getElementById("f").addEventListener("submit",(e)=>{e.preventDefault(); const t=document.getElementById("q").value.trim(); if(t) reburst(t);});
+// 起動: 1秒後に最初の1本を開く（無音の自動再生）
+setTimeout(()=>{ if(auto) openShard(3); }, 1200);
+</script>

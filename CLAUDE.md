@@ -391,6 +391,13 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
   既知: Gemini は `next`（次の言葉3つ）を返さないことがあり既定値に落ちる（プロンプト調整の余地）。
 - **`npx next dev` を node_modules 未完了のまま走らせると npx が最新の Next（16系）を取ってきて tsconfig.json を書き換え AGENTS.md を生成する**。
   先に `npm ci` を完了させ `node_modules/.bin/next` を確認してから起動する。`pkill -f "next dev"` は自分のシェルも殺す（exit 144）→ `fuser -k 3142/tcp`。
+- **Playwright の実行パス（2026-10-14 の環境）**: `/opt/pw-browsers/chromium` はディレクトリ。Chromium 141（`chromium-1194/chrome-linux/chrome`）は
+  旧 headless を削除済みで playwright-core 1.47 から起動できない（"Old Headless mode has been removed"）。
+  **`executablePath: "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell"`** を使う（`npm i --no-save playwright-core@1.47.2`）。
+  python http.server は charset を付けないので日本語が化ける（公開時の骨格には charset がある）。
+- **動きのプロト（2026-10-14）**: 「動きのイメージが分からない」への回答として、Canvas 2D の単体 HTML `scratchpad/proto/page_template.html`
+  （実素材の3秒ループ6本＋サムネを data URI で埋め込み、約4.4MB）を Artifact として公開。破片の放射→1本が開いて再生→光が次を指す→
+  空間が回る→自由入力で収縮・再放射。本実装の仕様の叩き台であり、見た目は最終ではない。
 - 素材パイプライン実証（No.001）: 山場は1秒ごとの音量RMSの3秒窓最大で自動選択（9秒＝88:03のゴール直後の歓喜を正しく拾った）。
   出力: loop.mp4 387KB / loop.webm 332KB（480×270・3秒・無音）、detail.mp4 28MB（720p・4.5Mbps上限・54秒）、poster.webp 87KB、
   thumb.jpg 25KB、og.jpg 134KB（タイトル焼き込み）。1本あたり約110秒（54秒ソース、主に720p再エンコード）。
