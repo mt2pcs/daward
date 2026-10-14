@@ -207,6 +207,8 @@ async function main() {
           // Vertex AI Gemini（lib/gcpAuth.ts）。本番サービスにも同じ SA を渡す（メタデータサーバーの既定SAに権限が無くても動くように）
           ...(process.env.GCP_SA_KEY ? [{ name: 'GCP_SA_KEY', value: process.env.GCP_SA_KEY }] : []),
           ...(process.env.GEMINI_TEXT_MODEL ? [{ name: 'GEMINI_TEXT_MODEL', value: process.env.GEMINI_TEXT_MODEL }] : []),
+          ...(process.env.VOTE_PHASE ? [{ name: 'VOTE_PHASE', value: process.env.VOTE_PHASE }] : []),
+          ...(process.env.VOTE_END ? [{ name: 'VOTE_END', value: process.env.VOTE_END }] : []),
         ],
       }],
     },
