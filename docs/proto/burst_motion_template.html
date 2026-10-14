@@ -17,6 +17,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--display);ov
 /* ① 文字ブロック: 番号・タイトル・つなぐ言葉 */
 .cap{position:fixed;left:var(--gl);right:var(--gr);bottom:calc(118px + var(--gb));pointer-events:none;z-index:2;max-width:760px;opacity:0;transform:translateY(16px);transition:opacity .25s,transform .5s cubic-bezier(.2,.9,.2,1)}
 .cap.on{opacity:1;transform:none}
+.cap .sp{display:inline-block;font:700 11px/1 var(--num);letter-spacing:.2em;color:#050506;background:#fff;padding:5px 8px;margin-bottom:8px}
 .cap .no{font:700 clamp(40px,11vw,96px)/.9 var(--num);letter-spacing:-.01em;color:#fff;text-shadow:0 2px 24px rgba(0,0,0,.7)}
 .cap .ti{font:900 clamp(22px,6.4vw,54px)/1.15 var(--display);color:#fff;text-shadow:0 2px 24px rgba(0,0,0,.7);margin-top:4px;text-wrap:balance}
 .threads{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;pointer-events:auto}
@@ -35,6 +36,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--display);ov
 .next .card{position:relative;aspect-ratio:16/9;background:#111;border:1px solid rgba(255,255,255,.5);overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.6)}
 .next .card img{width:100%;height:100%;object-fit:cover;display:block}
 .next .card .lbl{position:absolute;left:0;right:0;bottom:0;padding:8px 10px;background:linear-gradient(transparent,rgba(0,0,0,.85));font:900 clamp(11px,3vw,14px)/1.2 var(--display);color:#fff}
+.next .card .sp{position:absolute;left:0;top:0;font:700 10px/1 var(--num);letter-spacing:.2em;color:#050506;background:#fff;padding:5px 7px}
 .next .card .lbl b{font:700 1.1em/1 var(--num);margin-right:8px}
 .chips{position:fixed;left:var(--gl);right:var(--gr);bottom:calc(70px + var(--gb));display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;z-index:2;padding-bottom:4px}
 .chips button{flex:0 0 auto;font:400 11px/1 var(--display);color:rgba(255,255,255,.75);background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.18);padding:8px 11px;border-radius:999px;cursor:pointer;backdrop-filter:blur(6px)}
@@ -48,36 +50,44 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--display);ov
 <canvas id="c"></canvas>
 <div class="hud"><div class="brand">DAZN AWARDS 2026<b>100 MOMENTS</b></div>
   <div class="mode"><button id="auto" aria-pressed="true">自動</button><button id="stop" aria-pressed="false">手動</button></div></div>
-<div class="cap" id="cap"><div class="no" id="cno"></div><div class="ti" id="cti"></div><div class="threads" id="threads"></div></div>
-<div class="next" id="next"><div class="why" id="why"><small>NEXT</small><span id="whyt"></span></div><div class="card"><img id="nimg" alt=""><div class="lbl"><b id="nno"></b><span id="nti"></span></div></div></div>
+<div class="cap" id="cap"><div class="sp" id="csp"></div><div class="no" id="cno"></div><div class="ti" id="cti"></div><div class="threads" id="threads"></div></div>
+<div class="next" id="next"><div class="why" id="why"><small>NEXT</small><span id="whyt"></span></div><div class="card"><img id="nimg" alt=""><div class="lbl"><b id="nno"></b><span id="nti"></span></div><div class="sp" id="nsp"></div></div></div>
 <div class="chips" id="chips"></div>
 <div class="bar"><form id="f"><input id="q" placeholder="いま、どんな熱狂を観たい？" autocomplete="off"><button type="submit">組み替える</button></form></div>
 <script>
 const ASSETS = __ASSETS__;
 const PALS = [["#ff2d55","#ff3fb0","#2f6bff","#b8ff3c","#ff8a3d","#e9ff2a"],["#ff8a3d","#ffd23c","#ff2d55","#ffffff","#ff3fb0","#e9ff2a"],["#2f6bff","#49d6ff","#ffffff","#b8ff3c","#8a7bff","#e9ff2a"],["#e9ff2a","#b8ff3c","#ff2d55","#ffffff","#ff8a3d","#2f6bff"]];
-const TYPES=[["people","選手",3],["teams","チーム",2.2],["motifs","モチーフ",2],["competition","大会",.6]];
+const SPORT={"0_ワールドカップ":"W杯","1_ACL":"サッカー","1_Jリーグ":"Jリーグ","1_世代別代表":"サッカー","1_女子サッカー":"女子サッカー","1_海外サッカー":"海外サッカー","2_センバツ":"高校野球","2_プロ野球":"プロ野球","3_Bリーグ":"Bリーグ","3_バスケ代表戦":"バスケ","3_女子バスケ代表戦":"女子バスケ","4_ラグビー日本代表":"ラグビー","4_リーグワン":"ラグビー","5_ボクシング":"ボクシング","6_モータースポーツ":"モータースポーツ"};
+const sportOf=(i)=>SPORT[ASSETS[i].sport]||"その他";
+const EMO={"喜":"歓喜","怒":"怒り","哀":"涙","楽":"痛快"};
+// つなぐ言葉 = 熱狂の種類（競技横断の10語）。主・副の2つと、感情（喜怒哀楽）
 const c=document.getElementById("c"), ctx=c.getContext("2d");
 let W=0,H=0,DPR=1,CX=0,CY=0,portrait=false,M=1;
 const resize=()=>{DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=W*DPR;c.height=H*DPR;portrait=H>W;CX=W/2;CY=H/2;M=Math.min(W,H);};
 addEventListener("resize",resize);resize();
 const imgs=ASSETS.map(a=>{const i=new Image();i.src=a.thumb;return i;});
-const vids=ASSETS.map(a=>{if(!a.loop)return null;const v=document.createElement("video");v.src=a.loop;v.muted=true;v.loop=true;v.playsInline=true;v.preload="auto";return v;});
+const toBlob=(u)=>{try{const [h,b]=u.split(",");const mime=h.slice(5,h.indexOf(";"));const bin=atob(b);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return URL.createObjectURL(new Blob([arr],{type:mime}));}catch(e){return u;}};
+const vids=ASSETS.map(a=>{if(!a.loop)return null;const v=document.createElement("video");v.src=toBlob(a.loop);v.muted=true;v.loop=true;v.playsInline=true;v.preload="auto";return v;});
 const rnd=Math.random, TAU=Math.PI*2, easeOut=(k)=>1-Math.pow(1-k,3), easeIO=(k)=>k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2, easeIn=(k)=>k*k*k;
 const $=(id)=>document.getElementById(id);
 const cap=$("cap"),threadsEl=$("threads"),nextEl=$("next");
 // ---- 文脈: この瞬間を他の瞬間とつなぐ属性（共有相手がいるものだけ）
-const attrsOf=(i)=>{const A=ASSETS[i];const out=[];for(const [k,label,w] of TYPES){for(const v of [].concat(A[k]||[]).filter(Boolean)){const others=[];ASSETS.forEach((B,j)=>{if(j!==i&&[].concat(B[k]||[]).includes(v))others.push(j);});if(others.length)out.push({k,label,w,v,others});}}return out.sort((a,b)=>b.w-a.w);};
-const simScore=(i,j)=>{let sc=0;for(const [k,,w] of TYPES){const a=[].concat(ASSETS[i][k]||[]),b=[].concat(ASSETS[j][k]||[]);for(const v of a)if(v&&b.includes(v))sc+=w;}return sc;};
+const attrsOf=(i)=>{const A=ASSETS[i];const out=[];
+  (A.netsu||[]).forEach((v,q)=>{const others=[];ASSETS.forEach((B,j)=>{if(j!==i&&(B.netsu||[]).includes(v))others.push(j);});const sports=new Set(others.map(sportOf));if(others.length)out.push({k:"netsu",label:q?"熱狂":"熱狂",w:q?2:3,v,others,sports:sports.size});});
+  if(A.emo&&EMO[A.emo]){const v=A.emo;const others=[];ASSETS.forEach((B,j)=>{if(j!==i&&B.emo===v)others.push(j);});const sports=new Set(others.map(sportOf));if(others.length)out.push({k:"emo",label:"感情",w:1,v:EMO[v],others,sports:sports.size});}
+  return out;};
+const simScore=(i,j)=>{let sc=0;for(const v of (ASSETS[i].netsu||[]))if((ASSETS[j].netsu||[]).includes(v))sc+=1;if(ASSETS[i].emo===ASSETS[j].emo)sc+=.5;return sc;};
 const history=[];
-const bestOther=(i,th)=>{const used=new Set([i,...history.slice(-8)]);const pool=th.others.filter(j=>!used.has(j)||!th.others.some(x=>!used.has(x)));return pool.sort((a,b)=>((ASSETS[b].loop?5:0)+simScore(i,b))-((ASSETS[a].loop?5:0)+simScore(i,a)))[0];};
-const anyWithLoop=(ex)=>{const pool=ASSETS.map((a,j)=>j).filter(j=>a=>true).filter(j=>ASSETS[j].loop&&!history.slice(-8).includes(j)&&j!==ex);return pool[Math.floor(rnd()*pool.length)];};
+const score=(i,j)=>(ASSETS[j].loop?5:-20)+(sportOf(j)!==sportOf(i)?6:0)+simScore(i,j)+(history.slice(-8).includes(j)?-30:0);
+const bestOther=(i,th)=>th.others.slice().sort((a,b)=>score(i,b)-score(i,a))[0];
+const anyWithLoop=(ex)=>{const pool=ASSETS.map((a,j)=>j).filter(j=>ASSETS[j].loop&&!history.slice(-8).includes(j)&&j!==ex&&(ex<0||sportOf(j)!==sportOf(ex)));const p2=pool.length?pool:ASSETS.map((a,j)=>j).filter(j=>ASSETS[j].loop&&j!==ex);return p2[Math.floor(rnd()*p2.length)];};
 // ---- 状態: play（映像＋言葉＋次の1本） / fly（炸裂の中を次へ）
 let pal=PALS[0],cur=-1,state="idle",t0=0,now=performance.now(),auto=true,flash=0;
 let threads=[],chosen=null,nextIdx=-1,reason="",flyFrom=null,flyWord=null;
 const PLAY_MS=3200,SHOW_MS=1500,FLY_MS=950;
-function showMoment(i){cur=i;history.push(i);const A=ASSETS[i];$("cno").textContent=A.no;$("cti").textContent=A.title;
+function showMoment(i){cur=i;history.push(i);const A=ASSETS[i];$("cno").textContent=A.no;$("cti").textContent=A.title;$("csp").textContent=sportOf(i);
   threads=attrsOf(i).slice(0,3);chosen=null;nextIdx=-1;threadsEl.innerHTML="";
-  threads.forEach((th,k)=>{const b=document.createElement("button");b.type="button";b.innerHTML=`<small>${th.label} ×${th.others.length+1}</small>${th.v}`;b.onclick=(e)=>{e.stopPropagation();choose(th,true);};th.el=b;threadsEl.appendChild(b);setTimeout(()=>b.classList.add("in"),250+k*140);});
+  threads.forEach((th,k)=>{const b=document.createElement("button");b.type="button";b.innerHTML=`<small>${th.label} ×${th.others.length+1} · ${th.sports}競技</small>${th.v}`;b.onclick=(e)=>{e.stopPropagation();choose(th,true);};th.el=b;threadsEl.appendChild(b);setTimeout(()=>b.classList.add("in"),250+k*140);});
   cap.classList.add("on");nextEl.classList.remove("on");
   const v=vids[i];if(v){v.currentTime=0;v.play().catch(()=>{});}
   state="play";t0=now;}
@@ -85,22 +95,22 @@ function showMoment(i){cur=i;history.push(i);const A=ASSETS[i];$("cno").textCont
 let lastKey="";
 function pickThread(){ if(!threads.length)return null; const sc=threads.map(th=>{const j=bestOther(cur,th);const key=th.label+th.v;return {th,s:(j===undefined?-99:th.w+simScore(cur,j)*.3+(ASSETS[j].loop?2:0))-(key===lastKey?4:0)+rnd()*.6};}).sort((a,b)=>b.s-a.s);return sc[0].th; }
 function choose(th,manual){ if(th)lastKey=th.label+th.v; if(state!=="play")return; chosen=th;
-  if(th){nextIdx=bestOther(cur,th);reason=`同じ${th.label}：${th.v}`;}
+  if(th){nextIdx=bestOther(cur,th);reason=th.v;}
   else{nextIdx=anyWithLoop(cur);reason="";}
   if(nextIdx===undefined||nextIdx<0){nextIdx=anyWithLoop(cur);}
   for(const t of threads)t.el.classList.toggle("on",t===th),t.el.classList.toggle("off",!!th&&t!==th);
-  const N=ASSETS[nextIdx];$("whyt").textContent=reason;$("nimg").src=N.thumb;$("nno").textContent=N.no;$("nti").textContent=N.title;nextEl.classList.add("on");
+  const N=ASSETS[nextIdx];$("whyt").textContent=th?`「${th.v}」を、次は${sportOf(nextIdx)}で`:`次は${sportOf(nextIdx)}`;$("nsp").textContent=sportOf(nextIdx);$("nimg").src=N.thumb;$("nno").textContent=N.no;$("nti").textContent=N.title;nextEl.classList.add("on");
   if(manual)setTimeout(fly,700); }
 function fly(){ if(state!=="play"||nextIdx<0)return; const r=nextEl.querySelector(".card").getBoundingClientRect();
-  flyFrom={x:r.left,y:r.top,w:r.width,h:r.height,from:cur,to:nextIdx,word:reason};
+  flyFrom={x:r.left,y:r.top,w:r.width,h:r.height,from:cur,to:nextIdx,word:reason,sub:`${sportOf(cur)} → ${sportOf(nextIdx)}`};
   const v=vids[nextIdx];if(v){v.currentTime=0;v.play().catch(()=>{});}
   cap.classList.remove("on");nextEl.classList.remove("on");state="fly";t0=now;
   for(const s of streaks)respawn(s,true);}
 function reburst(text){ // 言葉: 一致する属性を持つ瞬間へ。無ければ映像のあるものへ
-  pal=PALS[1+(text.length%3)];let hit=-1,bs=0;ASSETS.forEach((A,j)=>{if(j===cur)return;let sc=0;for(const [k,,w] of TYPES)for(const v of [].concat(A[k]||[]))if(v&&(v.includes(text)||text.includes(v)))sc+=w;if(A.loop)sc+=.01;if(sc>bs){bs=sc;hit=j;}});
+  pal=PALS[1+(text.length%3)];let hit=-1,bs=0;ASSETS.forEach((A,j)=>{if(j===cur)return;let sc=0;for(const v of [...(A.netsu||[]),...(A.motifs||[]),...(A.people||[]),...(A.teams||[]),EMO[A.emo]||""])if(v&&(v.includes(text)||text.includes(v)))sc+=3;if(sc>0)sc+=(cur>=0?score(cur,j):(A.loop?5:0));if(sc>bs){bs=sc;hit=j;}});
   nextIdx=hit>=0?hit:anyWithLoop(cur);reason=text;
-  if(state==="play"){const r=nextEl.getBoundingClientRect();flyFrom={x:CX+W*.3,y:CY-H*.2,w:W*.25,h:W*.25*9/16,from:cur,to:nextIdx,word:text};}
-  else flyFrom={x:CX,y:CY,w:1,h:1,from:-1,to:nextIdx,word:text};
+  if(state==="play"){const r=nextEl.getBoundingClientRect();flyFrom={x:CX+W*.3,y:CY-H*.2,w:W*.25,h:W*.25*9/16,from:cur,to:nextIdx,word:text,sub:`→ ${sportOf(nextIdx)}`};}
+  else flyFrom={x:CX,y:CY,w:1,h:1,from:-1,to:nextIdx,word:text,sub:""};
   const v=vids[nextIdx];if(v){v.currentTime=0;v.play().catch(()=>{});}
   cap.classList.remove("on");nextEl.classList.remove("on");state="fly";t0=now;for(const s of streaks)respawn(s,true);}
 // ---- 炸裂: 飛行の間だけ、次の1本の位置を消失点にして光の筋が放射する
@@ -138,7 +148,8 @@ function frame(t){
     const x=F.x+(0-F.x)*e,y=F.y+(0-F.y)*e,w=F.w+(W-F.w)*e,h=F.h+(H-F.h)*e;
     drawCover(srcOf(F.to),x,y,w,h,1);ctx.strokeStyle=`rgba(255,255,255,${1-e})`;ctx.lineWidth=1;ctx.strokeRect(x,y,w,h);
     // 理由（言葉）が飛行の間だけ大きく
-    if(F.word){ctx.save();const fs=Math.min(M*.11,W*.9/Math.max(6,F.word.length));ctx.font=`900 ${fs}px "Noto Sans JP", sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.globalAlpha=Math.min(1,k*5)*(k>.75?(1-k)/.25:1);ctx.lineWidth=fs*.18;ctx.strokeStyle="rgba(5,5,6,.9)";ctx.lineJoin="round";ctx.strokeText(F.word,CX,CY*(portrait?.9:1));ctx.fillStyle="#e9ff2a";ctx.fillText(F.word,CX,CY*(portrait?.9:1));ctx.restore();}
+    if(F.word){ctx.save();const fs=Math.min(M*.11,W*.9/Math.max(6,F.word.length));ctx.font=`900 ${fs}px "Noto Sans JP", sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.globalAlpha=Math.min(1,k*5)*(k>.75?(1-k)/.25:1);ctx.lineWidth=fs*.18;ctx.strokeStyle="rgba(5,5,6,.9)";ctx.lineJoin="round";ctx.strokeText(F.word,CX,CY*(portrait?.9:1));ctx.fillStyle="#e9ff2a";ctx.fillText(F.word,CX,CY*(portrait?.9:1));
+      if(F.sub){const f2=Math.max(14,fs*.34);ctx.font=`900 ${f2}px "Noto Sans JP", sans-serif`;ctx.lineWidth=f2*.2;ctx.strokeText(F.sub,CX,CY*(portrait?.9:1)+fs*.85);ctx.fillStyle="#fff";ctx.fillText(F.sub,CX,CY*(portrait?.9:1)+fs*.85);}ctx.restore();}
     // DAZN フレーム（向かう先）
     const fs=M*.05*(1-e*.5);ctx.fillStyle="#050506";ctx.fillRect(vx-fs/2,vy-fs/2,fs,fs);ctx.strokeStyle=`rgba(255,255,255,${.9*(1-e)})`;ctx.lineWidth=2;ctx.strokeRect(vx-fs/2,vy-fs/2,fs,fs);
     if(k>=1){flash=.5;showMoment(F.to);flyFrom=null;}
@@ -152,8 +163,8 @@ $("auto").onclick=()=>{auto=true;setPressed();};
 $("stop").onclick=()=>{auto=false;setPressed();};
 function setPressed(){$("auto").setAttribute("aria-pressed",String(auto));$("stop").setAttribute("aria-pressed",String(!auto));}
 addEventListener("keydown",(e)=>{if(e.key==="ArrowRight"||e.key===" "){if(state==="play"){if(!chosen)choose(pickThread(),false);fly();}}});
-const chips=$("chips");["ベテランの意地","日本代表","土壇場"].forEach(t=>{const b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=()=>{$("q").value=t;};chips.appendChild(b);});
+const chips=$("chips");["土壇場の一撃","めちゃくちゃ泣ける","ベテランの熱量"].forEach(t=>{const b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=()=>{$("q").value=t;};chips.appendChild(b);});
 $("f").addEventListener("submit",(e)=>{e.preventDefault();const t=$("q").value.trim();if(t)reburst(t);});
 setTimeout(()=>{reburst("100 MOMENTS");},300);
-window.__p={get:()=>({state,cur,nextIdx,reason,threads:threads.map(t=>t.label+":"+t.v+"x"+t.others.length)})};
+window.__p={get:()=>({state,cur,no:cur>=0?ASSETS[cur].no:null,sport:cur>=0?sportOf(cur):null,nextIdx,nextSport:nextIdx>=0?sportOf(nextIdx):null,reason,vt:cur>=0&&vids[cur]?+vids[cur].currentTime.toFixed(2):null,vr:cur>=0&&vids[cur]?vids[cur].readyState:null,threads:threads.map(t=>t.v+"x"+t.others.length+"/"+t.sports)})};
 </script>
