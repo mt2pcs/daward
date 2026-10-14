@@ -29,6 +29,8 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--display);ov
 .bar input{flex:1;min-width:0;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.22);color:var(--fg);font:400 15px/1 var(--display);padding:13px 14px;border-radius:4px;backdrop-filter:blur(8px)}
 .bar input:focus{outline:none;border-color:var(--accent)}
 .bar button{font:900 13px/1 var(--display);letter-spacing:.08em;background:var(--accent);color:#050506;border:0;padding:0 16px;border-radius:4px;cursor:pointer;white-space:nowrap}
+.ctxlog{position:fixed;left:var(--gl);top:48px;font:500 10px/1.6 "Oswald","Noto Sans JP",monospace;letter-spacing:.14em;color:rgba(255,255,255,.55);pointer-events:none;z-index:2;white-space:pre;opacity:0;transition:opacity .3s}
+.ctxlog.on{opacity:1}.ctxlog b{color:var(--accent);font-weight:500}
 .hint{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);font:500 11px/1 var(--num);letter-spacing:.3em;color:rgba(255,255,255,.6);pointer-events:none;z-index:2;opacity:0;transition:opacity .4s}
 .hint.on{opacity:1}
 @media (prefers-reduced-motion:reduce){.cap,.cap .nx{transition:none}}
@@ -38,6 +40,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--display);ov
   <div class="mode"><button id="auto" aria-pressed="true">自動</button><button id="stop" aria-pressed="false">手動</button></div></div>
 <div class="cap" id="cap"><div class="no" id="cno"></div><div class="ti" id="cti"></div><div class="sh" id="csh"></div><div class="nx" id="cnx"><small>NEXT</small><span id="cnxt"></span></div></div>
 <div class="hint" id="hint">TAP → NEXT</div>
+<div class="ctxlog" id="ctxlog"></div>
 <div class="chips" id="chips"></div>
 <div class="bar"><form id="f"><input id="q" placeholder="いま、どんな熱狂を観たい？" autocomplete="off"><button type="submit">組み替える</button></form></div>
 <script>
@@ -56,7 +59,7 @@ let W=0,H=0,DPR=1,CX=0,CY=0,portrait=false,F=1,M=1;
 const resize=()=>{DPR=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;c.width=W*DPR;c.height=H*DPR;portrait=H>W;CX=W/2;CY=portrait?H*.42:H*.5;M=Math.min(W,H);F=M*.55;};
 addEventListener("resize",resize);resize();
 const imgs=ASSETS.map(a=>{const i=new Image();i.src=a.thumb;return i;});
-const vids=ASSETS.map(a=>{const v=document.createElement("video");v.src=a.loop;v.muted=true;v.loop=true;v.playsInline=true;v.preload="auto";return v;});
+const vids=ASSETS.map(a=>{if(!a.loop)return null;const v=document.createElement("video");v.src=a.loop;v.muted=true;v.loop=true;v.playsInline=true;v.preload="auto";return v;});
 const rnd=Math.random, TAU=Math.PI*2;
 const easeOut=(k)=>1-Math.pow(1-k,3), easeIn=(k)=>k*k*k, easeIO=(k)=>k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
 // ---- 世界: トンネル座標（角度 a・壁からの距離 d・奥行き z）。z が小さいほど手前。前進 = 全員の z が減る
@@ -78,11 +81,39 @@ const mkNames=(list,startZ)=>{names=list.map((t,i)=>({text:t,a:(i/list.length)*T
 mkNames(SETS.default);
 // ---- 瞬間（パネル）: 奥（z=6）から飛んできて z=1 で画面になる。遊んだら手前へ抜ける
 let cur=null,nxt=null;const exiting=[];let photoCursor=2,word=null;
+// ---- 文脈マップ: 各瞬間の属性（選手/チーム/モチーフ/大会）と、それを共有する他の瞬間＝糸
+const TYPES=[["people","選手",3],["teams","チーム",2.2],["motifs","モチーフ",2],["competition","大会",.6]];
+const attrsOf=(i)=>{const A=ASSETS[i];const out=[];for(const [k,label,w] of TYPES){for(const v of [].concat(A[k]||[]).filter(Boolean)){const others=[];ASSETS.forEach((B,j)=>{if(j!==i&&[].concat(B[k]||[]).includes(v))others.push(j);});out.push({k,label,w,v,others});}}return out;};
+const simScore=(i,j)=>{let sc=0;for(const [k,,w] of TYPES){const a=[].concat(ASSETS[i][k]||[]),b=[].concat(ASSETS[j][k]||[]);for(const v of a)if(v&&b.includes(v))sc+=w;}return sc;};
+const history=[];let ego=null;const ctxlog=document.getElementById("ctxlog");
+function buildEgo(i){
+  const all=attrsOf(i).sort((a,b)=>(b.others.length?b.w:b.w*.3)-(a.others.length?a.w:a.w*.3));
+  const maxN=portrait?5:6;const nodes=all.slice(0,maxN);
+  // 配置: 画面中心のまわりの楕円（下＝文字の領域は空ける）。角度 0 が真上
+  const rx=portrait?W*.36:W*.34,ry=portrait?H*.17:H*.27,cy=portrait?H*.3:H*.4,span=portrait?135:120;const n=nodes.length;
+  nodes.forEach((nd,k)=>{const th=(-span+2*span*(n>1?k/(n-1):.5))*Math.PI/180;nd.sx=CX+Math.sin(th)*rx;nd.sy=cy-Math.cos(th)*ry;nd.born=now+200+k*120;nd.r=Math.max(16,M*.03);});
+  // 候補: 各ノードが導く他の瞬間（直近に見たものは除く。映像のあるものを優先）
+  const used=new Set([i,...history.slice(-6)]);const cands=[];
+  for(const nd of nodes){const pool=nd.others.filter(j=>!used.has(j)).sort((a,b)=>(ASSETS[b].loop?5:0)+simScore(i,b)-((ASSETS[a].loop?5:0)+simScore(i,a)));
+    pool.slice(0,2).forEach((j,q)=>{if(cands.length>=6)return;used.add(j);const dir=Math.atan2(nd.sy-(CY+vp.y),nd.sx-(CX+vp.x));cands.push({photo:j,node:nd,a:dir-spin+(q?.42:-.12),d:.95,z:2.3+q*.75+rnd()*.2,born:now+450+cands.length*90,alpha:1,score:nd.w+simScore(i,j)+(ASSETS[j].loop?5:-100)+rnd()*.5});});}
+  const shared=nodes.filter(nd=>nd.others.length).length;
+  const cnt=(k)=>[].concat(ASSETS[i][k]||[]).filter(Boolean).length;
+  ctxlog.innerHTML=`CONTEXT ENGINE ▸ 選手 <b>${cnt("people")}</b> · チーム <b>${cnt("teams")}</b> · 大会 <b>${cnt("competition")}</b> · モチーフ <b>${cnt("motifs")}</b>
+共有する属性 <b>${shared}</b> → 糸 <b>${cands.length}</b>本`;ctxlog.classList.add("on");
+  ego={i,nodes,cands,t0:now,chosen:null,fade:1};
+}
+function follow(cand){ if(!ego||nxt||ego.chosen)return; ego.chosen=cand; const nd=cand.node;
+  const p={photo:cand.photo,a:cand.a,d:.62,z:cand.z,z0:cand.z,alpha:1,state:"approach",t0:now,k:0};nxt=p;photoCursor=cand.photo+1;
+  const vv=vids[p.photo];if(vv){vv.currentTime=0;vv.play().catch(()=>{});}
+  const reason=`同じ${nd.label}：${nd.v}`;document.getElementById("cnxt").textContent=reason;cnx.classList.add("on");hint.classList.remove("on");
+}
 const cap=document.getElementById("cap"),cnx=document.getElementById("cnx"),hint=document.getElementById("hint");
 function newPanel(photo){return {photo,a:rnd()*TAU,d:.62,z:6,alpha:1,state:"approach",t0:now,k:0};}
 function setCaption(p){const A=ASSETS[p.photo];document.getElementById("cno").textContent=A.no;document.getElementById("cti").textContent=A.title;document.getElementById("csh").textContent=A.short;}
-function startNext(){ if(nxt)return; const p=newPanel(photoCursor%ASSETS.length);photoCursor++;nxt=p;
-  const vv=vids[p.photo];vv.currentTime=0;vv.play().catch(()=>{});
+function startNext(){ if(nxt)return;
+  if(ego&&!ego.chosen&&ego.cands.length){const best=ego.cands.slice().sort((a,b)=>b.score-a.score)[0];if(best.score>0){follow(best);return;}}
+  let ph=photoCursor%ASSETS.length;for(let g=0;g<ASSETS.length&&!ASSETS[ph].loop;g++)ph=(ph+1)%ASSETS.length;const p=newPanel(ph);photoCursor=ph+1;nxt=p;
+  const vv=vids[p.photo];if(vv){vv.currentTime=0;vv.play().catch(()=>{});}
   if(cur){document.getElementById("cnxt").textContent=REASONS[(cur.photo+p.photo)%REASONS.length];cnx.classList.add("on");}
   hint.classList.remove("on"); }
 function reburst(text){
@@ -92,7 +123,7 @@ function reburst(text){
   mkNames(list,2.2);
   spinT+=TAU*(rnd()<.5?1:-1);
   vpT={x:(rnd()-.5)*F*.8,y:(rnd()-.5)*F*.5};
-  word={text,t0:now};
+  word={text,t0:now};ego=null;ctxlog.classList.remove("on");
   if(cur&&cur.state!=="exit"){cur.state="exit";cur.t0=now;exiting.push(cur);}cur=null;
   if(nxt){nxt.state="exit";nxt.t0=now;exiting.push(nxt);nxt=null;}
   cap.classList.remove("on");cnx.classList.remove("on");
@@ -101,7 +132,7 @@ function reburst(text){
 function drawCoverIn(src,x,y,w,h,alpha){const iw=src.videoWidth||src.naturalWidth||384,ih=src.videoHeight||src.naturalHeight||216;const sc=Math.max(w/iw,h/ih);const dw=iw*sc,dh=ih*sc;ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();ctx.globalAlpha=alpha;ctx.drawImage(src,x+(w-dw)/2,y+(h-dh)/2*(portrait?.7:1),dw,dh);ctx.restore();}
 function drawPanel(p){
   const q=proj(p.a,p.d,p.z);const w=W*1.04/p.z,h=H*1.04/p.z;const x=q.x-w/2,y=q.y-h/2;
-  const vv=vids[p.photo];const src=(p.z<2.5&&vv.readyState>=2)?vv:imgs[p.photo];
+  const vv=vids[p.photo];const src=(vv&&p.z<2.5&&vv.readyState>=2)?vv:imgs[p.photo];
   const a=p.alpha*(p.z>4.5?(6-p.z)/1.5:1);
   // 近づく間は進行方向へ傾く板（遠近）
   ctx.save();
@@ -125,11 +156,12 @@ function frame(t){
   v+=(vT-v)*(1-Math.exp(-dt/.25));
   const dz=v*dt;
   const upd=(p)=>{const s=(now-p.t0)/1000;
-    if(p.state==="approach"){p.k=Math.min(1,s/1.15);p.z=6-4.88*easeOut(p.k);if(p.k>=1){p.state="play";p.t0=now;p.z=1.12;if(cur&&cur!==p&&cur.state==="play"){cur.state="exit";cur.t0=now;exiting.push(cur);}cur=p;nxt=null;setCaption(p);cap.classList.add("on");cnx.classList.remove("on");if(!auto)hint.classList.add("on");}}
-    else if(p.state==="play"){p.z=1.12-.17*Math.min(1,s/2.8);if(p===cur&&auto&&s>1.5&&!nxt)startNext();}
-    else if(p.state==="exit"){const k=Math.min(1,s/.75);if(p.z0===undefined)p.z0=p.z;p.z=p.z0-(p.z0-.32)*easeIn(k);p.alpha=1-k;if(k>=1){vids[p.photo].pause();p.dead=true;}}
+    if(p.state==="approach"){const z0=p.z0||6;p.k=Math.min(1,s/(p.z0?1.0:1.15));p.z=z0-(z0-1.12)*easeOut(p.k);if(p.k>=1){p.state="play";p.t0=now;p.z=1.12;history.push(p.photo);buildEgo(p.photo);if(cur&&cur!==p&&cur.state==="play"){cur.state="exit";cur.t0=now;exiting.push(cur);}cur=p;nxt=null;setCaption(p);cap.classList.add("on");cnx.classList.remove("on");if(!auto)hint.classList.add("on");}}
+    else if(p.state==="play"){p.z=1.12-.17*Math.min(1,s/2.8);if(p===cur&&auto&&s>1.9&&!nxt)startNext();}
+    else if(p.state==="exit"){const k=Math.min(1,s/.75);if(p.z0===undefined)p.z0=p.z;p.z=p.z0-(p.z0-.32)*easeIn(k);p.alpha=1-k;if(k>=1){if(vids[p.photo])vids[p.photo].pause();p.dead=true;}}
   };
-  if(cur)upd(cur);if(nxt){upd(nxt);if(nxt&&cur&&cur.state==="play"&&nxt.k>.42){cur.state="exit";cur.t0=now;exiting.push(cur);cap.classList.remove("on");}}
+  if(cur)upd(cur);if(nxt){upd(nxt);if(nxt&&cur&&cur.state==="play"&&nxt.k>.42){cur.state="exit";cur.t0=now;exiting.push(cur);cap.classList.remove("on");ctxlog.classList.remove("on");}}
+  if(ego){ego.fade+=((nxt||!cur||cur.state!=="play")?-dt/.45:0);if(ego.fade<=0)ego=null;}
   for(const p of exiting)upd(p);for(let i=exiting.length-1;i>=0;i--)if(exiting[i].dead)exiting.splice(i,1);
   // ---- 光の筋（炸裂の線）: 奥から手前へ流れる
   ctx.save();ctx.globalCompositeOperation="lighter";ctx.lineCap="butt";
@@ -154,8 +186,28 @@ function frame(t){
   // 再生中: 炸裂の切れ目が映像の上を走り続ける + 文字の影
   if(cur&&cur.state==="play"){ctx.save();ctx.globalAlpha=.28;ctx.strokeStyle="#050506";ctx.lineWidth=1;ctx.beginPath();const ox=CX+vp.x,oy=CY+vp.y;for(let k=0;k<14;k++){const a=spin*.5+k/14*TAU;ctx.moveTo(ox+Math.cos(a)*14,oy+Math.sin(a)*14);ctx.lineTo(ox+Math.cos(a)*M*2,oy+Math.sin(a)*M*2);}ctx.stroke();ctx.restore();}
   if(cap.classList.contains("on")){const g=ctx.createLinearGradient(0,H*.45,0,H);g.addColorStop(0,"rgba(0,0,0,0)");g.addColorStop(1,"rgba(0,0,0,.85)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
+  // ---- 文脈マップ: 映像のまわりに属性ノード、奥に候補の瞬間、ノード→候補の糸。選ばれた糸が光る
+  if(ego){const E=ego;const fade=Math.max(0,Math.min(1,E.fade));const ox=CX,oy=portrait?H*.34:H*.42;
+    for(const cd of E.cands){cd.z-=dz*.22;}
+    ctx.save();
+    // 候補（奥の瞬間）
+    for(const cd of E.cands){const k=Math.max(0,Math.min(1,(now-cd.born)/350));if(k<=0)continue;const sel=E.chosen===cd;if(E.chosen&&!sel)cd.alpha=Math.max(0,cd.alpha-dt/.4);if(sel&&nxt){cd.sx=undefined;continue;}
+      const q=proj(cd.a,cd.d,cd.z);const w=Math.min(M*.42,M*.5/cd.z),h=w*9/16;cd.sx=q.x;cd.sy=q.y;cd.w=w;cd.h=h;const al=fade*k*cd.alpha;
+      ctx.globalAlpha=al*.9;drawCoverIn(imgs[cd.photo],q.x-w/2,q.y-h/2,w,h,al*.9);ctx.globalAlpha=al;ctx.strokeStyle=sel?"#e9ff2a":"rgba(255,255,255,.5)";ctx.lineWidth=sel?2:1;ctx.strokeRect(q.x-w/2,q.y-h/2,w,h);
+      ctx.font=`700 ${Math.max(9,w*.07)}px Oswald, sans-serif`;ctx.fillStyle="#fff";ctx.textAlign="left";ctx.textBaseline="top";ctx.fillText(ASSETS[cd.photo].no,q.x-w/2+4,q.y-h/2+3);}
+    // 糸: ノード→候補
+    for(const cd of E.cands){if(cd.sx===undefined)continue;const nd=cd.node;const k=Math.max(0,Math.min(1,(now-cd.born)/350));const sel=E.chosen===cd;ctx.globalAlpha=fade*k*cd.alpha*(sel?1:.35);ctx.strokeStyle=sel?"#e9ff2a":"#fff";ctx.lineWidth=sel?2:1;if(sel){ctx.shadowColor="#e9ff2a";ctx.shadowBlur=14;}ctx.beginPath();ctx.moveTo(nd.sx,nd.sy);ctx.lineTo(cd.sx,cd.sy);ctx.stroke();ctx.shadowBlur=0;}
+    // ノード（属性）と、映像の主題からノードへの線
+    for(const nd of E.nodes){const k=Math.max(0,Math.min(1,(now-nd.born)/300));if(k<=0)continue;const sel=E.chosen&&E.chosen.node===nd;const dimk=E.chosen&&!sel?.35:1;const al=fade*k*dimk;
+      ctx.globalAlpha=al*.5;ctx.strokeStyle=sel?"#e9ff2a":"rgba(255,255,255,.8)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(nd.sx,nd.sy);ctx.stroke();
+      ctx.globalAlpha=al;const fs=Math.max(12,M*.03),fl=Math.max(8,M*.016);ctx.font=`900 ${fs}px "Noto Sans JP", sans-serif`;const tw=ctx.measureText(nd.v).width;ctx.font=`500 ${fl}px Oswald, sans-serif`;const lw=ctx.measureText(nd.label+(nd.others.length?"  ×"+(nd.others.length+1):"")).width;const bw=Math.max(tw,lw)+22,bh=fs+fl+16;const bx=Math.min(W-16-bw,Math.max(16,nd.sx-bw/2)),by=nd.sy-bh/2;
+      ctx.fillStyle=sel?"#e9ff2a":"rgba(5,5,6,.72)";ctx.fillRect(bx,by,bw,bh);ctx.strokeStyle=sel?"#e9ff2a":(nd.others.length?"rgba(255,255,255,.7)":"rgba(255,255,255,.25)");ctx.lineWidth=1;ctx.strokeRect(bx,by,bw,bh);
+      ctx.fillStyle=sel?"#050506":(nd.others.length?"#e9ff2a":"rgba(255,255,255,.5)");ctx.textAlign="left";ctx.textBaseline="top";ctx.fillText(nd.label+(nd.others.length?"  ×"+(nd.others.length+1):""),bx+11,by+7);
+      ctx.fillStyle=sel?"#050506":"#fff";ctx.font=`900 ${fs}px "Noto Sans JP", sans-serif`;ctx.fillText(nd.v,bx+11,by+7+fl+3);
+      ctx.beginPath();ctx.arc(nd.sx,nd.sy,3,0,TAU);ctx.fillStyle=sel?"#e9ff2a":"#fff";ctx.fill();nd.bx=bx;nd.by=by;nd.bw=bw;nd.bh=bh;}
+    ctx.restore();}
   // ---- 糸: いまの瞬間から次の瞬間へ（理由付きの遷移）
-  if(nxt&&cur){const q=proj(nxt.a,nxt.d,nxt.z);const k=Math.min(1,(now-nxt.t0)/400);const sx=CX,sy=CY-H*.06;const ex=sx+(q.x-sx)*k,ey=sy+(q.y-sy)*k;ctx.save();ctx.globalCompositeOperation="lighter";ctx.strokeStyle="rgba(233,255,42,.95)";ctx.lineWidth=2.5;ctx.shadowColor="#e9ff2a";ctx.shadowBlur=22;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(ex,ey,5,0,TAU);ctx.fill();ctx.restore();
+  if(nxt&&cur){const q=proj(nxt.a,nxt.d,nxt.z);const k=Math.min(1,(now-nxt.t0)/400);const nd=ego&&ego.chosen?ego.chosen.node:null;const sx=nd?nd.sx:CX,sy=nd?nd.sy:CY-H*.06;const ex=sx+(q.x-sx)*k,ey=sy+(q.y-sy)*k;ctx.save();ctx.globalCompositeOperation="lighter";ctx.strokeStyle="rgba(233,255,42,.95)";ctx.lineWidth=2.5;ctx.shadowColor="#e9ff2a";ctx.shadowBlur=22;ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(ex,ey,5,0,TAU);ctx.fill();ctx.restore();
     if(k>=1){const mx=(sx+ex)/2,my=(sy+ey)/2;let ang=Math.atan2(ey-sy,ex-sx);if(Math.cos(ang)<0)ang+=Math.PI;const fs=Math.max(13,M*.034);ctx.save();ctx.translate(mx,my);ctx.rotate(ang);ctx.font=`900 ${fs}px "Noto Sans JP", sans-serif`;ctx.textAlign="center";ctx.textBaseline="bottom";ctx.lineWidth=fs*.3;ctx.strokeStyle="rgba(5,5,6,.85)";ctx.lineJoin="round";ctx.strokeText(document.getElementById("cnxt").textContent,0,-6);ctx.fillStyle="#e9ff2a";ctx.fillText(document.getElementById("cnxt").textContent,0,-6);ctx.restore();}}
   // ---- 言葉: 目の奥から飛んでくる
   if(word){const k=Math.min(1,(now-word.t0)/1300);const fs=M*(.08+1.2*easeIn(k));ctx.save();ctx.font=`900 ${fs}px "Noto Sans JP", sans-serif`;ctx.textAlign="center";ctx.textBaseline="middle";ctx.globalAlpha=Math.min(1,k*4)*(1-easeIn(k));ctx.fillStyle="#fff";ctx.shadowColor="#e9ff2a";ctx.shadowBlur=40;ctx.fillText(word.text,CX+vp.x,CY+vp.y);ctx.restore();}
@@ -164,7 +216,10 @@ function frame(t){
   if(flash>0){ctx.fillStyle=`rgba(255,255,255,${flash*.7})`;ctx.fillRect(0,0,W,H);flash-=dt*2.4;}
 }
 requestAnimationFrame(frame);
-c.addEventListener("pointerdown",()=>{startNext();});
+c.addEventListener("pointerdown",(e)=>{const x=e.clientX,y=e.clientY;
+  if(ego&&!ego.chosen&&!nxt){for(const cd of ego.cands){if(cd.sx!==undefined&&Math.abs(x-cd.sx)<cd.w/2+8&&Math.abs(y-cd.sy)<cd.h/2+8){follow(cd);return;}}
+    for(const nd of ego.nodes){if(nd.bx!==undefined&&x>=nd.bx-6&&x<=nd.bx+nd.bw+6&&y>=nd.by-6&&y<=nd.by+nd.bh+6){const cd=ego.cands.filter(c=>c.node===nd).sort((a,b)=>b.score-a.score)[0];if(cd){follow(cd);return;}}}}
+  startNext();});
 document.getElementById("auto").onclick=()=>{auto=true;setPressed();hint.classList.remove("on");if(!cur&&!nxt)startNext();};
 document.getElementById("stop").onclick=()=>{auto=false;setPressed();if(cur)hint.classList.add("on");};
 function setPressed(){document.getElementById("auto").setAttribute("aria-pressed",String(auto));document.getElementById("stop").setAttribute("aria-pressed",String(!auto));}
@@ -172,5 +227,5 @@ addEventListener("keydown",(e)=>{if(e.key==="ArrowRight"||e.key===" ")startNext(
 const chips=document.getElementById("chips");["ベテランの熱量","めちゃくちゃ泣ける","土壇場の一撃"].forEach(t=>{const b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=()=>{document.getElementById("q").value=t;};chips.appendChild(b);});
 document.getElementById("f").addEventListener("submit",(e)=>{e.preventDefault();const t=document.getElementById("q").value.trim();if(t)reburst(t);});
 setTimeout(()=>{startNext();},900);
-window.__p={get:()=>({v,vp,spin,cur:cur&&{z:cur.z,state:cur.state},nxt:nxt&&{z:nxt.z,k:nxt.k},exiting:exiting.length,names:names.map(n=>+n.z.toFixed(2))})};
+window.__p={ego:()=>ego&&{nodes:ego.nodes.map(n=>[n.label,n.v,n.others.length,Math.round(n.sx),Math.round(n.sy)]),cands:ego.cands.map(c=>[c.photo,c.node.v,+c.z.toFixed(2),Math.round(c.sx||-1),Math.round(c.sy||-1),+c.alpha.toFixed(2),c.born<performance.now()])},get:()=>({v,vp,spin,cur:cur&&{z:cur.z,state:cur.state},nxt:nxt&&{z:nxt.z,k:nxt.k},exiting:exiting.length,names:names.map(n=>+n.z.toFixed(2))})};
 </script>
