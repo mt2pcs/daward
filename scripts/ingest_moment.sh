@@ -39,8 +39,10 @@ PEAK=$(python3 -c "print(max(0.0,min(float('$PEAK'), float('$DUR')-$LOOP)))")
 # 体験用ループ（無音・480×270・30fps・H.264 baseline/WebM VP9）。最後の0.3秒をクロスフェード風に見せるため ループは短く切るだけ（UI側で loop）
 ffmpeg -v error -y -ss "$PEAK" -t $LOOP -i "$SRC" -an -vf "scale=480:270:flags=lanczos,fps=30" -c:v libx264 -profile:v baseline -level 3.0 -pix_fmt yuv420p -crf 23 -movflags +faststart "$OUT/loop.mp4"
 ffmpeg -v error -y -ss "$PEAK" -t $LOOP -i "$SRC" -an -vf "scale=480:270:flags=lanczos,fps=30" -c:v libvpx-vp9 -b:v 0 -crf 34 -deadline good -cpu-used 2 "$OUT/loop.webm"
-# 詳細・フィード用（720p、音あり）
+# 詳細・フィード用（720p、音あり）。SKIP_DETAIL=1 で省略（まずループ・画像だけ全件回すとき）
+if [ -z "${SKIP_DETAIL:-}" ]; then
 ffmpeg -v error -y -i "$SRC" -vf "scale=1280:720:flags=lanczos,fps=30" -c:v libx264 -preset medium -crf 22 -maxrate 4500k -bufsize 9000k -pix_fmt yuv420p -c:a aac -b:a 128k -movflags +faststart "$OUT/detail.mp4"
+fi
 # ポスター・サムネ（山場の中央のフレーム）
 MID=$(python3 -c "print(float('$PEAK')+$LOOP/2)")
 ffmpeg -v error -y -ss "$MID" -i "$SRC" -frames:v 1 -vf "scale=1280:720" -q:v 80 "$OUT/poster.webp"
