@@ -204,6 +204,9 @@ async function main() {
           ...(process.env.OPENAI_API_KEY ? [{ name: 'OPENAI_API_KEY', value: process.env.OPENAI_API_KEY }] : []),
           ...(process.env.OPENAI_MODEL ? [{ name: 'OPENAI_MODEL', value: process.env.OPENAI_MODEL }] : []),
           ...(process.env.VISUAL_MODE ? [{ name: 'VISUAL_MODE', value: process.env.VISUAL_MODE }] : []),
+          // Vertex AI Gemini（lib/gcpAuth.ts）。本番サービスにも同じ SA を渡す（メタデータサーバーの既定SAに権限が無くても動くように）
+          ...(process.env.GCP_SA_KEY ? [{ name: 'GCP_SA_KEY', value: process.env.GCP_SA_KEY }] : []),
+          ...(process.env.GEMINI_TEXT_MODEL ? [{ name: 'GEMINI_TEXT_MODEL', value: process.env.GEMINI_TEXT_MODEL }] : []),
         ],
       }],
     },

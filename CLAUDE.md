@@ -377,8 +377,16 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
 **環境の事実（2026-10-14）**
 - **scratchpad はセッション（コンテナ）をまたぐと消える**。gen.mjs・モックサムネ・検証スクリプトは全部消えた。以後、再利用するスクリプトは
   `scripts/` にコミットする: `scripts/gen_image.mjs`（gpt-image-2）, `scripts/gen_titles.mjs`（タイトル3案）, `scripts/ingest_moment.sh`（素材一式）。
-- **OpenAI の残高が 0（credit_balance_exhausted）**。画像生成・タイトル生成が 429 で止まり、**本番の /api/interpret も辞書フォールバック
-  （source=dictionary）になっている**。チャージされるまで LLM 系は動かない。
+- **OpenAI の残高が 0（credit_balance_exhausted）**、AI Studio の `GEMINI_API_KEY` も prepaid 切れ（402）。
+  → **LLM はすべて Vertex AI Gemini に切替（GCP プロジェクト love-coach-sprint0 に課金、認証は GCP_SA_KEY の SA）**。
+  テキスト `gemini-3.8-flash`（global エンドポイント）、画像 `gemini-3.1-flash-image`（aspectRatio/imageSize 指定）。
+  `gemini-3.1-pro-preview` は 500、`gemini-3-pro-image-preview` は 404 だった。
+  共通: `scripts/gcp_auth.js`（トークン）, `scripts/vertex.js`（json()/image()）, アプリ側は `lib/gcpAuth.ts`（Cloud Run ではメタデータサーバー、
+  ローカルは GCP_SA_KEY）+ `lib/interpret.ts` の chatJSON が Vertex を既定に（`LLM_PROVIDER=openai` で旧経路）。deploy スクリプトは
+  GCP_SA_KEY / GEMINI_TEXT_MODEL をサービス env に渡す。ローカル検証で /api/interpret source=llm、腕名「背中で語る意地」「最後の舞台に燃ゆ」。
+  既知: Gemini は `next`（次の言葉3つ）を返さないことがあり既定値に落ちる（プロンプト調整の余地）。
+- **`npx next dev` を node_modules 未完了のまま走らせると npx が最新の Next（16系）を取ってきて tsconfig.json を書き換え AGENTS.md を生成する**。
+  先に `npm ci` を完了させ `node_modules/.bin/next` を確認してから起動する。`pkill -f "next dev"` は自分のシェルも殺す（exit 144）→ `fuser -k 3142/tcp`。
 - 素材パイプライン実証（No.001）: 山場は1秒ごとの音量RMSの3秒窓最大で自動選択（9秒＝88:03のゴール直後の歓喜を正しく拾った）。
   出力: loop.mp4 387KB / loop.webm 332KB（480×270・3秒・無音）、detail.mp4 28MB（720p・4.5Mbps上限・54秒）、poster.webp 87KB、
   thumb.jpg 25KB、og.jpg 134KB（タイトル焼き込み）。1本あたり約110秒（54秒ソース、主に720p再エンコード）。

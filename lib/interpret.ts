@@ -1,5 +1,11 @@
 import { EMOTIONS, type Emotion, type Moment } from "./types";
 import { cosine, textToVector, vecOf } from "./emotionSpace";
+import { gcpAvailable, gcpProjectId, gcpToken } from "./gcpAuth";
+
+// LLM の提供元: Vertex AI Gemini（既定。GCP の SA かメタデータサーバーがあれば）→ OpenAI（OPENAI_API_KEY）→ 辞書
+function llmAvailable(): boolean {
+  return gcpAvailable() || !!process.env.OPENAI_API_KEY;
+}
 
 // 言葉 → 渦の腕（クラスタ）。
 // 固定の分類（感情8種）ではなく、LLMが100本の映像を読んで「その言葉のための腕」を命名・割当する。
@@ -47,7 +53,7 @@ export async function interpret(text: string, moments: Moment[]): Promise<Interp
   const hit = cache.get(key);
   if (hit) return hit;
   let out: Interpretation | null = null;
-  if (process.env.OPENAI_API_KEY) {
+  if (llmAvailable()) {
     try {
       out = await interpretLLM(key, moments);
     } catch (e) {
@@ -66,7 +72,7 @@ export function defaultArms(moments: Moment[]): Promise<Interpretation> {
   if (defaultPending) return defaultPending;
   defaultPending = (async () => {
     let out: Interpretation | null = null;
-    if (process.env.OPENAI_API_KEY) {
+    if (llmAvailable()) {
       try {
         out = await defaultLLM(moments);
       } catch (e) {
@@ -132,6 +138,25 @@ async function chatJSON(system: string, user: string): Promise<Record<string, un
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 40000);
   try {
+    if (gcpAvailable() && process.env.LLM_PROVIDER !== "openai") {
+      // Vertex AI Gemini（global エンドポイント）
+      const model = process.env.GEMINI_TEXT_MODEL || "gemini-3.8-flash";
+      const token = await gcpToken();
+      const res = await fetch(`https://aiplatform.googleapis.com/v1/projects/${gcpProjectId()}/locations/global/publishers/google/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents: [{ role: "user", parts: [{ text: user }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0.6 },
+        }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error(`vertex ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const j = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+      const text = (j.candidates?.[0]?.content?.parts ?? []).map((p) => p.text ?? "").join("");
+      return JSON.parse(text) as Record<string, unknown>;
+    }
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
