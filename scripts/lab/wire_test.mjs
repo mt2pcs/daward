@@ -1,0 +1,15 @@
+import { chromium } from "/home/user/daward/node_modules/playwright-core/index.mjs";
+const [W, H, tag] = [+process.argv[2], +process.argv[3], process.argv[4]], out = process.env.OUT;
+const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell" });
+const p = await b.newPage({ viewport: { width: W, height: H } });
+const logs = []; p.on("console", (m) => m.type() === "error" && logs.push(m.text())); p.on("pageerror", (e) => logs.push("ERR " + e.message));
+await p.goto("http://127.0.0.1:3170/index.html"); await p.waitForTimeout(1800);
+const shot = (n) => p.screenshot({ path: `${out}/${tag}_${n}.png` });
+const clickText = async (t) => { const r = await p.evaluate((t) => { const e = [...document.querySelectorAll(".c")].find((x) => x.querySelector(".nm")?.textContent === t && getComputedStyle(x).opacity > 0.5); if (!e) return null; const b = e.getBoundingClientRect(); return [b.x + b.width / 2, b.y + b.height / 2]; }, t); if (!r) throw new Error("not found " + t); await p.mouse.click(r[0], r[1]); };
+await shot("1uni");
+await clickText("神戸スティーラーズ初制覇").catch(async()=>{console.log("uni click miss");await p.evaluate(()=>__w.open("090"))}); await p.waitForTimeout(1500); await shot("2open"); await p.waitForTimeout(2300); await shot("3slab"); await p.waitForTimeout(2600); await shot("4frags");
+await clickText("倒れ込んだ敗者"); await p.waitForTimeout(600); await shot("5burst"); await p.waitForTimeout(2200); await shot("6cluster");
+await p.click("#faces button:nth-of-type(2)"); await p.waitForTimeout(2600); await shot("7body");
+await clickText("崩れ落ちるプレンガ"); await p.waitForTimeout(2600); await shot("8recenter");
+await p.click("#faces button:nth-of-type(3)"); await p.waitForTimeout(2600); await shot("9time");
+console.log(tag, logs.join("\n") || "no errors"); await b.close();
