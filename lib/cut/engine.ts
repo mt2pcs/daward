@@ -52,6 +52,9 @@ function lexMatch(q: string): Read {
   for (const sit of LEX.situations) { const hit = sit.syn.find((s) => mark(s)); if (hit) for (const [v, w] of Object.entries(sit.to)) put(v, w * 0.9, "状況:" + hit); }
   const sports = LEX.sports.filter((sp) => sp.syn.some((s) => mark(s))).map((sp) => sp.v);
   const names = NAMES.filter((n) => mark(n.name) || (q.length >= 2 && n.name.includes(q) && mark(q))).map((n) => ({ name: n.name, nos: Array.from(n.nos) }));
+  // タイトルにも人名が入っている（映像から読めなかった場合の補完）
+  if (names.length) { const extra = MOM.filter((m) => names.some((n) => m.title.includes(n.name)) && !names.some((n) => n.nos.includes(m.no))).map((m) => m.no); if (extra.length) names.push({ name: names[0].name, nos: extra }); }
+  else if (q.length >= 2) { const byTitle = MOM.filter((m) => m.title.includes(q)).map((m) => m.no); if (byTitle.length) { names.push({ name: q, nos: byTitle }); mark(q); } }
   // 読めた文字の割合（助詞・記号・「やつ」「したい」などは数えない）
   const filler = /[のがをにでとはもやへ、。！？!?\s・「」『』ー〜]|やつ|したい|みたい|見たい|観たい|ような|ください|下さい|めちゃくちゃ|めっちゃ|すごい|とにかく|ほしい/g;
   let content = 0, hitc = 0; const fill = new Array(q.length).fill(false); let m: RegExpExecArray | null; filler.lastIndex = 0;
@@ -87,8 +90,12 @@ async function vertexChain(system: string, user: string, schema: object, perCall
   for (const model of CHAIN) { try { return await vertexJSON(system, user, schema, perCallMs, model); } catch (e) { last = e; } }
   throw last;
 }
+// 事前翻訳表は「やつ」「したい」「みたい」などの言い回しを外した形でも引く（「えぐいやつ」→「えぐい」）
+const TAIL = /(なやつ|のやつ|やつ|が見たい|を見たい|が観たい|を観たい|見たい|観たい|したい|みたい|な感じ|系|もの|もん|シーン|瞬間)$/;
 export async function translate(q: string): Promise<Translation | null> {
   if (TCACHE.has(q)) return TCACHE.get(q)!;
+  const stripped = q.replace(TAIL, "").trim();
+  if (stripped && stripped !== q && TCACHE.has(stripped)) return TCACHE.get(stripped)!;
   if (!gcpAvailable()) return null;
   const vocab = LEX.axes.map((a) => `${a.label}: ${a.values.map((v) => v.v).join(" / ")}`).join("\n");
   const sys = `スポーツのハイライト100本を、観る人の言葉で組み替えるサービスの入力解釈器です。入力された言葉を、下の語彙の値（最大5つ、重み0.3〜1）に翻訳します。
@@ -147,16 +154,19 @@ function score(read: Read, useAnchor = true) {
   return out.filter((x) => x.s >= top * 0.3).slice(0, 36).map((x) => ({ ...x, s: +(x.s / top).toFixed(3) }));
 }
 const SPLIT_W: Record<string, number> = { story: 1, who: 0.9, play: 0.7, scene: 0.5, feel: 0.4 };
-function buildArms(cands: ReturnType<typeof score>, read: Read): { keys: string[]; moments: CutMoment[] }[] {
+function buildArms(cands: ReturnType<typeof score>, read: Read): { keys: string[]; byName?: boolean; moments: CutMoment[] }[] {
   const qv = read.values.slice().sort((a, b) => b.w - a.w).map((x) => x.v);
   // 主となる点いた値で束ねる
   let groups = new Map<string, typeof cands>();
-  for (const c of cands) { const k = c.hits.slice().sort((a, b) => (VAL[c.m.no][b] || 0) - (VAL[c.m.no][a] || 0))[0] || "__name"; if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(c); }
+  const nameNos = new Set(read.names.flatMap((n) => n.nos));
+  for (const c of cands) { if (nameNos.has(c.m.no)) { if (!groups.has("__name")) groups.set("__name", []); groups.get("__name")!.push(c); continue; } const k = c.hits.slice().sort((a, b) => (VAL[c.m.no][b] || 0) - (VAL[c.m.no][a] || 0))[0] || "__name"; if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(c); }
   // 束が少ない（言葉が1つの値に当たった等）→ いちばん大きい束を、その中で分かれる値（物語・主役・場面・プレー）でさらに割る
-  let guard = 0;
-  while (groups.size < 3 && guard++ < 3) {
-    const [bigKey, big] = Array.from(groups.entries()).sort((a, b) => b[1].length - a[1].length)[0] || [];
+  let guard = 0; const tried = new Set<string>();
+  while (guard++ < 6) {
+    const [bigKey, big] = Array.from(groups.entries()).filter(([k]) => !tried.has(k)).sort((a, b) => b[1].length - a[1].length)[0] || [];
     if (!big || big.length < 4) break;
+    if (groups.size >= 3 && big.length <= 10) break; // 束が3つ以上あり、最大でも10本以下なら十分
+    tried.add(bigKey!);
     const cnt: Record<string, number> = {};
     for (const c of big) for (const v of Object.keys(VAL[c.m.no])) if (SPLIT_W[AXIS_OF[v]] && !qv.includes(v) && v !== bigKey) cnt[v] = (cnt[v] || 0) + 1;
     const splitters = Object.entries(cnt).filter(([, n]) => n >= 2 && n <= big.length * 0.7).sort((a, b) => b[1] * idf(b[0]) * SPLIT_W[AXIS_OF[b[0]]] - a[1] * idf(a[0]) * SPLIT_W[AXIS_OF[a[0]]]).slice(0, 4).map(([v]) => v);
@@ -168,10 +178,10 @@ function buildArms(cands: ReturnType<typeof score>, read: Read): { keys: string[
     groups = next;
   }
   // 1本だけの束は、値を最も共有する束へ寄せる
-  const arr = Array.from(groups.entries()).map(([k, list]) => ({ keys: k.split("|").filter((x) => x !== "__name"), list }));
-  const small = arr.filter((g) => g.list.length < 2), big2 = arr.filter((g) => g.list.length >= 2);
+  const arr = Array.from(groups.entries()).map(([k, list]) => ({ keys: k.split("|").filter((x) => x !== "__name"), byName: k === "__name", list }));
+  const small = arr.filter((g) => g.list.length < 2 && !g.byName), big2 = arr.filter((g) => g.list.length >= 2 || g.byName);
   for (const g of small) { if (!big2.length) { big2.push(g); continue; } const c = g.list[0]; let best = big2[0], bs = -1; for (const b of big2) { const sc = b.keys.reduce((a, v) => a + (VAL[c.m.no][v] || 0), 0); if (sc > bs) { bs = sc; best = b; } } best.list.push(c); }
-  return big2.sort((a, b) => b.list.length - a.list.length).slice(0, 5).map((g) => ({ keys: g.keys, moments: g.list.sort((a, b) => b.s - a.s).map((c) => ({ no: c.m.no, s: c.s, hits: Array.from(new Set([...c.hits, ...g.keys.filter((k) => VAL[c.m.no][k])])) })) }));
+  return big2.sort((a, b) => (b.byName ? 99 : 0) + b.list.length - ((a.byName ? 99 : 0) + a.list.length)).slice(0, 5).map((g) => ({ keys: g.keys, byName: g.byName, moments: g.list.sort((a, b) => b.s - a.s).map((c) => ({ no: c.m.no, s: c.s, hits: Array.from(new Set([...c.hits, ...g.keys.filter((k) => VAL[c.m.no][k])])) })) }));
 }
 function threads(arms: { keys: string[]; moments: CutMoment[] }[]) {
   const out: { a: string; b: string; shared: string[]; w: number }[] = [];
@@ -198,8 +208,8 @@ const SYN_OF: Record<string, string[]> = {}; for (const a of LEX.axes) for (cons
 const grounded = (name: string, keys: string[]) => keys.some((k) => (SYN_OF[k] || [k]).some((w) => name.includes(w)));
 const POETIC = /夜空|閃光|希望|予感|胎動|風|雨|虹|月|光|輝|軌跡|華|舞|囁|煌|彩|響|宿命|運命|物語|ドラマ|伝説|奇跡|魂|鼓動|旋律|咆哮|頂|翼|星|空|夢/;
 const NCACHE = new Map<string, string[]>();
-async function nameArms(q: string, arms: { keys: string[]; moments: CutMoment[] }[]): Promise<{ names: string[]; source: "llm" | "template" }> {
-  const tmpl = arms.map((a) => template(a.keys));
+async function nameArms(q: string, arms: { keys: string[]; byName?: boolean; moments: CutMoment[] }[]): Promise<{ names: string[]; source: "llm" | "template" }> {
+  const tmpl = arms.map((a) => (a.byName ? `${q}の瞬間` : template(a.keys)));
   const key = q + "::" + arms.map((a) => a.keys.join("+")).join("/");
   if (NCACHE.has(key)) return { names: NCACHE.get(key)!, source: "llm" };
   if (!gcpAvailable()) return { names: tmpl, source: "template" };
@@ -207,11 +217,11 @@ async function nameArms(q: string, arms: { keys: string[]; moments: CutMoment[] 
 - 見出しは中身を言う。各腕の「中身の値」の言葉（またはその言い換え）を必ず含める。例: 中身=ベテラン×引退 →「ベテラン、最後の打席」「引退の日の一振り」
 - 4〜12文字。スポーツ新聞・実況が使う、具体的で強い言葉。投げた言葉の口調は受けてよい。
 - 禁止: 詩的・抽象的な比喩（空・光・風・雨・夢・奇跡・魂・物語・運命 など）、人名・チーム名・大会名・数字、腕どうしの重複。`;
-  const user = `言葉: 「${q}」\n` + arms.map((a, i) => `腕${i + 1}: 中身の値=${a.keys.join("×")} / 例=${a.moments.slice(0, 3).map((m) => MOM.find((x) => x.no === m.no)!.title).join("、")}`).join("\n");
+  const user = (q ? `言葉: 「${q}」\n` : "（言葉には触れず、中身だけで見出しを付ける）\n") + arms.map((a, i) => `腕${i + 1}: 中身の値=${a.keys.join("×")} / 例=${a.moments.slice(0, 3).map((m) => MOM.find((x) => x.no === m.no)!.title).join("、")}`).join("\n");
   try {
     const r = await vertexChain(sys, user, { type: "OBJECT", properties: { names: { type: "ARRAY", items: { type: "STRING" } } }, required: ["names"] }, 3000);
     const bad = (n: string, keys: string[]) => n.length < 3 || n.length > 14 || /\d/.test(n) || POETIC.test(n) || !grounded(n, keys) || NAMES.some((x) => x.name.length >= 2 && n.includes(x.name));
-    const names = arms.map((a, i) => { const n = String(r.names?.[i] || "").trim(); return !n || bad(n, a.keys) ? tmpl[i] : n; });
+    const names = arms.map((a, i) => { if (a.byName) return tmpl[i]; const n = String(r.names?.[i] || "").trim(); return !n || bad(n, a.keys) ? tmpl[i] : n; });
     if (new Set(names).size !== names.length) return { names: tmpl, source: "template" };
     NCACHE.set(key, names); return { names, source: "llm" };
   } catch { return { names: tmpl, source: "template" }; }
@@ -245,8 +255,9 @@ export async function resolve(raw: string): Promise<Cut> {
         const merged = new Map(read.values.filter((x) => !(lowCov && x.via.startsWith("状況:"))).map((x) => [x.v, x]));
         for (const x of tr.values) if (!merged.has(x.v)) merged.set(x.v, { v: x.v, axis: AXIS_OF[x.v], w: x.w * 0.9, via: "読み" });
         read = { values: Array.from(merged.values()), sports: Array.from(new Set([...read.sports, ...tr.sports])), names: read.names };
-        status = tr.kind === "metaphor" ? "metaphor" : tr.kind === "entity_absent" ? "nearest" : "translated";
-        message = tr.kind === "metaphor" ? `「${q}」を〈${tr.reading || read.values.slice(0, 2).map((x) => x.v).join("・")}〉として読みました` : tr.kind === "entity_absent" ? `「${q}」は100の瞬間に含まれていません。近い熱狂で組みました` : null;
+        const absent = tr.kind === "entity_absent" && !read.names.length; // 人名が一覧に当たっていれば「いない」扱いにしない
+        status = tr.kind === "metaphor" ? "metaphor" : absent ? "nearest" : "translated";
+        message = tr.kind === "metaphor" ? `「${q}」を〈${tr.reading || read.values.slice(0, 2).map((x) => x.v).join("・")}〉として読みました` : absent ? `「${q}」は100の瞬間に含まれていません。近い熱狂で組みました` : null;
       }
     } else if (!read.values.length && !read.names.length && !read.sports.length) {
       // (d) LLM が使えない/落ちた → 字の近さで最後の網
@@ -264,8 +275,20 @@ export async function resolve(raw: string): Promise<Cut> {
     if (wide.length) { cands = [...inSport.map((c) => ({ ...c, s: Math.min(1, c.s + 0.5) })), ...wide]; message = (message ? message + "。" : "") + `${read.sports.join("・")}の外にも広げました`; }
   }
   if (!cands.length) return { ...(await defaultCut()), q, status: "unreadable", message: `「${q}」に当てはまる瞬間が見つかりませんでした。たとえば…`, ms: Date.now() - t0 };
+  // (f) それでも少ない → 見つかった瞬間に特徴的な値（希少な順に3つ）を足して、近い熱狂まで広げる
+  if (cands.length < MIN_MOMENTS) {
+    const used = new Set(read.values.map((x) => x.v)); const cnt: Record<string, number> = {};
+    for (const c of cands) for (const [v, sv] of Object.entries(VAL[c.m.no])) if (!used.has(v) && AXIS_OF[v] !== "mood") cnt[v] = (cnt[v] || 0) + sv * idf(v);
+    const extra = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([v]) => ({ v, axis: AXIS_OF[v], w: 0.5, via: "近い熱狂" }));
+    if (extra.length) {
+      // 広げた分は人名の加点を外して別に採点する（人名の瞬間の点が高すぎて足切りで全部落ちた）
+      const near = score({ values: [...read.values.filter((x) => x.via !== "既定"), ...extra], sports: [], names: [] }, false).filter((c) => !cands.some((x) => x.m.no === c.m.no)).slice(0, 18).map((c) => ({ ...c, s: c.s * 0.8 }));
+      cands = [...cands, ...near];
+      read = { ...read, values: [...read.values, ...extra] };
+    }
+  }
   const armsRaw = buildArms(cands, read);
-  const nm = await nameArms(q, armsRaw);
+  const nm = await nameArms(status === "nearest" ? "" : q, armsRaw);
   const cut = done({ status, message, read, source, arms: armsRaw.map((a, i) => ({ name: nm.names[i], nameSource: nm.source, ...a })), threads: threads(armsRaw), next: nextWords(armsRaw, read) });
   CCACHE.set(q, cut);
   return cut;
