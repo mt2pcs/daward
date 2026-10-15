@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default function MomentsLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="v26">
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+JP:wght@400;700;900&display=swap" />
       <Header phase={phase()} voteEnd={fmtMD(VOTE_END)} />
       {children}
     </div>

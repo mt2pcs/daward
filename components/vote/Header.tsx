@@ -15,7 +15,7 @@ export default function Header({ phase, voteEnd }: { phase: Phase; voteEnd: stri
     <>
       <header className="v26-h">
         <div className="wrap">
-          <Link href="/moments" className="v26-logo" aria-label="DAZN 100 MOMENTS"><i /><span>DAZN 100 MOMENTS</span></Link>
+          <Link href="/moments" className="v26-logo" aria-label="DAZN 100 MOMENTS"><i /><span>DAZN <em>100</em> MOMENTS</span></Link>
           <nav className="v26-nav">
             <span className="period">{phase === "open" ? `投票期間：〜${voteEnd}` : phase === "pre" ? "投票は11月上旬開始" : phase === "closed" ? "投票受付終了" : "結果発表"}</span>
             <a className="txt" href="#" onClick={(e) => { e.preventDefault(); setRules(true); }}>投票ルール</a>

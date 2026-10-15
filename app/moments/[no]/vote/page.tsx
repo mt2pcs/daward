@@ -14,7 +14,7 @@ export default function VoteConfirm({ params }: { params: { no: string } }) {
   return (
     <main className="v26-page">
       <h1>{v.voted ? "本日は投票済みです" : "このモーメントに投票しますか？"}</h1>
-      <div className="thumb">{th && <img src={th} alt="" />}</div>
+      <div className="thumb">{th && <img src={th} alt="" />}<span className="no">{m.no}</span></div>
       <div className="cap"><small>No.{m.no}　{m.sportLabel}</small>{m.title}</div>
       {v.voted ? (
         <>

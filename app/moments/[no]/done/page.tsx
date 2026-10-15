@@ -13,7 +13,7 @@ export default function VoteDone({ params }: { params: { no: string } }) {
     <main className="v26-page">
       <h1>投票ありがとうございました！</h1>
       <p className="note" style={{ textAlign: "left", marginTop: 6 }}>投票したモーメント</p>
-      <div className="thumb">{th && <img src={th} alt="" />}</div>
+      <div className="thumb">{th && <img src={th} alt="" />}<span className="no">{m.no}</span></div>
       <div className="cap"><small>No.{m.no}　{m.sportLabel}</small>{m.title}</div>
       <p className="note">明日また投票できます</p>
       <div className="share">

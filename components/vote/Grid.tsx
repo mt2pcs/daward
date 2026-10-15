@@ -23,12 +23,13 @@ export default function Grid({ items, votedNo }: { items: GridItem[]; votedNo: s
         {GROUPS.map((g) => <button key={g} aria-pressed={group === g} onClick={() => setGroup(g)}>{g}</button>)}
       </div></div>
       <div className="wrap">
+        <div className="v26-count">{group === "すべて" ? "ALL 100 MOMENTS" : `${group} · ${list.length} MOMENTS`}</div>
         <div className="v26-grid">
           {list.slice(0, shown).map((m) => (
             <Link key={m.no} href={`/moments/${m.no}`} className="v26-card">
               <div className="th">
                 {m.thumb ? <img src={m.thumb} alt="" loading="lazy" /> : null}
-                <span className="no">No.{m.no}</span>
+                <span className="no">{m.no}</span>
                 {!m.hasVideo && <span className="nov">画像のみ</span>}
                 {votedNo === m.no && <span className="voted" />}
               </div>
@@ -37,7 +38,7 @@ export default function Grid({ items, votedNo }: { items: GridItem[]; votedNo: s
             </Link>
           ))}
         </div>
-        <div ref={sentinel} className="v26-more">{shown < list.length ? "読み込み中…" : `${list.length} MOMENTS`}</div>
+        <div ref={sentinel} className="v26-more">{shown < list.length ? "LOADING…" : `${list.length} MOMENTS`}</div>
       </div>
     </>
   );

@@ -17,6 +17,6 @@ export function generateMetadata({ params }: { params: { no: string } }): Metada
 export default function MomentDetail({ params }: { params: { no: string } }) {
   const i = indexOf(params.no); if (i < 0) notFound();
   const v = votedToday();
-  const items = MOMENTS.map((m) => { const c = media(m); return { no: m.no, title: m.title, short: m.short, description: m.description, sportLabel: m.sportLabel, group: m.group, date: m.date, competition: m.context.competition, detail: c?.detail || null, loop: c?.loop || null, webm: c?.webm || null, poster: c?.poster || null, thumb: c?.thumb || null }; });
+  const items = MOMENTS.map((m) => { const c = media(m); return { no: m.no, title: m.title, short: m.short, description: m.description, sportLabel: m.sportLabel, group: m.group, date: m.date, competition: m.context.competition, why: m.context.why, crowd: m.context.crowd, beat: m.context.beat, detail: c?.detail || null, loop: c?.loop || null, webm: c?.webm || null, poster: c?.poster || null, thumb: c?.thumb || null }; });
   return <main><Feed items={items} start={i} phase={phase()} votedNo={v.voted ? v.no || null : null} /></main>;
 }
