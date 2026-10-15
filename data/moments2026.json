@@ -21,6 +21,7 @@
   "clips": [
    {
     "key": "001_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/001_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/001_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/001_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/001_01/poster.webp",
@@ -71,6 +72,7 @@
   "clips": [
    {
     "key": "002_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/002_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/002_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/002_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/002_01/poster.webp",
@@ -122,6 +124,7 @@
   "clips": [
    {
     "key": "003_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/003_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/003_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/003_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/003_01/poster.webp",
@@ -172,6 +175,7 @@
   "clips": [
    {
     "key": "004_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/004_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/004_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/004_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/004_01/poster.webp",
@@ -182,6 +186,7 @@
    },
    {
     "key": "004_02",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/004_02/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/004_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/004_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/004_02/poster.webp",
@@ -192,6 +197,7 @@
    },
    {
     "key": "004_03",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/004_03/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/004_03/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/004_03/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/004_03/poster.webp",
@@ -240,6 +246,7 @@
   "clips": [
    {
     "key": "005_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/005_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/005_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/005_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/005_01/poster.webp",
@@ -250,6 +257,7 @@
    },
    {
     "key": "005_02",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/005_02/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/005_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/005_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/005_02/poster.webp",
@@ -260,6 +268,7 @@
    },
    {
     "key": "005_03",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/005_03/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/005_03/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/005_03/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/005_03/poster.webp",
@@ -270,6 +279,7 @@
    },
    {
     "key": "005_04",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/005_04/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/005_04/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/005_04/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/005_04/poster.webp",
@@ -320,6 +330,7 @@
   "clips": [
    {
     "key": "006_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/006_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/006_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/006_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/006_01/poster.webp",
@@ -330,6 +341,7 @@
    },
    {
     "key": "006_02",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/006_02/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/006_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/006_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/006_02/poster.webp",
@@ -340,6 +352,7 @@
    },
    {
     "key": "006_03",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/006_03/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/006_03/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/006_03/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/006_03/poster.webp",
@@ -428,6 +441,7 @@
   "clips": [
    {
     "key": "008_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/008_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/008_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/008_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/008_01/poster.webp",
@@ -438,6 +452,7 @@
    },
    {
     "key": "008_02",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/008_02/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/008_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/008_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/008_02/poster.webp",
@@ -487,6 +502,7 @@
   "clips": [
    {
     "key": "009_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/009_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/009_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/009_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/009_01/poster.webp",
@@ -539,6 +555,7 @@
   "clips": [
    {
     "key": "010_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/010_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/010_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/010_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/010_01/poster.webp",
@@ -626,6 +643,7 @@
   "clips": [
    {
     "key": "012_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/012_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/012_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/012_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/012_01/poster.webp",
@@ -675,6 +693,7 @@
   "clips": [
    {
     "key": "013_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/013_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/013_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/013_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/013_01/poster.webp",
@@ -724,6 +743,7 @@
   "clips": [
    {
     "key": "014_01",
+    "detail": "https://storage.googleapis.com/e-mooments-assets/m/014_01/detail.mp4",
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/014_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/014_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/014_01/poster.webp",
@@ -773,6 +793,7 @@
   "clips": [
    {
     "key": "015_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/015_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/015_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/015_01/poster.webp",
@@ -822,6 +843,7 @@
   "clips": [
    {
     "key": "016_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/016_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/016_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/016_01/poster.webp",
@@ -832,6 +854,7 @@
    },
    {
     "key": "016_02",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/016_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/016_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/016_02/poster.webp",
@@ -919,6 +942,7 @@
   "clips": [
    {
     "key": "018_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/018_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/018_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/018_01/poster.webp",
@@ -970,6 +994,7 @@
   "clips": [
    {
     "key": "019_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/019_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/019_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/019_01/poster.webp",
@@ -1020,6 +1045,7 @@
   "clips": [
    {
     "key": "020_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/020_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/020_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/020_01/poster.webp",
@@ -1105,6 +1131,7 @@
   "clips": [
    {
     "key": "022_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/022_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/022_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/022_01/poster.webp",
@@ -1192,6 +1219,7 @@
   "clips": [
    {
     "key": "024_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/024_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/024_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/024_01/poster.webp",
@@ -1202,6 +1230,7 @@
    },
    {
     "key": "024_02",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/024_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/024_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/024_02/poster.webp",
@@ -1212,6 +1241,7 @@
    },
    {
     "key": "024_03",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/024_03/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/024_03/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/024_03/poster.webp",
@@ -1262,6 +1292,7 @@
   "clips": [
    {
     "key": "025_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/025_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/025_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/025_01/poster.webp",
@@ -1312,6 +1343,7 @@
   "clips": [
    {
     "key": "026_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/026_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/026_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/026_01/poster.webp",
@@ -1361,6 +1393,7 @@
   "clips": [
    {
     "key": "027_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/027_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/027_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/027_01/poster.webp",
@@ -1493,6 +1526,7 @@
   "clips": [
    {
     "key": "030_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/030_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/030_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/030_01/poster.webp",
@@ -1503,6 +1537,7 @@
    },
    {
     "key": "030_02",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/030_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/030_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/030_02/poster.webp",
@@ -1551,6 +1586,7 @@
   "clips": [
    {
     "key": "031_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/031_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/031_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/031_01/poster.webp",
@@ -1601,6 +1637,7 @@
   "clips": [
    {
     "key": "032_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/032_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/032_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/032_01/poster.webp",
@@ -1611,6 +1648,7 @@
    },
    {
     "key": "032_02",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/032_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/032_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/032_02/poster.webp",
@@ -1621,6 +1659,7 @@
    },
    {
     "key": "032_03",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/032_03/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/032_03/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/032_03/poster.webp",
@@ -1672,6 +1711,7 @@
   "clips": [
    {
     "key": "033_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/033_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/033_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/033_01/poster.webp",
@@ -1722,6 +1762,7 @@
   "clips": [
    {
     "key": "034_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/034_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/034_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/034_01/poster.webp",
@@ -1772,6 +1813,7 @@
   "clips": [
    {
     "key": "035_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/035_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/035_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/035_01/poster.webp",
@@ -1782,6 +1824,7 @@
    },
    {
     "key": "035_02",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/035_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/035_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/035_02/poster.webp",
@@ -1792,6 +1835,7 @@
    },
    {
     "key": "035_03",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/035_03/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/035_03/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/035_03/poster.webp",
@@ -1843,6 +1887,7 @@
   "clips": [
    {
     "key": "036_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/036_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/036_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/036_01/poster.webp",
@@ -1931,6 +1976,7 @@
   "clips": [
    {
     "key": "038_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/038_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/038_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/038_01/poster.webp",
@@ -2016,6 +2062,7 @@
   "clips": [
    {
     "key": "040_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/040_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/040_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/040_01/poster.webp",
@@ -2100,6 +2147,7 @@
   "clips": [
    {
     "key": "042_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/042_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/042_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/042_01/poster.webp",
@@ -2110,6 +2158,7 @@
    },
    {
     "key": "042_02",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/042_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/042_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/042_02/poster.webp",
@@ -2159,6 +2208,7 @@
   "clips": [
    {
     "key": "043_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/043_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/043_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/043_01/poster.webp",
@@ -2169,6 +2219,7 @@
    },
    {
     "key": "043_02",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/043_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/043_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/043_02/poster.webp",
@@ -2295,6 +2346,7 @@
   "clips": [
    {
     "key": "046_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/046_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/046_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/046_01/poster.webp",
@@ -2419,6 +2471,7 @@
   "clips": [
    {
     "key": "049_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/049_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/049_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/049_01/poster.webp",
@@ -2469,6 +2522,7 @@
   "clips": [
    {
     "key": "050_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/050_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/050_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/050_01/poster.webp",
@@ -2520,6 +2574,7 @@
   "clips": [
    {
     "key": "051_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/051_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/051_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/051_01/poster.webp",
@@ -2571,6 +2626,7 @@
   "clips": [
    {
     "key": "052_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/052_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/052_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/052_01/poster.webp",
@@ -2623,6 +2679,7 @@
   "clips": [
    {
     "key": "053_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/053_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/053_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/053_01/poster.webp",
@@ -2675,6 +2732,7 @@
   "clips": [
    {
     "key": "054_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/054_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/054_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/054_01/poster.webp",
@@ -2727,6 +2785,7 @@
   "clips": [
    {
     "key": "055_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/055_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/055_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/055_01/poster.webp",
@@ -2737,6 +2796,7 @@
    },
    {
     "key": "055_02",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/055_02/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/055_02/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/055_02/poster.webp",
@@ -2744,6 +2804,17 @@
     "og": "https://storage.googleapis.com/e-mooments-assets/m/055_02/og.jpg",
     "peakSec": 4,
     "srcDuration": 98.532311
+   },
+   {
+    "key": "055_03",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/055_03/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/055_03/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/055_03/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/055_03/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/055_03/og.jpg",
+    "peakSec": 38,
+    "srcDuration": 41.066667
    }
   ],
   "context": {
@@ -2784,8 +2855,42 @@
   "emo": "喜",
   "prio": "★★★",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "056_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/056_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/056_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/056_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/056_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/056_01/og.jpg",
+    "peakSec": 5,
+    "srcDuration": 30.144
+   },
+   {
+    "key": "056_02",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/056_02/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/056_02/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/056_02/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/056_02/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/056_02/og.jpg",
+    "peakSec": 19,
+    "srcDuration": 26.069333
+   },
+   {
+    "key": "056_03",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/056_03/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/056_03/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/056_03/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/056_03/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/056_03/og.jpg",
+    "peakSec": 4,
+    "srcDuration": 54.613333
+   }
+  ],
   "context": {
    "people": [
     "前田健太"
@@ -2824,8 +2929,20 @@
   "emo": "喜",
   "prio": "★★★",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "057_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/057_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/057_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/057_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/057_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/057_01/og.jpg",
+    "peakSec": 17,
+    "srcDuration": 162.56
+   }
+  ],
   "context": {
    "people": [
     "益田直也"
@@ -2865,8 +2982,20 @@
   "emo": "喜",
   "prio": "★★★",
   "delivered": "",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "058_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/058_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/058_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/058_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/058_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/058_01/og.jpg",
+    "peakSec": 89,
+    "srcDuration": 133.632
+   }
+  ],
   "context": {
    "people": [
     "横山陸人"
@@ -2909,6 +3038,7 @@
   "clips": [
    {
     "key": "059_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/059_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/059_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/059_01/poster.webp",
@@ -2956,8 +3086,20 @@
   "emo": "哀",
   "prio": "★★★",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "060_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/060_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/060_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/060_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/060_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/060_01/og.jpg",
+    "peakSec": 158,
+    "srcDuration": 186.368
+   }
+  ],
   "context": {
    "people": [
     "仲田慶介"
@@ -2996,8 +3138,53 @@
   "emo": "哀",
   "prio": "★★★",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "061_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/061_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/061_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/061_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/061_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/061_01/og.jpg",
+    "peakSec": 9,
+    "srcDuration": 55.36
+   },
+   {
+    "key": "061_02",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/061_02/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/061_02/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/061_02/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/061_02/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/061_02/og.jpg",
+    "peakSec": 13,
+    "srcDuration": 48.065356
+   },
+   {
+    "key": "061_03",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/061_03/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/061_03/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/061_03/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/061_03/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/061_03/og.jpg",
+    "peakSec": 37,
+    "srcDuration": 63.616
+   },
+   {
+    "key": "061_04",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/061_04/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/061_04/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/061_04/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/061_04/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/061_04/og.jpg",
+    "peakSec": 15,
+    "srcDuration": 79.765333
+   }
+  ],
   "context": {
    "people": [
     "岩本勉"
@@ -3040,6 +3227,7 @@
   "clips": [
    {
     "key": "062_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/062_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/062_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/062_01/poster.webp",
@@ -3087,8 +3275,31 @@
   "emo": "哀",
   "prio": "★★★",
   "delivered": "済",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "063_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/063_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/063_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/063_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/063_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/063_01/og.jpg",
+    "peakSec": 3,
+    "srcDuration": 16.832
+   },
+   {
+    "key": "063_02",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/063_02/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/063_02/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/063_02/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/063_02/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/063_02/og.jpg",
+    "peakSec": 10,
+    "srcDuration": 16.384
+   }
+  ],
   "context": {
    "people": [
     "つば九郎"
@@ -3126,8 +3337,53 @@
   "emo": "哀",
   "prio": "★★★",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "064_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/064_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/064_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/064_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/064_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/064_01/og.jpg",
+    "peakSec": 9,
+    "srcDuration": 55.36
+   },
+   {
+    "key": "064_02",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/064_02/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/064_02/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/064_02/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/064_02/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/064_02/og.jpg",
+    "peakSec": 13,
+    "srcDuration": 48.065356
+   },
+   {
+    "key": "064_03",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/064_03/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/064_03/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/064_03/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/064_03/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/064_03/og.jpg",
+    "peakSec": 37,
+    "srcDuration": 63.616
+   },
+   {
+    "key": "064_04",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/064_04/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/064_04/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/064_04/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/064_04/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/064_04/og.jpg",
+    "peakSec": 15,
+    "srcDuration": 79.765333
+   }
+  ],
   "context": {
    "people": [],
    "teams": [
@@ -3168,6 +3424,7 @@
   "clips": [
    {
     "key": "065_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/065_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/065_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/065_01/poster.webp",
@@ -3218,6 +3475,7 @@
   "clips": [
    {
     "key": "066_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/066_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/066_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/066_01/poster.webp",
@@ -3263,8 +3521,20 @@
   "emo": "",
   "prio": "",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "067_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/067_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/067_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/067_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/067_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/067_01/og.jpg",
+    "peakSec": 12,
+    "srcDuration": 59.946667
+   }
+  ],
   "context": {
    "people": [
     "佐藤輝明"
@@ -3302,8 +3572,20 @@
   "emo": "",
   "prio": "",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "068_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/068_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/068_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/068_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/068_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/068_01/og.jpg",
+    "peakSec": 181,
+    "srcDuration": 254.997333
+   }
+  ],
   "context": {
    "people": [],
    "teams": [
@@ -3339,8 +3621,20 @@
   "emo": "",
   "prio": "",
   "delivered": "",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "069_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/069_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/069_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/069_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/069_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/069_01/og.jpg",
+    "peakSec": 139,
+    "srcDuration": 372.255211
+   }
+  ],
   "context": {
    "people": [],
    "teams": [
@@ -3380,6 +3674,7 @@
   "clips": [
    {
     "key": "070_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/070_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/070_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/070_01/poster.webp",
@@ -3428,6 +3723,7 @@
   "clips": [
    {
     "key": "071_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/071_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/071_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/071_01/poster.webp",
@@ -3477,6 +3773,7 @@
   "clips": [
    {
     "key": "072_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/072_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/072_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/072_01/poster.webp",
@@ -3522,8 +3819,20 @@
   "emo": "喜",
   "prio": "★★★",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "073_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/073_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/073_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/073_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/073_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/073_01/og.jpg",
+    "peakSec": 51,
+    "srcDuration": 124.266667
+   }
+  ],
   "context": {
    "people": [
     "中村拓人"
@@ -3562,8 +3871,20 @@
   "emo": "喜",
   "prio": "★★★",
   "delivered": "済",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "074_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/074_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/074_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/074_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/074_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/074_01/og.jpg",
+    "peakSec": 4,
+    "srcDuration": 17.045333
+   }
+  ],
   "context": {
    "people": [
     "富樫勇樹"
@@ -3605,6 +3926,7 @@
   "clips": [
    {
     "key": "075_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/075_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/075_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/075_01/poster.webp",
@@ -3692,8 +4014,20 @@
   "emo": "楽",
   "prio": "★★★",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "077_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/077_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/077_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/077_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/077_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/077_01/og.jpg",
+    "peakSec": 34,
+    "srcDuration": 69.226667
+   }
+  ],
   "context": {
    "people": [],
    "teams": [
@@ -3729,8 +4063,53 @@
   "emo": "喜",
   "prio": "★★★",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "078_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/078_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/078_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/078_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/078_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/078_01/og.jpg",
+    "peakSec": 11,
+    "srcDuration": 19.754667
+   },
+   {
+    "key": "078_02",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/078_02/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/078_02/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/078_02/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/078_02/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/078_02/og.jpg",
+    "peakSec": 13,
+    "srcDuration": 27.84
+   },
+   {
+    "key": "078_03",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/078_03/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/078_03/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/078_03/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/078_03/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/078_03/og.jpg",
+    "peakSec": 10,
+    "srcDuration": 52.757333
+   },
+   {
+    "key": "078_04",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/078_04/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/078_04/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/078_04/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/078_04/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/078_04/og.jpg",
+    "peakSec": 2,
+    "srcDuration": 15.317333
+   }
+  ],
   "context": {
    "people": [
     "富永啓生"
@@ -3773,6 +4152,7 @@
   "clips": [
    {
     "key": "079_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/079_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/079_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/079_01/poster.webp",
@@ -3780,6 +4160,17 @@
     "og": "https://storage.googleapis.com/e-mooments-assets/m/079_01/og.jpg",
     "peakSec": 10,
     "srcDuration": 37.658422
+   },
+   {
+    "key": "079_02",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/079_02/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/079_02/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/079_02/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/079_02/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/079_02/og.jpg",
+    "peakSec": 27,
+    "srcDuration": 77.866667
    }
   ],
   "context": {
@@ -3818,8 +4209,20 @@
   "emo": "楽",
   "prio": "★★★",
   "delivered": "済",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "080_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/080_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/080_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/080_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/080_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/080_01/og.jpg",
+    "peakSec": 3,
+    "srcDuration": 12.021667
+   }
+  ],
   "context": {
    "people": [
     "八村塁",
@@ -3862,6 +4265,7 @@
   "clips": [
    {
     "key": "081_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/081_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/081_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/081_01/poster.webp",
@@ -3908,8 +4312,20 @@
   "emo": "哀",
   "prio": "★★★",
   "delivered": "済",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "082_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/082_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/082_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/082_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/082_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/082_01/og.jpg",
+    "peakSec": 103,
+    "srcDuration": 116.440333
+   }
+  ],
   "context": {
    "people": [
     "桶谷大"
@@ -3951,6 +4367,7 @@
   "clips": [
    {
     "key": "083_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/083_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/083_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/083_01/poster.webp",
@@ -4072,8 +4489,20 @@
   "emo": "喜",
   "prio": "★★★",
   "delivered": "済",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "086_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/086_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/086_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/086_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/086_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/086_01/og.jpg",
+    "peakSec": 17,
+    "srcDuration": 58.4
+   }
+  ],
   "context": {
    "people": [
     "伊藤龍之介"
@@ -4115,6 +4544,7 @@
   "clips": [
    {
     "key": "087_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/087_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/087_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/087_01/poster.webp",
@@ -4165,6 +4595,7 @@
   "clips": [
    {
     "key": "088_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/088_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/088_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/088_01/poster.webp",
@@ -4214,6 +4645,7 @@
   "clips": [
    {
     "key": "089_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/089_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/089_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/089_01/poster.webp",
@@ -4261,8 +4693,31 @@
   "emo": "喜",
   "prio": "★★★",
   "delivered": "済",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "090_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/090_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/090_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/090_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/090_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/090_01/og.jpg",
+    "peakSec": 12,
+    "srcDuration": 74.62455
+   },
+   {
+    "key": "090_02",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/090_02/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/090_02/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/090_02/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/090_02/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/090_02/og.jpg",
+    "peakSec": 53,
+    "srcDuration": 100.483717
+   }
+  ],
   "context": {
    "people": [],
    "teams": [
@@ -4381,6 +4836,7 @@
   "clips": [
    {
     "key": "093_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/093_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/093_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/093_01/poster.webp",
@@ -4462,8 +4918,42 @@
   "emo": "楽",
   "prio": "★★★",
   "delivered": "未",
-  "hasVideo": false,
-  "clips": [],
+  "hasVideo": true,
+  "clips": [
+   {
+    "key": "095_01",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/095_01/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/095_01/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/095_01/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/095_01/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/095_01/og.jpg",
+    "peakSec": 45,
+    "srcDuration": 48.84
+   },
+   {
+    "key": "095_02",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/095_02/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/095_02/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/095_02/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/095_02/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/095_02/og.jpg",
+    "peakSec": 1,
+    "srcDuration": 65.728
+   },
+   {
+    "key": "095_03",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/095_03/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/095_03/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/095_03/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/095_03/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/095_03/og.jpg",
+    "peakSec": 8,
+    "srcDuration": 85.38
+   }
+  ],
   "context": {
    "people": [
     "ウシク"
@@ -4502,6 +4992,7 @@
   "clips": [
    {
     "key": "096_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/096_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/096_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/096_01/poster.webp",
@@ -4509,6 +5000,17 @@
     "og": "https://storage.googleapis.com/e-mooments-assets/m/096_01/og.jpg",
     "peakSec": 16,
     "srcDuration": 74.986667
+   },
+   {
+    "key": "096_02",
+    "detail": null,
+    "loop": "https://storage.googleapis.com/e-mooments-assets/m/096_02/loop.mp4",
+    "webm": "https://storage.googleapis.com/e-mooments-assets/m/096_02/loop.webm",
+    "poster": "https://storage.googleapis.com/e-mooments-assets/m/096_02/poster.webp",
+    "thumb": "https://storage.googleapis.com/e-mooments-assets/m/096_02/thumb.jpg",
+    "og": "https://storage.googleapis.com/e-mooments-assets/m/096_02/og.jpg",
+    "peakSec": 189,
+    "srcDuration": 370.44
    }
   ],
   "context": {
@@ -4586,6 +5088,7 @@
   "clips": [
    {
     "key": "098_01",
+    "detail": null,
     "loop": "https://storage.googleapis.com/e-mooments-assets/m/098_01/loop.mp4",
     "webm": "https://storage.googleapis.com/e-mooments-assets/m/098_01/loop.webm",
     "poster": "https://storage.googleapis.com/e-mooments-assets/m/098_01/poster.webp",

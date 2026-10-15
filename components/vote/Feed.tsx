@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Phase } from "@/lib/vote/data";
 
 // V-02 詳細: SP は縦スワイプで次々に見られる全画面。PC は前後矢印とキーボード。URL は見ている瞬間に追従
-export interface FeedItem { no: string; title: string; short: string; description: string; sportLabel: string; group: string; date: string; competition: string; loop: string | null; webm: string | null; poster: string | null; thumb: string | null }
+export interface FeedItem { no: string; title: string; short: string; description: string; sportLabel: string; group: string; date: string; competition: string; detail: string | null; loop: string | null; webm: string | null; poster: string | null; thumb: string | null }
 interface Props { items: FeedItem[]; start: number; phase: Phase; votedNo: string | null }
 
 export default function Feed({ items, start, phase, votedNo }: Props) {
@@ -68,21 +68,34 @@ export default function Feed({ items, start, phase, votedNo }: Props) {
         return (
           <section className="v26-slide" key={m.no} data-i={i}>
             <div className="media">
-              {m.loop && near ? (
-                <video data-i={i} muted loop playsInline preload={i === cur ? "auto" : "metadata"} poster={m.poster || undefined}>
-                  <source src={m.webm || undefined} type="video/webm" />
-                  <source src={m.loop} type="video/mp4" />
-                </video>
+              {m.detail && near ? (
+                <video data-i={i} controls muted playsInline preload={i === cur ? "auto" : "metadata"} poster={m.poster || undefined} src={m.detail} />
+              ) : m.loop && near ? (
+                <>
+                  <video data-i={i} muted loop playsInline preload={i === cur ? "auto" : "metadata"} poster={m.poster || undefined}>
+                    <source src={m.webm || undefined} type="video/webm" />
+                    <source src={m.loop} type="video/mp4" />
+                  </video>
+                  <span className="tag">DIGEST · フル映像は準備中</span>
+                </>
               ) : m.poster ? <img src={near ? m.poster : undefined} alt="" /> : <div className="noimg">映像は準備中です</div>}
               <div className="nav"><button aria-label="前のモーメント" onClick={() => go(-1)}>←</button><button aria-label="次のモーメント" onClick={() => go(1)}>→</button></div>
             </div>
             <div className="shade" />
-            {i === 0 && <div className="swipe">↑ スワイプで次のモーメント</div>}
+            {i < items.length - 1 && (
+              <button className="nexthint" onClick={() => go(1)}>
+                {items[i + 1].thumb && <img src={near ? items[i + 1].thumb! : undefined} alt="" />}
+                <span><small>↓ 次のモーメント</small>No.{items[i + 1].no} {items[i + 1].title}</span>
+              </button>
+            )}
             <div className="info">
+              <div className="grow">
               <div className="meta"><b>No.{m.no}</b><span>{m.sportLabel}</span>{m.date && <span>{m.date}</span>}</div>
               <h2>{m.title}</h2>
-              <p className="desc">{m.short || m.description}</p>
+              <p className="desc">{m.description !== m.title ? m.description : m.short}</p>
+              {m.short && m.description !== m.short && <p className="desc" style={{ marginTop: 4, color: "#aaa" }}>{m.short}</p>}
               {m.competition && <div className="rel">関連：{m.competition}</div>}
+              </div>
               <div className="acts">
                 {phase === "open" && votedNo === m.no && <span className="v26-vote done">本日は投票済みです</span>}
                 {phase === "open" && votedNo && votedNo !== m.no && <span className="v26-vote off">本日は投票済み（No.{votedNo}）</span>}

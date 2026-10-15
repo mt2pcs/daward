@@ -1,7 +1,7 @@
 import raw from "@/data/moments2026.json";
 
 // 投票サイト「DAZN 100 MOMENTS」のデータ層。元データは素材シート（data/sheet2026.json）＋文脈（data/context2026.json）＋取り込み済み素材。
-export interface Clip { key: string; loop: string; webm: string; poster: string; thumb: string; og: string; peakSec: number; srcDuration: number }
+export interface Clip { key: string; detail: string | null; loop: string; webm: string; poster: string; thumb: string; og: string; peakSec: number; srcDuration: number }
 export interface Moment2026 {
   no: string; title: string; titles: string[]; short: string; description: string;
   sport: string; sportLabel: string; group: string; date: string; rights: string; emo: string; prio: string; delivered: string;

@@ -10,7 +10,7 @@ const keys = existsSync(assetsDir) ? readdirSync(assetsDir).filter((d) => /^\d{3
 const seen = new Set(); const out = [];
 for (const r of sheet) {
   if (!/^\d{3}$/.test(r.no) || +r.no > 100 || seen.has(r.no)) continue; seen.add(r.no);
-  const clips = keys.filter((k) => k.startsWith(r.no + "_")).sort().map((k) => { const meta = JSON.parse(readFileSync(`${assetsDir}/${k}/meta.json`, "utf8")); return { key: k, loop: `${assetBase}/${k}/loop.mp4`, webm: `${assetBase}/${k}/loop.webm`, poster: `${assetBase}/${k}/poster.webp`, thumb: `${assetBase}/${k}/thumb.jpg`, og: `${assetBase}/${k}/og.jpg`, peakSec: meta.peak_sec, srcDuration: meta.src_duration }; });
+  const clips = keys.filter((k) => k.startsWith(r.no + "_")).sort().map((k) => { const meta = JSON.parse(readFileSync(`${assetsDir}/${k}/meta.json`, "utf8")); const hasDetail = existsSync(`${assetsDir}/${k}/detail.ok`); return { key: k, detail: hasDetail ? `${assetBase}/${k}/detail.mp4` : null, loop: `${assetBase}/${k}/loop.mp4`, webm: `${assetBase}/${k}/loop.webm`, poster: `${assetBase}/${k}/poster.webp`, thumb: `${assetBase}/${k}/thumb.jpg`, og: `${assetBase}/${k}/og.jpg`, peakSec: meta.peak_sec, srcDuration: meta.src_duration }; });
   const c = ctx[r.no] || {};
   const m = (r.date || "").match(/^(\d{1,2})\/(\d{1,2})/); const date = m ? `2026.${m[1].padStart(2, "0")}.${m[2].padStart(2, "0")}` : "";
   out.push({ no: r.no, title: (r.titles || [])[0] || r.moment.slice(0, 20), titles: r.titles || [], short: r.short || "", description: r.moment, sport: r.sport, sportLabel: LABEL[r.sport] || r.sport.replace(/^\d_/, ""), group: GROUP(r.sport), date, rights: r.rights || "", emo: r.emo || "", prio: r.prio || "", delivered: r.delivered || "", hasVideo: clips.length > 0, clips,
