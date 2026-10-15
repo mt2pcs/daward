@@ -1,9 +1,14 @@
 import MomentsApp from "@/components/MomentsApp";
+import ExperienceApp from "@/components/ExperienceApp";
 import { listMoments } from "@/lib/store";
+import { MOMENTS, media } from "@/lib/vote/data";
 
 export const dynamic = "force-dynamic";
 
-// VISUAL_MODE=burst のサービス（別URL）は「熱狂の炸裂」の見せ方で同じアプリを出す
+// VISUAL_MODE=burst のサービスは本番の体験（2026年の100本＋切り口エンジン）。渦版（e-mooments）はプロトタイプのまま残す
 export default function Home() {
-  return <MomentsApp initialMoments={listMoments()} visual={process.env.VISUAL_MODE === "burst" ? "burst" : "vortex"} />;
+  if (process.env.VISUAL_MODE === "burst") {
+    return <ExperienceApp moments={MOMENTS.map((m) => ({ no: m.no, title: m.title, sportLabel: m.sportLabel, group: m.group, date: m.date, thumb: media(m)?.thumb || null }))} />;
+  }
+  return <MomentsApp initialMoments={listMoments()} visual="vortex" />;
 }

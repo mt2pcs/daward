@@ -24,6 +24,7 @@ export interface Moment {
   vec?: number[]; // 8軸の感情ベクトル（EMOTIONS順、0..1）
   intensity?: number; // 感情の強度（静謐0.2〜爆発1.0）
   peakSec?: number; // 山場の頭出し秒（0=冒頭から）
+  thumbUrl?: string; // 2026本番素材: 公開バケットのサムネを直接読む（CORS 付き）
 }
 
 // スペシャル映像の1カット。role が感情の弧の中での役割

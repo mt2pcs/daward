@@ -219,6 +219,8 @@ interface Label {
   born: number;
   stamped?: boolean;
 }
+// 糸: 違う腕の瞬間どうしを、共有する値（引退・土壇場…）でつなぐ。文字は辞書の言葉だけ
+export interface Thread { a: string; b: string; shared: string[] }
 export interface VortexApi {
   tourNext: () => void;
   tourPrev: () => void;
@@ -242,7 +244,7 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
 }
-function drawCard(c: HTMLCanvasElement, m: MomentWithStats, img: HTMLImageElement | null, color: string) {
+function drawCard(c: HTMLCanvasElement, m: MomentWithStats, img: HTMLImageElement | null, color: string, noTitle = false) {
   const W = c.width, H = c.height;
   const ctx = c.getContext("2d")!;
   ctx.clearRect(0, 0, W, H);
@@ -272,7 +274,7 @@ function drawCard(c: HTMLCanvasElement, m: MomentWithStats, img: HTMLImageElemen
   ctx.shadowBlur = 8;
   let title = m.title;
   while (ctx.measureText(title).width > W - 32 && title.length > 2) title = title.slice(0, -2) + "…";
-  ctx.fillText(title, 16, H - 14);
+  if (!noTitle) ctx.fillText(title, 16, H - 14);
   ctx.shadowBlur = 0;
   ctx.restore();
   ctx.strokeStyle = color;
@@ -356,7 +358,9 @@ export default function VortexSpace({
   onViewDirty,
   api,
   visual = "vortex",
+  threads,
 }: {
+  threads?: Thread[];
   moments: MomentWithStats[];
   visual?: Visual;
   arms: Interpretation | null;
@@ -386,7 +390,9 @@ export default function VortexSpace({
     onTour?: (t: TourState | null) => void;
     onViewDirty?: (d: boolean) => void;
     soundOn: boolean;
-  }>({ cards: new Map(), momentsRef: moments, onSelect, onHover, onTour, onViewDirty, soundOn });
+    threads: Thread[];
+  }>({ cards: new Map(), momentsRef: moments, onSelect, onHover, onTour, onViewDirty, soundOn, threads: threads || [] });
+  S.current.threads = threads || [];
   S.current.momentsRef = moments;
   S.current.onSelect = onSelect;
   S.current.onHover = onHover;
@@ -456,7 +462,8 @@ export default function VortexSpace({
     [...moments].sort((a, b) => b.votes - a.votes).slice(0, GRID[0] * GRID[1]).forEach((m, i) => {
       const img = new Image();
       img.onload = () => { actx.drawImage(img, (i % GRID[0]) * 256, Math.floor(i / GRID[0]) * 144, 256, 144); atlasDirty = true; };
-      img.src = `/api/thumb/${m.youtubeId}`;
+      if (m.thumbUrl) img.crossOrigin = "anonymous";
+      if (m.thumbUrl || m.youtubeId) img.src = m.thumbUrl || `/api/thumb/${m.youtubeId}`;
     });
     const eyeAspect = 16 / 10;
     const fluid = new FluidSim(renderer, 1600, 1000, coarse ? 128 : 192, coarse ? 512 : 768);
@@ -662,13 +669,13 @@ export default function VortexSpace({
           for (let b = 0; b < 8; b++) {
             const off = (b - 3.5) * 0.11 + (hash(arm.name, 40 + b) - 0.5) * 0.08;
             const roff = 1 + (hash(arm.name, b) - 0.5) * 8;
-            const width = 0.8 + hash(arm.name, 20 + b) * 3.4;
+            const width = 0.25 + hash(arm.name, 20 + b) * 1.1; // 細い破片（太いと画面が色で埋まる）
             const col = new THREE.Color(arm.color);
             const tint = hash(arm.name, 80 + b);
             if (tint < 0.3) col.lerp(new THREE.Color("#ffffff"), 0.35); else if (tint > 0.75) col.multiplyScalar(0.55);
             const mat = new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
             const mesh = shardMesh(base, off, roff, width, (b - 3.5) * 0.9, mat, 0.5 + hash(arm.name, 100 + b) * 0.3, -0.35 + hash(arm.name, 120 + b) * 0.2);
-            mesh.userData.targetOpacity = 0.55 + hash(arm.name, 60 + b) * 0.4;
+            mesh.userData.targetOpacity = 0.3 + hash(arm.name, 60 + b) * 0.35;
             mesh.userData.arm = ai;
             mesh.userData.b = b;
             mesh.visible = tier < 3 || b % 2 === 0;
@@ -753,7 +760,7 @@ export default function VortexSpace({
     moments.forEach((m, i) => {
       const canvas = document.createElement("canvas");
       canvas.width = 384; canvas.height = 216;
-      drawCard(canvas, m, null, "#666");
+      drawCard(canvas, m, null, "#666", burstMode);
       const tex = new THREE.CanvasTexture(canvas);
       tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
@@ -768,12 +775,29 @@ export default function VortexSpace({
       };
       c.tbase = c.base;
       const img = new Image();
-      img.onload = () => { c.img = img; drawCard(canvas, m, img, c.color); tex.needsUpdate = true; };
-      img.src = `/api/thumb/${m.youtubeId}`;
+      img.onload = () => { c.img = img; drawCard(canvas, m, img, c.color, burstMode); tex.needsUpdate = true; };
+      if (m.thumbUrl) img.crossOrigin = "anonymous";
+      if (m.thumbUrl || m.youtubeId) img.src = m.thumbUrl || `/api/thumb/${m.youtubeId}`; // 素材の無い瞬間は読みに行かない
       cards.set(m.id, c);
       void i;
     });
     const cardList = Array.from(cards.values()); // 毎フレーム Array.from で配列を作らない
+    // ---- 糸（SVG。毎フレーム属性だけ更新）----
+    const SVGNS = "http://www.w3.org/2000/svg";
+    const threadSvg = document.createElementNS(SVGNS, "svg");
+    threadSvg.setAttribute("class", "vs-threads");
+    host.appendChild(threadSvg);
+    const MAX_T = 8;
+    const tEls = Array.from({ length: MAX_T }, (_, i) => {
+      const g = document.createElementNS(SVGNS, "g");
+      const path = document.createElementNS(SVGNS, "path"); path.setAttribute("id", `vs-th-${i}`);
+      const glow = document.createElementNS(SVGNS, "path"); glow.setAttribute("class", "glow");
+      const text = document.createElementNS(SVGNS, "text");
+      const tp = document.createElementNS(SVGNS, "textPath"); tp.setAttribute("href", `#vs-th-${i}`); tp.setAttribute("startOffset", "50%"); tp.setAttribute("text-anchor", "middle");
+      text.appendChild(tp); g.appendChild(glow); g.appendChild(path); g.appendChild(text); threadSvg.appendChild(g);
+      return { g, path, glow, tp, alpha: 0 };
+    });
+    const pa = new THREE.Vector3(), pb = new THREE.Vector3();
 
 
     // ---- ラベル（腕の名前。流れに沿って傾く板）----
@@ -863,7 +887,7 @@ export default function VortexSpace({
             const sc = a.text ? 0.55 + 0.65 * (a.scores[id] ?? 0.5) : 0.75 + 0.45 * votesOf(id);
             const ro = 2 + (hash(id, 5) - 0.5) * 8;
             c.tdim = 1;
-            if (c.color !== arm.color) { c.color = arm.color; drawCard(c.canvas, c.m, c.img, arm.color); c.tex.needsUpdate = true; }
+            if (c.color !== arm.color) { c.color = arm.color; drawCard(c.canvas, c.m, c.img, arm.color, burstMode); c.tex.needsUpdate = true; }
             if (dramatic) {
               // 演出中は渦の目に吸い込まれたまま。ラベルの登場後に新しい腕へ放たれる
               pendingTargets.push({ c, base, s, ro, size: 12 * sc });
@@ -1306,7 +1330,8 @@ export default function VortexSpace({
         burstPhoto = damp(burstPhoto, phaseNow === "entry" || diving ? 1 : 0, dt, 0.9);
         const u = burstMat.uniforms;
         u.uK.value = burstK; u.uTime.value = t; u.uZoom.value = 1 + de * 1.9; u.uRot.value = spinAll * 0.15 + eyeSpin * 0.25;
-        u.uDim.value = phaseNow === "entry" || diving ? 1 : 0.7 + 0.3 * hot; u.uBurst.value = burst; u.uPhoto.value = burstPhoto;
+        // 空間では背景の楔を暗く沈める（黒い空間に細い光線とカードが主役。リファレンス docs/ref/exp_pc_cut.jpg）
+        u.uDim.value = phaseNow === "entry" || diving ? 1 : 0.18 + 0.25 * hot; u.uBurst.value = burst; u.uPhoto.value = burstPhoto;
       }
 
       // 粒子
@@ -1476,6 +1501,39 @@ export default function VortexSpace({
         } else crowd.setFocus(null);
       }
 
+      // 糸: 両端のカードが見えている時だけ。ホバー中のカードにつながる糸を強く
+      {
+        const showAll = phaseNow === "space" && !diving && pendingNow === null && tour === null;
+        const list = st.threads;
+        const w = W(), h = H();
+        for (let i = 0; i < MAX_T; i++) {
+          const el = tEls[i], th = list[i];
+          let target = 0;
+          if (th && showAll) {
+            const ca = cards.get(th.a), cb = cards.get(th.b);
+            if (ca && cb && ca.dim > 0.5 && cb.dim > 0.5) {
+              pa.copy(ca.pos).project(camera); pb.copy(cb.pos).project(camera);
+              if (pa.z < 1 && pb.z < 1 && Math.abs(pa.x) < 1.15 && Math.abs(pb.x) < 1.15 && Math.abs(pa.y) < 1.15 && Math.abs(pb.y) < 1.15) {
+                let ax = (pa.x * 0.5 + 0.5) * w, ay = (-pa.y * 0.5 + 0.5) * h, bx = (pb.x * 0.5 + 0.5) * w, by = (-pb.y * 0.5 + 0.5) * h;
+                if (ax > bx) { [ax, bx] = [bx, ax]; [ay, by] = [by, ay]; } // 文字が逆さにならないよう左→右
+                const mx = (ax + bx) / 2, my = (ay + by) / 2, dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
+                const bend = Math.min(90, len * 0.18);
+                const cx = mx + (dy / len) * bend, cy = my - (dx / len) * bend * (my < h / 2 ? -1 : 1);
+                const d = `M${ax.toFixed(1)},${ay.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)}`;
+                el.path.setAttribute("d", d); el.glow.setAttribute("d", d);
+                if (el.tp.textContent !== th.shared.join(" · ")) el.tp.textContent = th.shared.join(" · ");
+                const focusHit = hoverId !== null && (hoverId === th.a || hoverId === th.b);
+                target = hoverId ? (focusHit ? 1 : 0.15) : i < 4 ? 0.8 : 0.45;
+                el.g.classList.toggle("hot", focusHit);
+              }
+            }
+          }
+          el.alpha = damp(el.alpha, target, dt, 0.35);
+          el.g.setAttribute("opacity", el.alpha.toFixed(3));
+          el.g.style.display = el.alpha < 0.02 ? "none" : "";
+        }
+      }
+
       renderer.setRenderTarget(null);
       renderer.clear();
       renderer.render(scene, camera);
@@ -1495,6 +1553,7 @@ export default function VortexSpace({
       fluid.dispose();
       renderer.dispose();
       host.removeChild(renderer.domElement);
+      threadSvg.remove();
       st.setArms = undefined; st.setPhase = undefined; st.setFocus = undefined; st.setPending = undefined; st.pulse = undefined;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

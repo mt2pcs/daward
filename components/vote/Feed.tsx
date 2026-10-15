@@ -63,9 +63,7 @@ export default function Feed({ items, start, phase, votedNo }: Props) {
                 <div className="no">{m.no}</div>
                 <div className="chips"><span>{m.sportLabel}</span>{m.date && <span className="num">{m.date}</span>}{m.competition && m.competition !== m.sportLabel && <span>{m.competition}</span>}</div>
                 <h2>{m.title}</h2>
-                <p className="desc">{m.beat || m.short || m.description}</p>
-                {m.why && <div className="why"><small>WHY IT MOVES US</small><p>{m.why}</p></div>}
-                {m.crowd && <div className="crowd"><b>場内</b>{m.crowd}</div>}
+                <p className="desc">{m.description}</p>
                 <div className="acts">
                   {phase === "open" && votedNo === m.no && <span className="v26-vote done">本日は投票済みです</span>}
                   {phase === "open" && votedNo && votedNo !== m.no && <span className="v26-vote off">本日は投票済み（No.{votedNo}）</span>}
