@@ -88,26 +88,32 @@ export default function MeaningMap({ items, regions, neighbors, words }: { items
     const proj = (p: THREE.Vector3) => { const v = p.clone().project(camera); return { x: (v.x * 0.5 + 0.5) * W(), y: (-v.y * 0.5 + 0.5) * H(), z: v.z }; };
     const fwd = () => new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
     const orbit = (T: number) => { const k = clamp(T / TL.orbitEnd), r = lerp(128, 96, ease(k)), az = lerp(-0.6, 0.15, k) + 0.02 * Math.max(0, T - TL.orbitEnd) * 0, el2 = 0.22; return new THREE.Vector3(r * Math.sin(az) * Math.cos(el2), r * Math.sin(el2), r * Math.cos(az) * Math.cos(el2)); };
-    // 見せたい点の集まりが画面に収まるカメラ位置（中心から外向きに引く）
-    // 見せたい点の集まりがちょうど画面に収まる距離まで、中心から外向きに引く
+    // 見せたい点の集まりがちょうど画面に収まる距離まで、中心から外向きに引く（縦画面は横の視野で決まる）
+    let halfFov = (25 * Math.PI) / 180, halfH = halfFov;
     const frame = (pts: THREE.Vector3[], margin: number, side = new THREE.Vector3(0.25, 0.3, 1)) => {
       const c = pts.reduce((a, p) => a.add(p.clone()), new THREE.Vector3()).multiplyScalar(1 / pts.length);
       const rad = Math.max(...pts.map((p) => p.distanceTo(c))) + CW;
-      const dist = (rad / Math.tan((25 * Math.PI) / 180)) * margin;
+      const dist = (rad / Math.tan(halfFov)) * margin;
       const dir = c.clone().normalize().add(side).normalize();
       return { pos: c.clone().add(dir.multiplyScalar(dist)), look: c };
     };
     const camPose = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
     const setCam = (pos: THREE.Vector3, look: THREE.Vector3) => { camera.position.copy(pos); camera.lookAt(look); camera.updateMatrixWorld(); camPose.pos.copy(pos); camPose.look.copy(look); };
     const blend = (a: { pos: THREE.Vector3; look: THREE.Vector3 }, b: { pos: THREE.Vector3; look: THREE.Vector3 }, k: number) => ({ pos: a.pos.clone().lerp(b.pos, k), look: a.look.clone().lerp(b.look, k) });
-    // 各場面のカメラ
+    // 各場面のカメラ（画面の縦横で視野が変わるので、縦横比ごとに求め直す）
     const O7 = { pos: orbit(TL.orbitEnd), look: new THREE.Vector3() };
-    const wideA = frame(A.map((i) => cards[i].home), 1.25, new THREE.Vector3(0.6, 0.35, 0.8));
     const nbPts = [A0, ...nbA.slice(0, 4)].map((i) => cards[i].home);
-    const nbrA = frame(nbPts, 1.05, new THREE.Vector3(0.4, 0.2, 1));
-    const wideB = frame([...Bs, A0].map((i) => cards[i].home), 1.2, new THREE.Vector3(-0.4, 0.4, 0.9));
-    const nbrW = frame([wordPos, ...nbW.slice(0, 5).map((i) => cards[i].home)], 1.05, new THREE.Vector3(0.2, 0.25, 1));
-    const vidFront = (i: number, look: THREE.Vector3, fromPos: THREE.Vector3) => { const d = fromPos.clone().sub(cards[i].home).normalize(); return { pos: cards[i].home.clone().add(d.multiplyScalar(4.6)), look: cards[i].home.clone() }; };
+    let wideA = O7, nbrA = O7, wideB = O7, nbrW = O7, poseKey = "";
+    const updatePoses = () => {
+      const key = `${halfFov.toFixed(4)}`; if (key === poseKey) return; poseKey = key;
+      wideA = frame(A.map((i) => cards[i].home), 1.25, new THREE.Vector3(0.6, 0.35, 0.8));
+      nbrA = frame(nbPts, 1.05, new THREE.Vector3(0.4, 0.2, 1));
+      wideB = frame([...Bs, A0].map((i) => cards[i].home), 1.2, new THREE.Vector3(-0.4, 0.4, 0.9));
+      nbrW = frame([wordPos, ...nbW.slice(0, 5).map((i) => cards[i].home)], 1.05, new THREE.Vector3(0.2, 0.25, 1));
+    };
+    // カードが画面の幅の85%になる距離
+    const fillDist = (wWorld: number) => wWorld / 0.85 / (2 * Math.tan(halfFov));
+    const vidFront = (i: number, look: THREE.Vector3, fromPos: THREE.Vector3) => { const d = fromPos.clone().sub(cards[i].home).normalize(); return { pos: cards[i].home.clone().add(d.multiplyScalar(fillDist(CW))), look: cards[i].home.clone() }; };
 
     const want: { v: HTMLVideoElement; t: number; vis: boolean }[] = [];
     const placeV = (v: HTMLVideoElement, c: THREE.Vector3, w: number, h: number, op: number) => {
@@ -117,7 +123,13 @@ export default function MeaningMap({ items, regions, neighbors, words }: { items
       v.style.transform = `translate(${a.x}px,${a.y}px)`; v.style.width = `${b.x - a.x}px`; v.style.height = `${b.y - a.y}px`; v.style.opacity = String(op); v.style.visibility = op > 0.01 ? "visible" : "hidden";
     };
     let labN = 0; const placedL: { x: number; y: number }[] = [];
+    // 縦画面: 文字をカードの横に浮かべない。カードに番号の印を付け、文字は画面下の決まった場所に一覧で出す（最大4行）
+    const portrait = () => W() < H();
+    const listItems: { p: THREE.Vector3; head: string; sub: string; op: number; big: boolean }[] = [];
+    const badges = Array.from({ length: 4 }, (_, k) => { const d = document.createElement("div"); d.className = "mm-badge"; d.textContent = String(k + 1); $(".mm-labels").appendChild(d); return d; });
+    const listRows = Array.from({ length: 4 }, (_, k) => { const d = document.createElement("div"); d.className = "mm-row"; d.innerHTML = `<i>${k + 1}</i><div><b></b><span></span></div>`; $(".mm-list").appendChild(d); return d; });
     const label = (p: THREE.Vector3, head: string, sub: string, op: number, big = false) => {
+      if (portrait()) { if (op > 0.01) listItems.push({ p: p.clone(), head, sub, op, big }); return; }
       if (op <= 0.01 || labN >= labPool.length) return; const d = labPool[labN++]; const s = proj(p); if (s.z > 1) { d.style.opacity = "0"; return; }
       // 文字どうしが重ならないように下へずらす
       let y = s.y; for (let k = 0; k < 6 && placedL.some((q) => Math.abs(q.x - s.x) < 280 && Math.abs(q.y - y) < 46); k++) y += 46;
@@ -127,10 +139,11 @@ export default function MeaningMap({ items, regions, neighbors, words }: { items
     };
 
     const render = (T: number) => {
-      want.length = 0; labN = 0; placedL.length = 0;
+      want.length = 0; labN = 0; placedL.length = 0; listItems.length = 0;
       const w = W(), h = H(), dpr = Math.min(1.75, devicePixelRatio || 1);
       if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { renderer.setPixelRatio(dpr); renderer.setSize(w, h, false); }
       camera.aspect = w / h; camera.fov = w < h ? 68 : 50; camera.updateProjectionMatrix();
+      halfH = (camera.fov * Math.PI) / 360; halfFov = Math.min(halfH, Math.atan(Math.tan(halfH) * camera.aspect)); updatePoses();
 
       // ── カメラ ──
       let pose = { pos: orbit(T), look: new THREE.Vector3() };
@@ -146,7 +159,7 @@ export default function MeaningMap({ items, regions, neighbors, words }: { items
       setCam(pose.pos, pose.look);
 
       // ── 映像が来て、割れる ──
-      const vCenter = O7.pos.clone().add(new THREE.Vector3().subVectors(O7.look, O7.pos).normalize().multiplyScalar(13));
+      const vCenter = O7.pos.clone().add(new THREE.Vector3().subVectors(O7.look, O7.pos).normalize().multiplyScalar(Math.max(13, fillDist(9))));
       const vIn = ease((T - TL.vIn) / 0.8), vOut = 1 - clamp((T - TL.split) / 0.45);
       const showA = T >= TL.vIn && T < TL.split + 0.5;
       // 映像のある間、宇宙は沈む
@@ -168,7 +181,7 @@ export default function MeaningMap({ items, regions, neighbors, words }: { items
       if (T >= TL.nbr - 0.6 && T < TL.dive + 1.0) { [A0, ...nbA].forEach((i) => focusSet.add(i)); dimOthers.k = clamp((T - TL.nbr + 0.6) / 0.8) * (1 - clamp((T - TL.dive) / 1.0)); }
       if (T >= TL.wordLand) { nbW.forEach((i) => focusSet.add(i)); dimOthers.k = Math.max(dimOthers.k, clamp((T - TL.wordLand) / 0.8)); }
       const visited = new Set<number>(); if (T >= TL.pick) visited.add(A0); if (T >= TL.dive) visited.add(B0);
-      const focusC = focusSet.size ? [...focusSet].reduce((a, i) => a.add(cards[i].home.clone()), new THREE.Vector3()).multiplyScalar(1 / focusSet.size) : new THREE.Vector3();
+      const focusC = focusSet.size ? Array.from(focusSet).reduce((a, i) => a.add(cards[i].home.clone()), new THREE.Vector3()).multiplyScalar(1 / focusSet.size) : new THREE.Vector3();
       cards.forEach((c, i) => {
         let pos = c.home.clone(), sc = 1, op = appear(i) * dimU;
         // 割れて飛ぶ: 映像の位置から自分の場所へ
@@ -215,7 +228,7 @@ export default function MeaningMap({ items, regions, neighbors, words }: { items
       const placedR: { x: number; y: number }[] = [];
       regions.map((r, j) => ({ r, j, p: new THREE.Vector3(r.center[0] * S, r.center[1] * S + 6, r.center[2] * S) })).sort((a, b) => a.p.distanceTo(camera.position) - b.p.distanceTo(camera.position)).forEach(({ r, j, p }) => {
         const s = proj(p); const d = regEls[j];
-        const clash = placedR.some((q) => Math.abs(q.x - s.x) < 230 && Math.abs(q.y - s.y) < 34);
+        const clash = placedR.some((q) => Math.abs(q.x - s.x) < (portrait() ? w * 0.9 : 230) && Math.abs(q.y - s.y) < (portrait() ? 70 : 34)) || (portrait() && placedR.length >= 2);
         let o = T < TL.vIn ? clamp((T - 2.4 - j * 0.28) / 0.8) : 0;
         if (T >= TL.land - 0.4 && T < TL.pick + 1.0) { const has = A.some((i) => items[i].region === r.id); o = has ? clamp((T - TL.land + 0.4) / 0.6) : 0.25 * clamp((T - TL.land) / 0.8); }
         if (T >= TL.land2 - 0.4 && T < TL.word) { const has = Bs.some((i) => items[i].region === r.id); o = has ? clamp((T - TL.land2 + 0.4) / 0.6) : 0.2; }
@@ -235,6 +248,9 @@ export default function MeaningMap({ items, regions, neighbors, words }: { items
       if (T >= TL.land2 && T < TL.word + 0.4) Bs.forEach((i, k) => label(cards[i].home, short(items[i].context), `${items[i].sport}　${fmtT(items[i].t)}`, clamp((T - TL.land2 - k * 0.25) / 0.5) * (1 - clamp((T - TL.word) / 0.4))));
       if (T >= TL.wordLand + 0.6) nbW.forEach((i, k) => label(cards[i].mesh.position, short(items[i].context), `${items[i].sport}　${fmtT(items[i].t)}`, clamp((T - TL.wordLand - 0.6 - k * 0.35) / 0.5)));
       labPool.forEach((d, k) => { if (k >= labN) d.style.opacity = "0"; });
+      const li = listItems.sort((a, b) => Number(b.big) - Number(a.big)).slice(0, 4);
+      listRows.forEach((d, k) => { const it = li[k]; d.style.opacity = it ? String(it.op) : "0"; d.style.display = it ? "flex" : "none"; if (it) { (d.querySelector("b") as HTMLElement).textContent = it.head; (d.querySelector("span") as HTMLElement).textContent = it.sub; } });
+      badges.forEach((d, k) => { const it = li[k]; if (!it) { d.style.opacity = "0"; return; } const s = proj(it.p); d.style.opacity = s.z > 1 ? "0" : String(it.op); d.style.transform = `translate(${s.x}px,${s.y}px)`; });
 
       // カーソル（タップの見本）
       const taps: [number, () => { x: number; y: number }][] = [[TL.pick, () => proj(cards[A0].home)], [TL.dive, () => proj(cards[B0].mesh.position)], [TL.send - 0.1, () => { const r = input.getBoundingClientRect(), rb = el.getBoundingClientRect(); return { x: r.right - rb.left - 40, y: r.top - rb.top + r.height / 2 }; }]];
@@ -261,7 +277,7 @@ export default function MeaningMap({ items, regions, neighbors, words }: { items
     let raf = 0; const t0 = performance.now();
     (window as any).__mm = { render, end: TL.end };
     if (!capture) { const loop = () => { raf = requestAnimationFrame(loop); render((performance.now() - t0) / 1000); }; raf = requestAnimationFrame(loop); }
-    return () => { cancelAnimationFrame(raf); [vA, vB].forEach((v) => { v.pause(); v.remove(); }); regEls.forEach((d) => d.remove()); labPool.forEach((d) => d.remove()); chipPool.forEach((d) => d.remove()); renderer.dispose(); };
+    return () => { cancelAnimationFrame(raf); [vA, vB].forEach((v) => { v.pause(); v.remove(); }); [...regEls, ...labPool, ...chipPool, ...badges, ...listRows].forEach((d) => d.remove()); renderer.dispose(); };
   }, [items, regions, neighbors, words]);
 
   return (
@@ -271,6 +287,7 @@ export default function MeaningMap({ items, regions, neighbors, words }: { items
       <canvas />
       <div className="mm-videos" />
       <div className="mm-labels" />
+      <div className="mm-list" />
       <div className="mm-title"><b>神戸スティーラーズ初制覇</b><span>リーグワン　0:49〜</span></div>
       <div className="mm-reading" />
       <div className="mm-input"><b /><i>投げる</i></div>
@@ -298,6 +315,13 @@ const CSS = `
 .mm-input{position:absolute;left:50%;bottom:7%;width:min(560px,86vw);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 20px;background:rgba(0,0,0,.7);border:2px solid #fff;opacity:0}
 .mm-input b{font-weight:900;font-size:20px}
 .mm-input i{font-style:normal;background:#ffff00;color:#000;font-weight:900;font-size:15px;padding:10px 16px}
+.mm-badge{position:absolute;left:0;top:0;opacity:0;translate:-50% -50%;width:26px;height:26px;border-radius:50%;background:#ffff00;color:#000;font:900 14px/26px Archivo,sans-serif;text-align:center;box-shadow:0 0 0 2px #000}
+.mm-list{position:absolute;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.mm-row{display:none;align-items:flex-start;gap:10px;padding:8px 10px;background:rgba(0,0,0,.72);border-left:3px solid #ffff00}
+.mm-row i{flex:none;width:22px;height:22px;border-radius:50%;background:#ffff00;color:#000;font:900 12px/22px Archivo,sans-serif;font-style:normal;text-align:center}
+.mm-row b{display:block;font-weight:900;font-size:14px;line-height:1.4}
+.mm-row span{display:block;margin-top:2px;font:700 10px/1 "Noto Sans JP",sans-serif;letter-spacing:.1em;color:#ffff00}
+@media (orientation:portrait){.mm-title{top:9%}.mm-title b{font-size:20px}.mm-reading{bottom:calc(9% + env(safe-area-inset-bottom,0px));font-size:14px}.mm-input{bottom:calc(5% + env(safe-area-inset-bottom,0px))}.mm-reg{font-size:15px}}
 .mm-cursor{position:absolute;left:-18px;top:-18px;width:36px;height:36px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.5);pointer-events:none;opacity:0}
 .mm-cursor::after{content:"";position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#fff}
 `;
