@@ -17,10 +17,9 @@ export default function MomentsTop() {
       {ph === "closed" && <div className="v26-banner">投票受付は終了しました。結果は <b>12/21 TOYOTA ARENA TOKYO</b> の授賞式で発表 <Link href="/#event">授賞式について →</Link></div>}
       {v.voted && ph === "open" && <div className="v26-banner">本日は <b>No.{v.no}</b> に投票済みです。明日また投票できます</div>}
       <section className="v26-kv">
-        <BurstHero />
+        <BurstHero anchor={{ sel: ".v26-kv .logo img", x: 0.5, y: 0.5 }} />
         <div className="in">
-          <div className="frame" aria-hidden />
-          <h1>DAZN 100 MOMENTS</h1>
+          <h1 className="logo"><img src="/brand/100moments_stack.webp" alt="DAZN 100 MOMENTS" width={2000} height={1640} /></h1>
           <p className="lead">2026年、心が震えた100の瞬間</p>
           <div className="tiny">{ph === "open" ? `VOTE 1 / DAY · UNTIL ${fmtMD(VOTE_END)} · NO SIGN-UP` : ph === "pre" ? "VOTING OPENS EARLY NOVEMBER" : ph === "closed" ? "VOTING CLOSED · CEREMONY 12/21" : "RESULTS"}</div>
           {SITE.experienceReady ? <Link href={SITE.experiencePath} className="go">熱狂の中を回遊する！</Link> : ph === "open" ? <p className="lead2">あなたが一番心を震わせたモーメントに投票しよう</p> : null}

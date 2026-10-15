@@ -649,6 +649,14 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
 - **落とし穴**: `.is a{color:inherit}` がボタンの `color:#050505` より強く、黄色ボタンの文字が白になった（投票サイトでも起きた不良）。ボタンは `.is a.is-btn-y` で指定する。
 - 投票サイトの変更: 「AWARDSについて」等のリンクを `/`（#faq / #campaign / #terms / #event）へ、シェア文をワイヤー P12 の案に。
 - 検証: `scratchpad/info/shot.mjs <base> <path> <tag>`（PC 1440 / SP 390 でセクションごとに実寸で撮る・SP メニュー）。
+- **支給ブランド素材（2026-10-15）** → `public/brand/`（パスは `lib/site/content.ts` の `BRAND`）: `awards2026_logo.webp`（縦組み・黒地）、
+  `awards_mark.webp`（バーストのマークのみ・透過。支給 webp の左半分を切り出し）、`100moments_h.webp` / `100moments_stack.webp`（黒地）、
+  `trophy.jpg`（支給写真は DAZN AWARDS 2025 のトロフィー。左の 2025 ロゴを避けてトロフィー部分を切り出し、キャプションに 2025 と明記）。
+  ロゴは黒地なので両サイトの背景を #000 にし、炸裂の上では `mix-blend-mode:lighten` で黒を抜く。**blend は見出し要素（h1）に付ける**
+  （img に付けると親の transform アニメーションが重ね合わせを閉じ込め、黒い箱が出る）。情報サイト KV の破片はロゴの色で、ロゴの DAZN マーク
+  （縦 0.305 の位置）から放射（`BurstHero` の `anchor`/`palette`/`alpha`）。
+- **ユーザー指摘（2026-10-15）「一般投票に参加した先から戻れない・トップに戻れない」** → 投票サイトのヘッダー左端に AWARDS マーク（情報サイト TOP へ）
+  ＋区切り＋100 MOMENTS ロゴ（一覧へ）。SP メニューにも「DAZN AWARDS 2026 トップ」「100 MOMENTS 一覧」。
 
 ## 投票サイト（2026-10-14 着手・vote1）
 

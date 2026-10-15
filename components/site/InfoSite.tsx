@@ -3,7 +3,10 @@ import BurstHero from "@/components/vote/BurstHero";
 import SiteHeader from "@/components/site/SiteHeader";
 import NomineeTabs from "@/components/site/NomineeTabs";
 import { byNo, media, VOTE_END, fmtMD } from "@/lib/vote/data";
-import { SITE, EVENT, KV_VIDEO, NEWS, ABOUT, CATEGORIES, NOMINEES, CAST, CAMPAIGN, LINKS, FAQ, sitePhase } from "@/lib/site/content";
+import { SITE, BRAND, EVENT, KV_VIDEO, NEWS, ABOUT, CATEGORIES, NOMINEES, CAST, CAMPAIGN, LINKS, FAQ, sitePhase } from "@/lib/site/content";
+
+// KV の破片はロゴの色で（ロゴの DAZN マークから放射）
+const LOGO_PALETTE = ["#ff3b5c", "#ff8a65", "#4de1ff", "#d9f04a", "#8e2a92", "#ff1f3d", "#ffd34d", "#ffffff"];
 
 // 情報サイト DAZN AWARDS 2026（ワイヤー I-00〜I-02）。1ページに上から KV / NEWS / ABOUT / AWARDS / 選考方法 / NOMINEES / CAST / EVENT / CAMPAIGN / FAQ。
 // 文言・公開フラグは lib/site/content.ts、時期（公開→ノミネート発表→投票締切→受賞発表）は投票サイトと共通の phase で切り替える。
@@ -28,9 +31,9 @@ export default function InfoSite() {
 
       {/* I-01 ① KV */}
       <section className="is-kv" aria-label="DAZN AWARDS 2026">
-        {KV_VIDEO ? <video className="is-kv-video" src={KV_VIDEO} autoPlay muted loop playsInline /> : <BurstHero center={0.42} />}
+        {KV_VIDEO ? <video className="is-kv-video" src={KV_VIDEO} autoPlay muted loop playsInline /> : <BurstHero palette={LOGO_PALETTE} alpha={0.55} density={0.8} anchor={{ sel: ".is-kv-logo", x: 0.5, y: 0.305 }} />}
         <div className="is-kv-in">
-          <div className="is-kv-frame"><h1><span>DAZN</span><span>AWARDS</span><span>2026</span></h1></div>
+          <h1 className="is-kv-h1"><img className="is-kv-logo" src={BRAND.awardsLogo} alt="DAZN AWARDS 2026" width={1214} height={2000} /></h1>
           <p className="is-kv-tag">{SITE.tagline}</p>
           <p className="is-kv-date">{EVENT.dateLabel}<i />{EVENT.venue}</p>
           <div className="is-kv-btns">
@@ -176,7 +179,7 @@ export default function InfoSite() {
       <footer className="is-foot">
         <div className="is-wrap">
           <a className="is-foot-banner" href={vote}>
-            <span className="lbl">一般投票</span><b>DAZN <em>100</em> MOMENTS</b><span>2026年、心が震えた100の瞬間</span><span className="go" aria-hidden>→</span>
+            <span className="lbl">一般投票</span><img className="logo100" src={BRAND.momentsH} alt="DAZN 100 MOMENTS" width={2000} height={439} /><span>2026年、心が震えた100の瞬間</span><span className="go" aria-hidden>→</span>
           </a>
           <div className="is-foot-row">
             <a href={LINKS.dazn} target="_blank" rel="noreferrer">DAZN 公式</a>

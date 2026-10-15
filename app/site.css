@@ -1,6 +1,6 @@
 /* 情報サイト DAZN AWARDS 2026 — リファレンス docs/ref/gen/info_pc_kv1.png / info_pc_awards1.png。
    黒・白・黄1色、角は立てる、巨大なコンデンス数字、DAZN フレームから直線の破片が放射（投票サイトと同じ言語） */
-.is{--acc:#ebff00;--bg:#050505;--fg:#f4f4f2;--dim:#9a9aa0;--line:rgba(255,255,255,.14);--panel:#0e0e10;
+.is{--acc:#ebff00;--bg:#000;--fg:#f4f4f2;--dim:#9a9aa0;--line:rgba(255,255,255,.14);--panel:#0e0e10;
   --num:"Oswald","Helvetica Neue",Arial,sans-serif;--jp:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
   background:var(--bg);color:var(--fg);font-family:var(--jp);min-height:100%;overflow-x:clip}
 .is a{color:inherit;text-decoration:none}
@@ -18,11 +18,11 @@
 .is-block{display:flex;width:100%}
 
 /* ---- ヘッダー（I-00） */
-.is-h{position:sticky;top:0;z-index:30;background:rgba(5,5,5,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
+.is-h{position:sticky;top:0;z-index:30;background:rgba(0,0,0,.9);backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px)}
 .is-h .is-wrap{display:flex;align-items:center;gap:20px;height:60px}
 .is-logo{display:flex;align-items:center;gap:10px;font:700 18px/1 var(--num);letter-spacing:.06em;white-space:nowrap}
 .is-logo b{font-weight:700;color:var(--acc)}
-.is-logo i{width:22px;height:22px;border:2.5px solid #fff;display:inline-block;flex:none}
+.is-logo img{height:34px;width:auto;flex:none;display:block}
 .is-nav{display:none;margin-left:auto;gap:28px}
 .is-nav a{font:500 14px/1 var(--num);letter-spacing:.14em;color:#ddd}
 .is-nav a:hover{color:#fff}
@@ -30,7 +30,7 @@
 .is-burger{margin-left:auto;width:40px;height:40px;background:none;border:0;display:flex;flex-direction:column;justify-content:center;gap:6px;padding:0 8px}
 .is-burger span{display:block;height:2px;background:#fff}
 @media(min-width:1000px){.is-nav{display:flex}.is-h-vote{display:inline-flex}.is-burger{display:none}}
-.is-menu{position:fixed;inset:0;z-index:60;background:#050505;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.is-menu{position:fixed;inset:0;z-index:60;background:#000;display:flex;flex-direction:column;padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 .is-menu-top{display:flex;align-items:center;justify-content:space-between;height:60px}
 .is-close{background:none;border:0;color:#fff;font:300 34px/1 var(--num);width:40px;height:40px}
 .is-menu nav{display:flex;flex-direction:column;margin:12px 0 28px}
@@ -44,10 +44,13 @@
 .is-kv{position:relative;overflow:hidden;min-height:calc(100svh - 60px);display:flex;align-items:center;justify-content:center;text-align:center;border-bottom:1px solid var(--line)}
 @media(min-width:900px){.is-kv{min-height:min(calc(100svh - 60px),900px)}}
 .is-kv .v26-burst,.is-kv-video{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:cover}
-.is-kv-in{position:relative;z-index:1;padding:40px 16px 56px;display:flex;flex-direction:column;align-items:center}
-.is-kv-frame{width:clamp(230px,30vw,340px);aspect-ratio:1;border:clamp(7px,.9vw,11px) solid #fff;background:#050505;box-shadow:0 0 0 clamp(10px,1.4vw,18px) rgba(5,5,5,.92),0 30px 120px rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center}
-.is-kv-frame h1{display:flex;flex-direction:column;font:700 clamp(46px,6.2vw,76px)/.98 var(--num);letter-spacing:.01em}
-.is-kv-tag{margin-top:clamp(26px,3vw,36px);font:700 clamp(22px,3.2vw,38px)/1.1 var(--num);letter-spacing:.01em;text-shadow:0 2px 24px rgba(0,0,0,.95)}
+/* z-index を付けない（付けるとロゴの黒地が炸裂と混ざらない） */
+.is-kv-in{position:relative;padding:32px 16px 48px;display:flex;flex-direction:column;align-items:center}
+.is-kv-h1{margin:0;line-height:0;mix-blend-mode:lighten}
+/* 支給ロゴは黒地。lighten で黒を抜き、後ろの炸裂とつなげる */
+.is-kv-logo{display:block;height:min(52vh,520px);width:auto}
+@media(max-width:700px){.is-kv-logo{height:min(46vh,380px)}}
+.is-kv-tag{margin-top:clamp(14px,2vw,22px);font:700 clamp(22px,3.2vw,38px)/1.1 var(--num);letter-spacing:.01em;text-shadow:0 2px 24px rgba(0,0,0,.95)}
 .is-kv-date{margin-top:10px;display:flex;align-items:center;gap:12px;font:700 clamp(14px,1.7vw,20px)/1 var(--num);letter-spacing:.06em;text-shadow:0 2px 20px rgba(0,0,0,.95)}
 .is-kv-date i{width:2px;height:1.1em;background:var(--acc)}
 .is-kv-btns{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
@@ -184,9 +187,8 @@
 .is-foot{padding:clamp(40px,6vw,72px) 0 calc(96px + env(safe-area-inset-bottom,0px))}
 @media(min-width:1000px){.is-foot{padding-bottom:48px}}
 .is-foot-banner{display:grid;grid-template-columns:1fr auto;gap:6px 20px;align-items:center;padding:clamp(22px,3vw,32px);border:2px solid #fff;transition:background .2s}
-.is-foot-banner:hover{background:#111}
-.is-foot-banner b{grid-column:1;font:700 clamp(30px,4vw,52px)/1 var(--num);letter-spacing:.02em}
-.is-foot-banner b em{font-style:normal;color:var(--acc)}
+.is-foot-banner:hover{border-color:var(--acc)}
+.is-foot-banner .logo100{grid-column:1;height:clamp(26px,3.4vw,46px);width:auto;display:block;margin:4px 0}
 .is-foot-banner span:not(.lbl):not(.go){grid-column:1;font-size:14px;color:#cfcfcb}
 .is-foot-banner .go{grid-column:2;grid-row:1/4;font:700 42px/1 var(--num);color:var(--acc)}
 .is-foot-row{margin-top:30px;display:flex;flex-wrap:wrap;gap:12px 26px;font:500 13px/1 var(--jp);color:#cfcfcb}

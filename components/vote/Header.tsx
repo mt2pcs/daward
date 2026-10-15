@@ -16,7 +16,11 @@ export default function Header({ phase, voteEnd }: { phase: Phase; voteEnd: stri
     <>
       <header className="v26-h">
         <div className="wrap">
-          <Link href="/moments" className="v26-logo" aria-label="DAZN 100 MOMENTS"><i /><span>DAZN <em>100</em> MOMENTS</span></Link>
+          <div className="v26-brand">
+            {/* 左端の AWARDS マークで情報サイト TOP へ戻る（どの画面からでも） */}
+            <a href={SITE.infoPath} className="v26-home" aria-label="DAZN AWARDS 2026 トップへ戻る" title="DAZN AWARDS 2026 トップへ"><img src="/brand/awards_mark.webp" alt="" width={400} height={484} /></a>
+            <Link href="/moments" className="v26-logo" aria-label="DAZN 100 MOMENTS 一覧"><img src="/brand/100moments_h.webp" alt="DAZN 100 MOMENTS" width={2000} height={439} /></Link>
+          </div>
           <nav className="v26-nav">
             <span className="period">{phase === "open" ? `投票期間：〜${voteEnd}` : phase === "pre" ? "投票は11月上旬開始" : phase === "closed" ? "投票受付終了" : "結果発表"}</span>
             <a className="txt" href="#" onClick={(e) => { e.preventDefault(); setRules(true); }}>投票ルール</a>
@@ -46,7 +50,8 @@ export default function Header({ phase, voteEnd }: { phase: Phase; voteEnd: stri
       {menu && (
         <div className="v26-modal v26-menu" role="dialog" aria-modal="true" onClick={() => setMenu(false)}>
           <div className="box" onClick={(e) => e.stopPropagation()}>
-            <a href="/">DAZN AWARDSについて</a>
+            <a href={SITE.infoPath}>DAZN AWARDS 2026 トップ</a>
+            <Link href="/moments" onClick={() => setMenu(false)}>100 MOMENTS 一覧</Link>
             <a href="/#campaign">ご招待キャンペーン</a>
             <a href="/#faq">FAQ</a>
             {SITE.experienceReady && <a href={SITE.experiencePath}>熱狂の中を回遊する</a>}

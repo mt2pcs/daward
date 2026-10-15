@@ -4,6 +4,14 @@ import { phase, type Phase } from "@/lib/vote/data";
 
 export { SITE } from "@/lib/site/flags";
 
+// ブランド素材（public/brand/。2026-10-15 支給。webp・背景黒。SVG 版・横組みロゴ・書体は未支給）
+export const BRAND = {
+  awardsLogo: "/brand/awards2026_logo.webp", // 縦組み（バースト＋DAZN＋DAZN AWARDS 2026）
+  awardsMark: "/brand/awards_mark.webp", // バーストのマークのみ（透過）
+  momentsH: "/brand/100moments_h.webp", // DAZN 100 MOMENTS 横組み
+  momentsStack: "/brand/100moments_stack.webp", // DAZN 100 MOMENTS 3段
+};
+
 export const EVENT = {
   dateLabel: "2026.12.21 MON",
   dateLong: "2026年12月21日（月）",
@@ -27,8 +35,8 @@ export const NEWS: { date: string; title: string; href?: string }[] = [
 export const ABOUT = {
   concept: "スポーツが生み出す「熱狂」を肯定し、心を揺さぶる瞬間の価値を、世界と分かち合う。",
   body: "2026年、スポーツは数えきれない瞬間で私たちの心を震わせた。DAZN AWARDS は、その熱狂を一夜に集め、最も人の心を動かしたモーメントを称える授賞式です。", // 説明会資料の文章をもとに一般向けに調整（要確認）
-  trophyImage: null as string | null, // 未支給
-  trophyCaption: "トロフィーは、天岩戸を開いた力の神・天手力男神（アメノタヂカラヲ）がモチーフ。", // 要確認
+  trophyImage: "/brand/trophy.jpg" as string | null, // 支給写真は 2025 年のトロフィー（2026 年の写真が届いたら差し替え）
+  trophyCaption: "トロフィーは、天岩戸を開いた力の神・天手力男神（アメノタヂカラヲ）がモチーフ。写真は DAZN AWARDS 2025 のトロフィー。", // 要確認
 };
 
 // 6つの熱狂部門。photo は 100 MOMENTS の中から部門を代表する1本の番号（山場のポスター 1280px を使う。寄りの画を目視で選んだ）
