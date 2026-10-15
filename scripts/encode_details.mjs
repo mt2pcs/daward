@@ -1,6 +1,6 @@
 // 詳細ページ用のフル映像（720p・音あり）を作って公開バケットへ上げる。元mp4は Dropbox から再取得し、処理後に削除する。
 //   node scripts/encode_details.mjs <assetsDir> [parallel=2]   （manifest.json の url を使う。detail.ok がある clip はスキップ）
-import { readFileSync, writeFileSync, existsSync, rmSync, statSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, rmSync, statSync, readdirSync } from "fs";
 import { execFileSync, spawn } from "child_process";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
@@ -8,8 +8,16 @@ const { getToken } = require("./gcp_auth.js");
 const [assetsDir, parArg] = process.argv.slice(2); const PAR = +(parArg || 2);
 const BUCKET = process.env.ASSET_BUCKET || "e-mooments-assets";
 const manifest = JSON.parse(readFileSync(`${assetsDir}/manifest.json`, "utf8"));
-const jobs = [];
-for (const no of Object.keys(manifest)) for (const c of manifest[no].clips || []) { if (!c || c.error || !c.url) continue; if (existsSync(`${assetsDir}/${c.key}/detail.ok`)) continue; jobs.push(c); }
+// URL は取り込みマニフェスト、無ければ素材シート（brief/moments100.json の links）から。並列取り込み分はマニフェストに載っていない
+const sheetPath = process.env.SHEET || `${assetsDir}/../brief/moments100.json`;
+const sheetUrls = {};
+if (existsSync(sheetPath)) for (const r of JSON.parse(readFileSync(sheetPath, "utf8"))) { if (!r.links || sheetUrls[r.no]) continue; sheetUrls[r.no] = [...String(r.links).matchAll(/https:\/\/www\.dropbox\.com\/\S+/g)].map((m) => m[0].replace(/dl=0/, "dl=1")); }
+const jobs = []; const seenKey = new Set();
+for (const no of Object.keys(manifest)) for (const c of manifest[no].clips || []) { if (!c || c.error || !c.url) continue; seenKey.add(c.key); if (existsSync(`${assetsDir}/${c.key}/detail.ok`)) continue; jobs.push(c); }
+for (const key of readdirSync(assetsDir).filter((d) => /^\d{3}_\d{2}$/.test(d))) {
+  if (seenKey.has(key) || existsSync(`${assetsDir}/${key}/detail.ok`) || !existsSync(`${assetsDir}/${key}/meta.json`)) continue;
+  const [no, k] = key.split("_"); const url = (sheetUrls[no] || [])[+k - 1]; if (url) jobs.push({ key, url });
+}
 console.log(`jobs ${jobs.length}`);
 let token = await getToken(), tokenAt = Date.now();
 async function upload(path, name, ct) {
