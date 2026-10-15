@@ -48,7 +48,7 @@
 .is-kv-in{position:relative;padding:32px 16px 48px;display:flex;flex-direction:column;align-items:center}
 .is-kv-h1{margin:0;line-height:0;mix-blend-mode:lighten}
 /* 支給ロゴは黒地。lighten で黒を抜き、後ろの炸裂とつなげる */
-.is-kv-logo{display:block;height:min(52vh,520px);width:auto}
+.is-kv-logo{display:block;height:min(60vh,600px);width:auto}
 @media(max-width:700px){.is-kv-logo{height:min(46vh,380px)}}
 .is-kv-tag{margin-top:clamp(14px,2vw,22px);font:700 clamp(22px,3.2vw,38px)/1.1 var(--num);letter-spacing:.01em;text-shadow:0 2px 24px rgba(0,0,0,.95)}
 .is-kv-date{margin-top:10px;display:flex;align-items:center;gap:12px;font:700 clamp(14px,1.7vw,20px)/1 var(--num);letter-spacing:.06em;text-shadow:0 2px 20px rgba(0,0,0,.95)}
@@ -88,7 +88,7 @@
 .is-concept{margin-top:26px;font:900 clamp(24px,3.2vw,40px)/1.45 var(--jp)}
 .is-concept span{display:inline-block}
 .is-body{margin-top:20px;font-size:15px;line-height:1.95;color:#cfcfcb;max-width:36em}
-.is-trophy{margin:0}
+.is-trophy{margin:0;width:100%;max-width:460px;justify-self:center}
 .is-trophy img,.is-trophy .ph{width:100%;aspect-ratio:4/5;object-fit:cover;display:block}
 .is-trophy .ph{border:1px solid var(--line);background:radial-gradient(circle at 50% 42%,#1c1c10 0,#050505 62%);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
 .is-trophy .ph::before{content:"";width:34%;aspect-ratio:1;border:6px solid #fff;box-shadow:0 0 0 10px #050505}
@@ -195,5 +195,6 @@
 .is-foot-row a:hover{color:#fff}
 .is-copy{margin-top:26px;font:500 12px/1 var(--num);letter-spacing:.14em;color:var(--dim)}
 
-/* 支給ロゴの文法の炸裂（ShardBurst） */
-.is-shards{position:absolute;inset:0;width:100%;height:100%;display:block}
+/* KV: 支給ロゴの破片そのものを動かす（LogoBurst） */
+.is-logo-gl{position:absolute;inset:0;width:100%;height:100%;display:block}
+.is-kv.gl-on .is-kv-logo{opacity:0}

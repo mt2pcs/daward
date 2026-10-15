@@ -1,5 +1,5 @@
 import "@/app/site.css";
-import ShardBurst from "@/components/site/ShardBurst";
+import LogoBurst from "@/components/site/LogoBurst";
 import SiteHeader from "@/components/site/SiteHeader";
 import NomineeTabs from "@/components/site/NomineeTabs";
 import { byNo, media, VOTE_END, fmtMD } from "@/lib/vote/data";
@@ -30,7 +30,7 @@ export default function InfoSite() {
 
       {/* I-01 ① KV */}
       <section className="is-kv" aria-label="DAZN AWARDS 2026">
-        {KV_VIDEO ? <video className="is-kv-video" src={KV_VIDEO} autoPlay muted loop playsInline /> : <ShardBurst anchor={{ sel: ".is-kv-logo", x: 0.5, y: 0.305, core: 0.34, avoid: { sel: ".is-kv-text" } }} />}
+        {KV_VIDEO ? <video className="is-kv-video" src={KV_VIDEO} autoPlay muted loop playsInline /> : <LogoBurst img=".is-kv-logo" src={BRAND.awardsLogo} />}
         <div className="is-kv-in">
           <h1 className="is-kv-h1"><img className="is-kv-logo" src={BRAND.awardsLogo} alt="DAZN AWARDS 2026" width={1214} height={2000} /></h1>
           <div className="is-kv-text">
@@ -61,7 +61,7 @@ export default function InfoSite() {
           <div className="is-wrap is-about">
             <div>
               <h2 className="is-h2">ABOUT</h2>
-              <p className="is-concept">{ABOUT.concept.split(/(?<=、)/).map((ph) => <span key={ph}>{ph}</span>)}</p>
+              <p className="is-concept">{ABOUT.concept.split(/(?<=、|生み出す)/).map((ph) => <span key={ph}>{ph}</span>)}</p>
               <p className="is-body">{ABOUT.body}</p>
             </div>
             <figure className="is-trophy">

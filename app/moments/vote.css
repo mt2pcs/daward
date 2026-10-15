@@ -32,14 +32,14 @@
 /* ---- KV: 炸裂 */
 .v26-kv{position:relative;overflow:hidden;min-height:min(72vh,620px);display:flex;align-items:center;justify-content:center;text-align:center;border-bottom:1px solid var(--line)}
 .v26-burst{position:absolute;inset:0;width:100%;height:100%;display:block}
-.v26-kv .in{position:relative;padding:60px 16px 40px}
-.v26-kv .in::before{content:"";position:absolute;left:50%;top:50%;width:140%;height:120%;transform:translate(-50%,-50%);background:radial-gradient(ellipse at center,rgba(5,5,5,.9) 0%,rgba(5,5,5,.6) 45%,transparent 70%);z-index:-1}
+.v26-kv .in{position:relative;padding:clamp(150px,calc(19vh + 44px),236px) 16px 40px}
 .v26-kv .frame{margin:0 auto 20px;width:clamp(96px,22vw,150px);aspect-ratio:1;border:4px solid #fff;background:#050505;box-shadow:0 0 0 8px #050505;position:relative}
 .v26-kv h1{font:700 clamp(40px,10vw,92px)/.95 var(--num);letter-spacing:.04em;text-shadow:0 2px 30px rgba(0,0,0,.9)}
 /* 支給ロゴ（黒地）。lighten で黒を抜いて炸裂とつなげる */
 .v26-kv h1.logo{line-height:0;margin:0 auto 6px;mix-blend-mode:lighten}
-.v26-kv h1.logo img{height:clamp(140px,24vh,240px);width:auto;display:block;margin:0 auto}
-.v26-kv .lead{margin:10px auto 0;font:900 clamp(15px,4.2vw,24px)/1.4 var(--jp);color:#fff;text-shadow:0 2px 20px rgba(0,0,0,.9)}
+.v26-kv h1.logo img{height:clamp(116px,19vh,190px);width:auto;display:block;margin:0 auto}
+.v26-kv .is-logo-gl{position:absolute;inset:0;width:100%;height:100%;display:block}
+.v26-kv .lead{margin:clamp(44px,8vh,72px) auto 0;font:900 clamp(15px,4.2vw,24px)/1.4 var(--jp);color:#fff;text-shadow:0 2px 20px rgba(0,0,0,.9)}
 .v26-kv .tiny{margin-top:12px;font:500 11px/1 var(--num);letter-spacing:.3em;color:#ddd}
 .v26-kv .go{display:inline-flex;align-items:center;gap:10px;margin-top:22px;padding:14px 26px;background:var(--acc);color:#050505;font:900 15px/1 var(--jp);border-radius:0;box-shadow:0 10px 40px rgba(255,255,0,.25)}
 .v26-kv .go::after{content:"→";font-family:var(--num)}
@@ -197,6 +197,4 @@
 @media(prefers-reduced-motion:reduce){.v26 *{animation:none !important;transition:none !important}.v26-card{opacity:1;transform:none}.v26-slide .media,.v26-slide .no,.v26-slide .chips,.v26-slide h2,.v26-slide .desc,.v26-slide .why,.v26-slide .crowd,.v26-slide .acts,.v26-slide .dazn,.v26-slide .nexthint{opacity:1}}
 .v26-kv .lead2{margin-top:18px;font:700 14px/1.6 var(--jp);color:#ddd;text-shadow:0 2px 16px rgba(0,0,0,.9)}
 
-/* 支給ロゴの文法の炸裂（ShardBurst） */
-.is-shards{position:absolute;inset:0;width:100%;height:100%;display:block}
 /* ロゴの文法（直線・角を立てる）に合わせてボタン類の角丸をやめる */
