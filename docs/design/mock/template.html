@@ -1,0 +1,441 @@
+<title>熱狂の発火 モック</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+JP:wght@500;700;900&display=swap">
+<style>
+/* 一画面の体験。黒い炸裂の上に、言葉で発火した瞬間だけが光る。文字は DOM、空間は Canvas */
+:root {
+  --bg: #050506; --ink: #f4f4f0; --dim: #8b8b86; --line: rgba(244,244,240,.18);
+  --y: #ebff00; --m: #ff2d9b; --b: #3d74ff;
+  --display: "Oswald", "Helvetica Neue", Arial, sans-serif;
+  --body: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); overflow: hidden; }
+#cv { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
+#vids { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; overflow: hidden; }
+.ui { position: fixed; z-index: 2; }
+.top { top: env(safe-area-inset-top, 0px); left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px; pointer-events: none; }
+.logo { font: 700 15px/1 var(--display); letter-spacing: .14em; display: flex; align-items: center; gap: 8px; }
+.logo i { width: 14px; height: 14px; border: 2px solid var(--ink); display: inline-block; }
+.logo b { color: var(--y); font-weight: 700; }
+.trail { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; color: var(--dim); max-width: 70vw; }
+.trail span { color: var(--ink); font-weight: 700; padding: 3px 8px; border: 1px solid currentColor; border-radius: 999px; }
+.trail span em { font-style: normal; color: var(--ink); }
+.about-btn { pointer-events: auto; white-space: nowrap; background: transparent; color: var(--dim); border: 1px solid var(--line); font: 500 12px/1 var(--body); padding: 8px 10px; cursor: pointer; }
+.about-btn:focus-visible, .bar button:focus-visible, .chips button:focus-visible, .focus button:focus-visible { outline: 2px solid var(--y); outline-offset: 2px; }
+.about { position: fixed; z-index: 5; top: calc(env(safe-area-inset-top, 0px) + 54px); right: max(16px, env(safe-area-inset-right, 0px)); width: min(380px, calc(100% - 32px));
+  background: rgba(10,10,12,.96); border: 1px solid var(--line); padding: 16px 18px; font-size: 13px; line-height: 1.75; }
+.about h2 { font: 700 14px/1.4 var(--body); margin: 0 0 8px; }
+.about ul { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+.about b { color: var(--y); }
+.bottom { left: 0; right: 0; bottom: 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 18px calc(16px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 10px;
+  background: linear-gradient(rgba(5,5,6,0), rgba(5,5,6,.82) 40%, rgba(5,5,6,.92)); }
+.ask { max-width: 100%; font: 900 clamp(20px, 3.4vw, 30px)/1.3 var(--body); text-align: center; text-wrap: balance; transition: opacity .5s; }
+.note { font-size: 12px; color: var(--dim); min-height: 1.4em; text-align: center; max-width: 100%; text-wrap: balance; }
+.note.warn { color: var(--y); }
+.bar { display: flex; gap: 8px; width: min(620px, 100%); }
+.bar input { flex: 1; min-width: 0; background: rgba(5,5,6,.85); border: 1px solid rgba(244,244,240,.4); color: var(--ink); font: 700 16px/1 var(--body); padding: 14px 14px; }
+.bar input:focus { outline: none; border-color: var(--y); }
+.bar button { background: var(--y); color: #050506; border: 0; font: 900 14px/1 var(--body); padding: 0 18px; cursor: pointer; white-space: nowrap; }
+.bar button:disabled { opacity: .45; cursor: default; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; max-width: 100%; }
+.chips button { background: transparent; color: var(--ink); border: 1px solid rgba(244,244,240,.35); border-radius: 999px; font: 700 12px/1 var(--body); padding: 8px 12px; cursor: pointer; }
+.chips button[data-used="1"] { color: var(--dim); }
+.focus { left: 50%; transform: translateX(-50%); bottom: calc(150px + env(safe-area-inset-bottom, 0px)); width: min(560px, calc(100% - 32px)); z-index: 4;
+  background: rgba(8,8,10,.95); border: 1px solid var(--line); padding: 14px 16px 16px; display: grid; gap: 8px; }
+.focus .arm { font: 900 12px/1 var(--body); color: #050506; padding: 5px 8px; justify-self: start; }
+.focus .row { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+.focus .no { font: 700 30px/1 var(--display); }
+.focus .ti { font: 900 16px/1.35 var(--body); min-width: 0; }
+.focus .sp { font-size: 11px; color: var(--dim); white-space: nowrap; }
+.focus .line { font: 700 15px/1.6 var(--body); }
+.focus .tc { font: 700 13px/1 var(--display); letter-spacing: .06em; color: var(--y); margin-right: 6px; }
+.focus .hist { display: grid; gap: 6px; border-top: 1px solid var(--line); padding-top: 8px; font-size: 12px; }
+.focus .hist div { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.focus .hist img { width: 64px; height: 36px; object-fit: cover; flex: none; }
+.focus .hist b { white-space: nowrap; }
+.focus .hist span { color: var(--dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus .acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.focus .acts button { font: 900 13px/1 var(--body); padding: 11px 14px; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--ink); }
+.focus .acts .vote { background: var(--y); color: #050506; border-color: var(--y); }
+.toast { left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 70px); background: var(--ink); color: #050506; font: 700 13px/1 var(--body); padding: 10px 14px; z-index: 6; }
+.word { left: 0; right: 0; text-align: center; pointer-events: none; font: 900 clamp(26px, 6vw, 64px)/1.1 var(--body); text-shadow: 0 0 30px rgba(0,0,0,.9); z-index: 3; }
+@media (max-width: 600px) { .focus { bottom: calc(172px + env(safe-area-inset-bottom, 0px)); } .focus .no { font-size: 24px; } }
+@media (prefers-reduced-motion: reduce) { .ask { transition: none; } }
+</style>
+
+<canvas id="cv" aria-label="100の瞬間の炸裂"></canvas>
+<div id="vids" aria-hidden="true"></div>
+<div class="ui top">
+  <div>
+    <div class="logo"><i></i>DAZN <b>100</b> MOMENTS</div>
+    <div class="trail" id="trail" hidden></div>
+  </div>
+  <button class="about-btn" id="aboutBtn" aria-expanded="false" aria-controls="about">このモックについて</button>
+</div>
+<div class="about" id="about" hidden>
+  <h2>見てほしいのは「見え方」です</h2>
+  <ul>
+    <li>言葉を投げると、反応した瞬間だけが<b>発火</b>し、映像がその言葉に答える<b>1秒</b>へ飛びます。発火した瞬間どうしが<b>線でつながり</b>、つながった結果として<b>束</b>になり、最後に<b>名前</b>が付きます。</li>
+    <li>次の言葉を投げても前の線は薄く残ります。2つ以上の言葉で発火した瞬間は大きくなり、タップすると<b>言葉ごとに違う1秒</b>が並びます。</li>
+    <li>映像は本番素材です。選ばれた時刻は AI が映像から読んだ実際の時刻です。</li>
+    <li>束の見出し・一文は<b>調整前のエンジンの出力そのまま</b>で、質は未完成です。</li>
+    <li>このモックで読めるのは下の3つの言葉だけです。素材を作り終えたのは映像のある77本中45本です。</li>
+  </ul>
+</div>
+<div class="ui word" id="word" hidden></div>
+<div class="ui focus" id="focus" hidden></div>
+<div class="ui toast" id="toast" hidden></div>
+<div class="ui bottom">
+  <div class="ask" id="ask">いま、どんな熱狂を観たい？</div>
+  <div class="note" id="note">言葉を投げると、100の瞬間のうち反応したものだけが発火します</div>
+  <form class="bar" id="form">
+    <input id="q" autocomplete="off" maxlength="40" placeholder="例: 仕事帰りにスカッとしたい" aria-label="熱狂の言葉">
+    <button id="go" type="submit">投げる</button>
+  </form>
+  <div class="chips" id="chips"></div>
+</div>
+
+<script>
+const D = __DATA__;
+const COLORS = ["#ebff00", "#ff2d9b", "#3d74ff"];
+const PAL = ["#ebff00", "#ff2d9b", "#3d74ff", "#ffffff", "#ff8a3d"];
+const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const cv = document.getElementById("cv"), ctx = cv.getContext("2d");
+const $ = (id) => document.getElementById(id);
+let W = 0, H = 0, DPR = 1, CX = 0, CY = 0, RX = 0, RY = 0;
+const hash = (s, k = 0) => { let h = 2166136261 ^ k; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return ((h >>> 0) % 10000) / 10000; };
+const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : 1 - Math.pow(1 - x, 3));
+const inout = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// ---- 瞬間（ノード）
+const GOLD = Math.PI * (3 - Math.sqrt(5));
+const nodes = D.moments.map((m, i) => {
+  const n = { ...m, i, ang: i * GOLD + hash(m.no, 1) * 0.4, rr: 0.26 + 0.7 * Math.sqrt(hash(m.no, 2)), x: 0, y: 0, tx: 0, ty: 0, w: 0, tw: 0, a: 0.5, ta: 0.5, hits: [], img: null };
+  if (m.thumb) { n.img = new Image(); n.img.src = m.thumb; }
+  return n;
+});
+const byNo = new Map(nodes.map((n) => [n.no, n]));
+const posters = {};
+for (const [k, v] of Object.entries(D.media)) { const im = new Image(); im.src = v.poster; posters[k] = im; }
+
+// ---- 背景の放射（ロゴの炸裂）
+const rays = Array.from({ length: 260 }, (_, i) => ({ ang: hash(i, 3) * Math.PI * 2, c: PAL[Math.floor(hash(i, 4) * PAL.length)], a: 0.05 + 0.12 * hash(i, 5), w: 0.6 + 2.6 * Math.pow(hash(i, 6), 3), l0: 0.12 + 0.2 * hash(i, 7), l1: 0.7 + 0.8 * hash(i, 8) }));
+
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1);
+  W = innerWidth; H = innerHeight;
+  cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  CX = W / 2; CY = H * (W < H ? 0.4 : 0.43);
+  RX = W * 0.48; RY = H * (W < H ? 0.36 : 0.4);
+  for (const n of nodes) { n.hx = CX + Math.cos(n.ang) * n.rr * RX; n.hy = CY + Math.sin(n.ang) * n.rr * RY; if (!n.x) { n.x = n.hx; n.y = n.hy; } }
+  if (cur) layoutClusters(cur);
+  else for (const n of nodes) { n.tx = n.hx; n.ty = n.hy; }
+}
+const nodeW = () => clamp(Math.min(W, H) * 0.035, 12, 22);
+const cardW = () => clamp(W * 0.12, 96, 176);
+
+// ---- 状態
+let cur = null;         // いま発火している言葉 { wi, t0, color, items, threads, arms }
+const history = [];     // 投げた言葉 [{word, color}]
+const memory = [];      // 前の言葉の線 { a, b, color }
+const vids = {};        // media key -> video
+let focusKey = null, hoverKey = null;
+
+function videoFor(key) {
+  if (vids[key]) return vids[key];
+  const v = document.createElement("video");
+  v.muted = true; v.loop = true; v.playsInline = true; v.setAttribute("playsinline", ""); v.preload = "auto";
+  const src = D.media[key];
+  const blobOf = (uri, type) => { const bin = atob(uri.split(",")[1]); const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); return URL.createObjectURL(new Blob([u8], { type })); };
+  // mp4 を優先（iOS）。再生できなければ webm に切り替える
+  const useMp4 = v.canPlayType("video/mp4") !== "";
+  v.src = useMp4 ? blobOf(src.mp4, "video/mp4") : blobOf(src.webm, "video/webm");
+  if (useMp4) v.addEventListener("error", () => { if (!v.dataset.fb) { v.dataset.fb = "1"; v.src = blobOf(src.webm, "video/webm"); v.play().catch(() => {}); } }, { once: true });
+  $("vids").appendChild(v);
+  vids[key] = v;
+  return v;
+}
+
+function throwWord(wi) {
+  const W0 = D.words[wi];
+  // 前の言葉を「記憶」にして、カードを放射の位置へ戻す
+  if (cur) {
+    for (const th of cur.lines) memory.push({ a: th.a, b: th.b, color: cur.color });
+    for (const it of cur.items) { const n = byNo.get(it.no); n.card = null; }
+    for (const v of Object.values(vids)) v.pause();
+  }
+  const color = COLORS[history.length % COLORS.length];
+  history.push({ word: W0.word, color });
+  const items = [];
+  W0.arms.forEach((a, ai) => a.items.forEach((it, k) => items.push({ ...it, arm: ai, k })));
+  // 線: エンジンの糸 + 同じ束の中のつながり
+  const lines = W0.threads.map((t) => ({ a: t.a, b: t.b, text: t.line, eng: true }));
+  W0.arms.forEach((a) => a.items.forEach((it, k) => { if (k > 0) lines.push({ a: a.items[k - 1].no, b: it.no, text: null, eng: false }); }));
+  cur = { wi, word: W0.word, t0: performance.now(), color, items, lines, arms: W0.arms.map((a) => ({ name: a.name, n: a.items.length, x: 0, y: 0 })) };
+  items.forEach((it, r) => { it.igniteAt = 0.95 + r * 0.14; it.lit = false; const n = byNo.get(it.no); n.hits.push({ word: W0.word, color, t: it.t, line: it.line, media: it.media, arm: W0.arms[it.arm].name }); });
+  layoutClusters(cur);
+  closeFocus();
+  $("ask").hidden = true;
+  const wEl = $("word"); wEl.textContent = "「" + W0.word + "」"; wEl.hidden = false; wEl.style.color = color;
+  renderTrail(); renderChips();
+  $("note").textContent = "「" + W0.word + "」を読んでいます"; $("note").className = "note";
+}
+
+// 束の置き場所: 中心のまわりに置き、束どうし・中心の枠と重ならないよう押し離す
+function layoutClusters(c) {
+  const cw = cardW(), ch = cw * 9 / 16, gap = 8, per = W < 520 ? 2 : 3;
+  const K = c.arms.length, top = 64 + (history.length ? 26 : 0), bottom = H - (W < 600 ? 190 : 170);
+  const boxes = c.arms.map((a, k) => {
+    const cols = Math.min(per, a.n), rows = Math.ceil(a.n / per);
+    const ang = -Math.PI / 2 + (k + 0.5) * (Math.PI * 2 / K) + 0.3;
+    return { k, w: cols * cw + (cols - 1) * gap, h: rows * ch + (rows - 1) * gap + 34, x: CX + Math.cos(ang) * RX * 0.6, y: CY + Math.sin(ang) * RY * 0.62, cols };
+  });
+  const fr = Math.min(W, H) * 0.08;
+  for (let it = 0; it < 120; it++) {
+    for (let i = 0; i < K; i++) for (let j = i + 1; j < K; j++) {
+      const A = boxes[i], B = boxes[j];
+      const ox = (A.w + B.w) / 2 + 10 - Math.abs(A.x - B.x), oy = (A.h + B.h) / 2 + 10 - Math.abs(A.y - B.y);
+      if (ox > 0 && oy > 0) { if (ox < oy) { const s = Math.sign(A.x - B.x) || 1; A.x += s * ox / 2; B.x -= s * ox / 2; } else { const s = Math.sign(A.y - B.y) || 1; A.y += s * oy / 2; B.y -= s * oy / 2; } }
+    }
+    for (const B of boxes) {
+      const ox = B.w / 2 + fr - Math.abs(B.x - CX), oy = B.h / 2 + fr - Math.abs(B.y - CY);
+      if (ox > 0 && oy > 0) { if (ox < oy) B.x += (Math.sign(B.x - CX) || 1) * ox; else B.y += (Math.sign(B.y - CY) || 1) * oy; }
+      B.x = clamp(B.x, 12 + B.w / 2, W - 12 - B.w / 2); B.y = clamp(B.y, top + B.h / 2, bottom - B.h / 2);
+    }
+  }
+  boxes.forEach((B) => { c.arms[B.k].x = B.x; c.arms[B.k].y = B.y - B.h / 2 + 22; c.arms[B.k].bw = B.w; });
+  for (const it of c.items) {
+    const B = boxes[it.arm], col = it.k % B.cols, row = Math.floor(it.k / B.cols);
+    it.cx = B.x - B.w / 2 + cw / 2 + col * (cw + gap); it.cy = B.y - B.h / 2 + 34 + ch / 2 + row * (ch + gap);
+  }
+  c.cw = cw; c.ch = ch;
+}
+
+// ---- 描画
+function frame(now) {
+  requestAnimationFrame(frame);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#050506"; ctx.fillRect(0, 0, W, H);
+  const t = cur ? (now - cur.t0) / 1000 * (RM ? 3 : 1) : 99;
+  const pulse = cur ? ease((t - 0.55) / 1.9) * 1.25 : -1;
+  const bundle = cur ? inout((t - 3.3) / 1.5) : 0;
+  const nameA = cur ? ease((t - 4.5) / 0.9) : 0;
+  const lineP = (i) => (cur ? ease((t - 2.4 - i * 0.12) / 0.9) : 0);
+  const R = Math.max(RX, RY);
+
+  // 放射
+  ctx.lineCap = "round";
+  for (const r of rays) {
+    const boost = pulse > 0 ? Math.max(0, 1 - Math.abs((r.l0 + r.l1) * 0.5 - pulse) / 0.25) : 0;
+    const settle = cur && t > 2.5 ? 0.55 : 1;
+    ctx.strokeStyle = r.c; ctx.globalAlpha = (r.a + boost * 0.35) * settle;
+    ctx.lineWidth = r.w;
+    const c = Math.cos(r.ang), s = Math.sin(r.ang);
+    ctx.beginPath(); ctx.moveTo(CX + c * r.l0 * R, CY + s * r.l0 * R); ctx.lineTo(CX + c * r.l1 * R, CY + s * r.l1 * R); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // 光の脈
+  if (pulse > 0 && pulse < 1.25) {
+    ctx.strokeStyle = cur.color; ctx.globalAlpha = 0.5 * (1 - pulse / 1.25); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(CX, CY, pulse * RX, pulse * RY, 0, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1;
+  }
+
+  // 記憶の線（前の言葉が引いた線は薄く残る）
+  for (const m of memory) {
+    const a = byNo.get(m.a), b = byNo.get(m.b); if (!a || !b) continue;
+    ctx.strokeStyle = m.color; ctx.globalAlpha = 0.22; ctx.lineWidth = 1;
+    curve(a.x, a.y, b.x, b.y); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // ノード（眠っている瞬間）
+  const nw = nodeW();
+  const litSet = new Set();
+  if (cur) for (const it of cur.items) if (t >= it.igniteAt) litSet.add(it.no);
+  for (const n of nodes) {
+    const inCur = cur && cur.items.some((it) => it.no === n.no);
+    const passed = cur && pulse > n.rr;
+    n.ta = !cur ? 0.5 : litSet.has(n.no) ? 1 : passed && !inCur ? (n.hits.length ? 0.45 : 0.12) : 0.5;
+    n.a += (n.ta - n.a) * 0.08;
+    if (litSet.has(n.no)) continue;
+    n.x += (n.hx - n.x) * 0.06; n.y += (n.hy - n.y) * 0.06;
+    const past = n.hits.length;
+    const s = nw * (1 + 0.35 * past) * (0.92 + 0.08 * Math.sin(now / 900 + n.i));
+    ctx.globalAlpha = n.a;
+    if (n.img && n.img.complete) ctx.drawImage(n.img, n.x - s / 2, n.y - s * 0.28, s, s * 0.56);
+    else { ctx.fillStyle = "#2a2a2e"; ctx.fillRect(n.x - s / 2, n.y - s * 0.28, s, s * 0.56); }
+    // 前の言葉で発火した印（言葉ごとの色の輪）
+    n.hits.forEach((h, k) => { ctx.strokeStyle = h.color; ctx.lineWidth = 1.5; ctx.globalAlpha = Math.min(1, n.a + 0.3); ctx.strokeRect(n.x - s / 2 - 2 - k * 3, n.y - s * 0.28 - 2 - k * 3, s + 4 + k * 6, s * 0.56 + 4 + k * 6); });
+  }
+  ctx.globalAlpha = 1;
+
+  // DAZN の枠（消失点）
+  drawFrame(Math.min(W, H) * 0.075, cur && t < 1.2 ? 1 + 0.25 * Math.sin(Math.min(1, t / 1.2) * Math.PI) : 1);
+
+  if (cur) {
+    const cw = cur.cw, ch = cur.ch;
+    // 発火したカードの位置: 放射の位置 → 束へ
+    for (const it of cur.items) {
+      const n = byNo.get(it.no);
+      if (t < it.igniteAt) continue;
+      if (!it.lit) { it.lit = true; it.lt = t; const v = videoFor(it.media); try { v.currentTime = 0; v.play().catch(() => {}); } catch (e) {} }
+      const g = ease((t - it.igniteAt) / 0.45);
+      const ix = n.hx, iy = n.hy;
+      n.x = ix + (it.cx - ix) * bundle; n.y = iy + (it.cy - iy) * bundle;
+      it.w = (nw + (cw * (0.72 + 0.28 * bundle) - nw) * g);
+    }
+    // 中心から各カードへの曲がった光（炸裂が束へ曲がる）
+    for (const it of cur.items) {
+      if (!it.lit) continue;
+      const n = byNo.get(it.no), arm = cur.arms[it.arm];
+      ctx.strokeStyle = cur.color; ctx.globalAlpha = 0.16 + 0.22 * bundle; ctx.lineWidth = 1.2;
+      const mx = CX + (arm.x - CX) * 0.35 * bundle + (n.x - CX) * 0.5 * (1 - bundle), my = CY + (arm.y - CY) * 0.35 * bundle + (n.y - CY) * 0.5 * (1 - bundle);
+      ctx.beginPath(); ctx.moveTo(CX, CY); ctx.quadraticCurveTo(mx, my, n.x, n.y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // 線（発火した瞬間どうしのつながり）
+    cur.lines.forEach((ln, i) => {
+      const a = byNo.get(ln.a), b = byNo.get(ln.b), p = lineP(i);
+      const ia = cur.items.find((x) => x.no === ln.a), ib = cur.items.find((x) => x.no === ln.b);
+      if (!a || !b || !ia?.lit || !ib?.lit || p <= 0) return;
+      const hot = focusKey && (focusKey === ia.media || focusKey === ib.media);
+      ctx.strokeStyle = cur.color; ctx.globalAlpha = ln.eng ? (hot ? 1 : 0.75) : 0.35; ctx.lineWidth = ln.eng ? 2 : 1;
+      const ex = a.x + (b.x - a.x) * p, ey = a.y + (b.y - a.y) * p;
+      curve(a.x, a.y, ex, ey); ctx.stroke();
+      // 線に沿って一文（エンジンの糸だけ、結線の間とフォーカス中）
+      const showText = ln.eng && ((t > 2.6 && t < 5.6) || hot);
+      if (showText && ln.text) {
+        const ta = hot ? 1 : clamp(Math.min((t - 2.6) / 0.4, (5.6 - t) / 0.6), 0, 1);
+        ctx.globalAlpha = ta; ctx.font = `700 ${W < 600 ? 11 : 13}px ${getComputedStyle(document.body).fontFamily}`;
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const txt = ln.text.length > 26 && W < 600 ? ln.text.slice(0, 25) + "…" : ln.text;
+        const tw = ctx.measureText(txt).width;
+        const lx = clamp(mx, 12 + tw / 2, W - 12 - tw / 2), ly = clamp(my - 10, 70, H - 200);
+        ctx.fillStyle = "rgba(5,5,6,.82)"; ctx.fillRect(lx - tw / 2 - 6, ly - 13, tw + 12, 20);
+        ctx.fillStyle = cur.color; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(txt, lx, ly - 2);
+      }
+    });
+    ctx.globalAlpha = 1;
+    // カード（その1秒の映像）
+    for (const it of cur.items) {
+      if (!it.lit) continue;
+      const n = byNo.get(it.no), w = it.w, h = w * 9 / 16, x = n.x - w / 2, y = n.y - h / 2;
+      const v = vids[it.media], focused = focusKey === it.media;
+      const src = v && v.readyState >= 2 ? v : posters[it.media];
+      ctx.globalAlpha = 1;
+      try { ctx.drawImage(src, x, y, w, h); } catch (e) { ctx.fillStyle = "#222"; ctx.fillRect(x, y, w, h); }
+      // 発火の閃光
+      const fl = clamp(1 - (t - it.igniteAt) / 0.5, 0, 1);
+      if (fl > 0) { ctx.fillStyle = cur.color; ctx.globalAlpha = fl * 0.55; ctx.fillRect(x, y, w, h); ctx.globalAlpha = 1; }
+      ctx.strokeStyle = focused ? "#fff" : cur.color; ctx.lineWidth = focused ? 3 : 1.5; ctx.strokeRect(x, y, w, h);
+      if (w > 60) {
+        // その1秒の時刻
+        ctx.font = `700 ${W < 600 ? 10 : 12}px Oswald, sans-serif`; ctx.textAlign = "left"; ctx.textBaseline = "top";
+        const lab = "▶ " + it.t.replace(/^0(\d:)/, "$1");
+        const lw = ctx.measureText(lab).width;
+        ctx.fillStyle = "rgba(5,5,6,.8)"; ctx.fillRect(x + 4, y + 4, lw + 8, W < 600 ? 15 : 17);
+        ctx.fillStyle = cur.color; ctx.fillText(lab, x + 8, y + 6);
+        if (n.hits.length > 1) { ctx.fillStyle = "#fff"; ctx.font = `900 ${W < 600 ? 9 : 11}px ${getComputedStyle(document.body).fontFamily}`; ctx.textAlign = "right"; const tag = n.hits.length + "つの言葉"; const tw2 = ctx.measureText(tag).width; ctx.fillStyle = "#fff"; ctx.fillRect(x + w - tw2 - 10, y + 4, tw2 + 8, W < 600 ? 14 : 16); ctx.fillStyle = "#050506"; ctx.fillText(tag, x + w - 6, y + 6); }
+      }
+    }
+    // 束の名前（最後に浮かび上がる）
+    if (nameA > 0) {
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      for (const a of cur.arms) {
+        const fs = W < 600 ? 14 : 18;
+        ctx.font = `900 ${fs}px ${getComputedStyle(document.body).fontFamily}`;
+        const tw = ctx.measureText(a.name).width;
+        const ax = clamp(a.x, 14 + tw / 2, W - 14 - tw / 2), ay = a.y - 6 + (1 - nameA) * 8;
+        ctx.globalAlpha = nameA;
+        ctx.save(); ctx.translate(ax, ay); ctx.rotate(-0.03);
+        ctx.fillStyle = cur.color; ctx.fillRect(-tw / 2 - 8, -fs * 0.72, tw + 16, fs * 1.44);
+        ctx.fillStyle = "#050506"; ctx.fillText(a.name, 0, 1);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // 言葉の帯（入ってきて枠の中へ吸い込まれる）
+    const wEl = $("word");
+    if (t < 2.2) { const k = ease(t / 0.5), out = ease((t - 1.1) / 1.0); wEl.style.top = (CY - 30) + "px"; wEl.style.opacity = String(k * (1 - out)); wEl.style.transform = `scale(${1.2 - 0.2 * k - 0.6 * out})`; }
+    else if (!wEl.hidden) wEl.hidden = true;
+    if (t > 5.4 && !cur.done) { cur.done = true; const n = cur.items.length, sp = new Set(cur.items.map((it) => byNo.get(it.no).sport)).size; $("note").textContent = `「${cur.word}」に${n}の瞬間が答えました（${sp}競技）。カードをタップすると、その1秒の理由が出ます`; }
+  }
+}
+function curve(ax, ay, bx, by) {
+  const mx = (ax + bx) / 2, my = (ay + by) / 2, dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1, bend = Math.min(60, len * 0.2);
+  ctx.beginPath(); ctx.moveTo(ax, ay); ctx.quadraticCurveTo(mx - dy / len * bend, my + dx / len * bend, bx, by);
+}
+function drawFrame(s, k) {
+  s *= k; const x = CX - s / 2, y = CY - s / 2, n = s * 0.16;
+  ctx.strokeStyle = "#f4f4f0"; ctx.lineWidth = Math.max(2, s * 0.05); ctx.lineJoin = "miter";
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(x + s, y); ctx.lineTo(x + s, y + s * 0.38); ctx.lineTo(x + s - n, y + s * 0.5); ctx.lineTo(x + s, y + s * 0.62);
+  ctx.lineTo(x + s, y + s); ctx.lineTo(x, y + s); ctx.lineTo(x, y + s * 0.62); ctx.lineTo(x + n, y + s * 0.5); ctx.lineTo(x, y + s * 0.38); ctx.closePath();
+  ctx.stroke();
+}
+
+// ---- 操作
+function hit(px, py) {
+  if (!cur) return null;
+  for (const it of [...cur.items].reverse()) { if (!it.lit) continue; const n = byNo.get(it.no), w = it.w, h = w * 9 / 16; if (px > n.x - w / 2 && px < n.x + w / 2 && py > n.y - h / 2 && py < n.y + h / 2) return it; }
+  return null;
+}
+function hitNode(px, py) {
+  const nw = nodeW() * 1.8;
+  for (const n of nodes) if (n.hits.length && Math.abs(px - n.x) < nw && Math.abs(py - n.y) < nw * 0.7) return n;
+  return null;
+}
+cv.addEventListener("click", (e) => {
+  const it = hit(e.clientX, e.clientY);
+  if (it) return openFocus(byNo.get(it.no), it.media);
+  const n = hitNode(e.clientX, e.clientY);
+  if (n) return openFocus(n, n.hits[n.hits.length - 1].media);
+  closeFocus();
+});
+cv.addEventListener("mousemove", (e) => { cv.style.cursor = hit(e.clientX, e.clientY) || hitNode(e.clientX, e.clientY) ? "pointer" : "default"; });
+function openFocus(n, key) {
+  focusKey = key;
+  const h = n.hits.find((x) => x.media === key) || n.hits[n.hits.length - 1];
+  const el = $("focus");
+  const many = n.hits.length > 1;
+  el.innerHTML = `<div class="arm" style="background:${h.color}">${esc(h.arm)}</div>
+    <div class="row"><span class="no">${n.no}</span><span class="ti">${esc(n.title)}</span><span class="sp">${esc(n.sport)}</span></div>
+    <div class="line"><span class="tc">▶ ${h.t}</span>${esc(h.line)}</div>
+    ${many ? `<div class="hist"><b>あなたの言葉ごとに開いた1秒</b>${n.hits.map((x) => `<div><img src="${D.media[x.media].poster}" alt=""><b style="color:${x.color}">「${esc(x.word)}」 ▶ ${x.t}</b><span>${esc(x.line)}</span></div>`).join("")}</div>` : ""}
+    <div class="acts"><button class="vote" id="voteBtn">この瞬間に投票する</button><button id="closeBtn">閉じる</button></div>`;
+  el.hidden = false;
+  $("voteBtn").onclick = () => toast("モックです。本番では投票の確認画面へ進みます");
+  $("closeBtn").onclick = closeFocus;
+  const v = videoFor(key); try { v.play().catch(() => {}); } catch (e) {}
+}
+function closeFocus() { focusKey = null; $("focus").hidden = true; }
+function toast(s) { const t = $("toast"); t.textContent = s; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (t.hidden = true), 2200); }
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function renderTrail() {
+  const el = $("trail"); el.hidden = !history.length;
+  el.innerHTML = "あなたの言葉 " + history.map((h) => `<span style="color:${h.color}"><em>${esc(h.word)}</em></span>`).join(" → ");
+}
+function renderChips() {
+  const used = new Set(history.map((h) => h.word));
+  $("chips").innerHTML = D.words.map((w, i) => `<button type="button" data-i="${i}" data-used="${used.has(w.word) ? 1 : 0}">${esc(w.word)}</button>`).join("");
+  $("chips").querySelectorAll("button").forEach((b) => (b.onclick = () => { $("q").value = D.words[+b.dataset.i].word; submit(); }));
+}
+function submit() {
+  const q = $("q").value.trim(); if (!q) return;
+  const wi = D.words.findIndex((w) => w.word === q);
+  if (wi < 0) { $("note").textContent = "このモックで読めるのは下の3つの言葉だけです（本番はどんな言葉でも読みます）"; $("note").className = "note warn"; return; }
+  if (cur && cur.wi === wi) return;
+  $("q").value = ""; throwWord(wi);
+}
+$("form").addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+$("aboutBtn").onclick = () => { const a = $("about"); a.hidden = !a.hidden; $("aboutBtn").setAttribute("aria-expanded", String(!a.hidden)); };
+addEventListener("resize", resize);
+resize(); renderChips(); requestAnimationFrame(frame);
+window.__mock = { throwWord, openFocus: (no) => { const n = byNo.get(no); openFocus(n, n.hits[n.hits.length - 1].media); }, state: () => ({ cur: cur && cur.word, history: history.map((h) => h.word) }) };
+</script>

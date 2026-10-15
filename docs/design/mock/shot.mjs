@@ -1,0 +1,23 @@
+import { chromium } from "../../exp/node_modules/playwright-core/index.mjs";
+const [w, h, tag] = [+process.argv[2], +process.argv[3], process.argv[4]];
+const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell", args: ["--no-sandbox"] });
+const p = await b.newPage({ viewport: { width: w, height: h } });
+const errs = []; p.on("pageerror", (e) => errs.push(String(e))); p.on("console", (m) => m.type() === "error" && errs.push(m.text()));
+const html = (await import("fs")).readFileSync("burst_mock.html", "utf8");
+await p.setContent(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>${html}</body></html>`);
+await p.waitForTimeout(1500); await p.screenshot({ path: `${tag}_0.png` });
+const throwW = async (word, n) => {
+  await p.fill("#q", word); await p.click("#go");
+  await p.waitForTimeout(1600); await p.screenshot({ path: `${tag}_${n}a.png` });
+  await p.waitForTimeout(1600); await p.screenshot({ path: `${tag}_${n}b.png` });
+  await p.waitForTimeout(3500); await p.screenshot({ path: `${tag}_${n}c.png` });
+};
+await throwW("仕事帰りにスカッとしたい", 1);
+await throwW("雨の日", 2);
+await p.evaluate(() => window.__mock.openFocus("051")); await p.waitForTimeout(800); await p.screenshot({ path: `${tag}_3focus.png` });
+await p.click("#closeBtn");
+await throwW("ベテランの熱量", 4);
+console.log(tag, "errors", errs, JSON.stringify(await p.evaluate(() => window.__mock.state())));
+const vs = await p.evaluate(() => [...document.querySelectorAll("#vids video")].map((v) => [v.readyState, +v.currentTime.toFixed(2)]));
+console.log("videos", JSON.stringify(vs));
+await b.close();
