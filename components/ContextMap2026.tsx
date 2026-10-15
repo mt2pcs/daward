@@ -314,7 +314,7 @@ export default function ContextMap2026({ moments, data }: { moments: CMMoment[];
         // ラベル: ズームと次数のしきい値でフェード（Obsidian の text fade threshold）
         const importance = n.kind === "moment" ? 0.45 + n.weight * 0.6 : n.kind === "context" ? 0.9 + Math.sqrt(n.deg) * 0.25 : 0.4 + Math.sqrt(n.deg) * 0.2;
         let la = Math.max(0, Math.min(1, (cam.k * importance - textK) / 0.3));
-        if (isFocus || isNeigh || (matchSet && matchSet.has(i))) la = 1;
+        if (isFocus || isNeigh || (matchSet && matchSet.has(i)) || n.kind === "context") la = 1; // 文脈の名前は常に出す（重なるものは下で捨てる）
         if (la > 0.02) labelsToDraw.push({ x: sx, y: sy + r + 3, t: n.label, a: la * a, c: n.kind === "moment" ? "#f4f4f2" : n.color, big: isFocus, p: (isFocus ? 1e6 : 0) + (isNeigh ? 1e5 : 0) + (n.kind === "context" ? 1e4 : 0) + n.deg * 10 + la });
       }
       ctx.textAlign = "center"; ctx.textBaseline = "top";
@@ -325,7 +325,9 @@ export default function ContextMap2026({ moments, data }: { moments: CMMoment[];
         const fs = l.big ? 14 : 11;
         ctx.font = `${l.big ? 700 : 500} ${fs}px system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif`;
         const t = l.t.length > 26 && !l.big ? l.t.slice(0, 25) + "…" : l.t;
-        const tw = ctx.measureText(t).width, box = [l.x - tw / 2 - 3, l.y - 1, l.x + tw / 2 + 3, l.y + fs + 2];
+        const tw = ctx.measureText(t).width;
+        l.x = Math.max(tw / 2 + 6, Math.min(W - tw / 2 - 6, l.x)); // 画面の端で切れないように内側へ寄せる
+        const box = [l.x - tw / 2 - 3, l.y - 1, l.x + tw / 2 + 3, l.y + fs + 2];
         if (placed.some((q) => box[0] < q[2] && box[2] > q[0] && box[1] < q[3] && box[3] > q[1])) continue;
         placed.push(box);
         ctx.fillStyle = `rgba(0,0,0,${0.75 * l.a})`;
@@ -490,6 +492,8 @@ export default function ContextMap2026({ moments, data }: { moments: CMMoment[];
 
 type G = ReturnType<typeof buildContextMap>;
 const tc = (t: string) => (t || "").replace(/^0(\d:)/, "$1");
+// 根拠の1秒のフレーム（scripts/contextmap/frames.mjs が公開バケットへ置く。無いものは隠す）
+const Frame = ({ r, small }: { r: CMReason; small?: boolean }) => r.t ? <img className={`cm-frame${small ? " sm" : ""}`} src={`https://storage.googleapis.com/e-mooments-assets/ctx/${r.id}.jpg`} alt="" loading="lazy" onError={(e) => { e.currentTarget.hidden = true; }} /> : null;
 function MomentPanel({ n, graph, selected, reasons, check, onPick }: { n: GNode; graph: G; selected: number; reasons: CMReason[]; check: Record<string, string[]>; onPick: (id: string) => void }) {
   const m = n.moment!;
   const ins = graph.links.filter((l) => l.kind === "in" && l.a === selected);
@@ -505,7 +509,7 @@ function MomentPanel({ n, graph, selected, reasons, check, onPick }: { n: GNode;
         {ins.map((l, k) => { const c = graph.nodes[l.b]; const r = l.reason; const k2 = r ? r.id.split("-")[1] : ""; return (
           <div key={k} className="cm-reason">
             <button className="cm-ctx" onClick={() => onPick(c.id)}>{c.label}</button>
-            {r && <><div className="cm-t">{r.t ? <>▶ {tc(r.t)}　</> : null}{r.seen}</div><p className="cg-why">{r.why}</p>{check[k2] && <div className="cm-flag">資料で確かめられない事実: {check[k2].join(" / ")}</div>}</>}
+            {r && <><Frame r={r} /><div className="cm-t">{r.t ? <>▶ {tc(r.t)}　</> : null}{r.seen}</div><p className="cg-why">{r.why}</p>{check[k2] && <div className="cm-flag">資料で確かめられない事実: {check[k2].join(" / ")}</div>}</>}
           </div>); })}
       </div>
       {pairs.length > 0 && (
@@ -537,7 +541,7 @@ function ContextPanel({ n, graph, selected, onPick }: { n: GNode; graph: G; sele
         {ins.map((l, k) => { const m = graph.nodes[l.a]; const r = l.reason; return (
           <div key={k} className="cm-reason">
             <button className="cg-row" onClick={() => onPick(m.id)}><span>{m.moment?.no} {m.label}</span><span className="cg-row-n">{m.moment?.sport}</span></button>
-            {r && <div className="cm-t">{r.t ? <>▶ {tc(r.t)}　</> : null}{r.seen}</div>}
+            {r && <div className="cm-ev"><Frame r={r} small /><div className="cm-t">{r.t ? <>▶ {tc(r.t)}　</> : null}{r.seen}</div></div>}
           </div>); })}
       </div>
       {pairs.length > 0 && (

@@ -2129,3 +2129,7 @@ textarea {
 .cm-pair { border-top: 1px solid rgba(255,255,255,.08); padding: 6px 0; }
 .cm-pline { font: 500 12px/1.65 "Noto Sans JP", system-ui, sans-serif; color: #e8e8e3; margin-top: 4px; }
 .cm-via { display: inline-block; color: #ebff00; font-weight: 700; margin-right: 8px; }
+.cm-frame { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; margin-top: 8px; border-radius: 4px; background: #15151a; }
+.cm-frame.sm { width: 112px; flex: none; margin-top: 6px; }
+.cm-ev { display: flex; gap: 10px; align-items: flex-start; }
+.cm-ev .cm-t { min-width: 0; }
