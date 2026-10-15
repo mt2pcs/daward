@@ -50,12 +50,12 @@
 /* 支給ロゴは黒地。lighten で黒を抜き、後ろの炸裂とつなげる */
 .is-kv-logo{display:block;height:min(60vh,600px);width:auto}
 @media(max-width:700px){.is-kv-logo{height:min(46vh,380px)}}
-.is-kv-tag{margin-top:clamp(14px,2vw,22px);font:700 clamp(22px,3.2vw,38px)/1.1 var(--num);letter-spacing:.01em;text-shadow:0 2px 24px rgba(0,0,0,.95)}
-.is-kv-date{margin-top:10px;display:flex;align-items:center;gap:12px;font:700 clamp(14px,1.7vw,20px)/1 var(--num);letter-spacing:.06em;text-shadow:0 2px 20px rgba(0,0,0,.95)}
+.is-kv-tag{margin-top:clamp(14px,2vw,22px);font:700 clamp(22px,3.2vw,38px)/1.1 var(--num);letter-spacing:.01em;text-shadow:0 0 2px #000,0 1px 3px #000,0 2px 22px rgba(0,0,0,.95),0 0 48px rgba(0,0,0,.85)}
+.is-kv-date{margin-top:10px;display:flex;align-items:center;gap:12px;font:700 clamp(14px,1.7vw,20px)/1 var(--num);letter-spacing:.06em;text-shadow:0 0 2px #000,0 1px 3px #000,0 2px 22px rgba(0,0,0,.95),0 0 48px rgba(0,0,0,.85)}
 .is-kv-date i{width:2px;height:1.1em;background:var(--acc)}
 .is-kv-btns{margin-top:26px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
 .is-kv-btns .is-btn-o{background:rgba(5,5,5,.7)}
-.is-kv-note{margin-top:14px;font:700 13px/1 var(--jp);letter-spacing:.08em;color:#ddd;text-shadow:0 2px 12px rgba(0,0,0,.9)}
+.is-kv-note{margin-top:14px;font:700 13px/1 var(--jp);letter-spacing:.08em;color:#ddd;text-shadow:0 0 2px #000,0 1px 3px #000,0 2px 22px rgba(0,0,0,.95),0 0 48px rgba(0,0,0,.85)}
 @media(max-width:560px){.is-kv-btns{flex-direction:column;width:100%;max-width:340px}.is-kv-btns .is-btn{width:100%}}
 
 /* ---- セクション共通 */

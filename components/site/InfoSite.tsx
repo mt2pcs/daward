@@ -31,7 +31,7 @@ export default function InfoSite() {
 
       {/* I-01 ① KV */}
       <section className="is-kv" aria-label="DAZN AWARDS 2026">
-        {KV_VIDEO ? <video className="is-kv-video" src={KV_VIDEO} autoPlay muted loop playsInline /> : <><SpaceStream logo=".is-kv-logo" avoid=".is-kv-text" /><LogoBurst img=".is-kv-logo" src={BRAND.awardsLogo} /></>}
+        {KV_VIDEO ? <video className="is-kv-video" src={KV_VIDEO} autoPlay muted loop playsInline /> : <><SpaceStream logo=".is-kv-logo" /><LogoBurst img=".is-kv-logo" src={BRAND.awardsLogo} /></>}
         <div className="is-kv-in">
           <h1 className="is-kv-h1"><img className="is-kv-logo" src={BRAND.awardsLogo} alt="DAZN AWARDS 2026" width={1214} height={2000} /></h1>
           <div className="is-kv-text">
