@@ -474,6 +474,15 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
 - 検証: `scratchpad/vote/shots.mjs`（SP 390×844 / PC 1280×800 で ルール→TOP→フィルタ→詳細→スワイプ→確認→投票→完了→投票済み表示→2回目 409 を通す）。
   **注意**: 初回アクセスはルールモーダルが自動で開く。Playwright の `page.click("a.v26-vote")` は最初の（画面外の）スライドのリンクを掴んでスナップ
   コンテナをスクロールさせるので、見えているスライドのリンクを座標でクリックする。
+- **品質の基準（2026-10-15 ユーザー判定「骨格＝動くだけの画面」は世に出せない）**: 投票サイトも恒常ルール通り、**先にリファレンス画像を作って
+  水準まで回してからコーディングする**。採用リファレンスは `docs/ref/vote_sp_detail.jpg` / `vote_sp_top.jpg` / `vote_pc_detail.jpg` / `vote_pc_top.jpg`
+  （アートディレクションは `docs/ref/vote_art_direction.txt`。Vertex 画像モデル、9:16/16:9、1枚約20秒）。要点: 黒・白・黄1色、巨大な Oswald の番号を
+  画像や見出しに重ねる、DAZN フレームから直線の破片が放射する KV（`components/vote/BurstHero.tsx`、Canvas 2D、SP 320本/PC 520本以上）、
+  詳細はポスターのぼかし背景＋番号＋チップ＋見出し＋展開＋「WHY IT MOVES US」（context2026 の why）＋場内（crowd）＋NEXT カード。
+  **出す前に実寸のスクリーンショットを1枚ずつ目視する**（縮小シートでは白文字on黄などの不良を見落とした）。
+- 詳細のフル映像: `scripts/encode_details.mjs <assetsDir> [並列]` が manifest の Dropbox URL から再取得→720p H.264（veryfast, crf23）＋AAC→
+  公開バケット `m/<key>/detail.mp4`→`<key>/detail.ok`。build_moments2026 は detail.ok があるものに `detail` URL を付け、Feed は controls 付きで再生
+  （無い間は 3秒ループ＋「DIGEST」表示）。1本あたり約30〜60秒、並列2。
 - 本番: 炸裂サービス（e-mooments-burst）に同居。`SERVICE=e-mooments-burst VISUAL_MODE=burst VOTE_PHASE=open node scripts/deploy_cloud_run.js`。rev `vote1`。
 
 ## セッション共通の運用ルール（ユーザーからの恒常指示・2026-08-25追記）
