@@ -20,10 +20,10 @@ async function json(system, user, opts = {}) {
   const text = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
   return JSON.parse(text);
 }
-// prompt → PNG Buffer
+// prompt → PNG Buffer（opts.refs: [{mime, data(base64)}] で参照画像を渡せる）
 async function image(prompt, aspectRatio = '16:9', opts = {}) {
   const j = await generate(opts.model || IMAGE_MODEL, {
-    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    contents: [{ role: 'user', parts: [...(opts.refs || []).map((r) => ({ inlineData: { mimeType: r.mime, data: r.data } })), { text: prompt }] }],
     generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio, ...(opts.imageSize ? { imageSize: opts.imageSize } : {}) } },
   });
   const p = (j.candidates?.[0]?.content?.parts || []).find((x) => x.inlineData);
