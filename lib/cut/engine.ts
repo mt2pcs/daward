@@ -230,6 +230,9 @@ async function nameArms(q: string, arms: { keys: string[]; byName?: boolean; mom
 // ---------- 5. 入口: 想定外の入力を含む全ての分岐
 const DEFAULT_Q = "__default";
 const CCACHE = new Map<string, Cut>();
+// 事前計算した切り口（scripts/precompute_cuts.mjs）。分解・辞書を変えたら作り直す
+import cutsRaw from "@/data/cuts2026.json";
+for (const [k, v] of Object.entries(cutsRaw as unknown as Record<string, Cut>)) CCACHE.set(normalize(k), { ...v, source: v.source + "+pre" });
 const MIN_MOMENTS = 6;
 export async function resolve(raw: string): Promise<Cut> {
   const t0 = Date.now();
