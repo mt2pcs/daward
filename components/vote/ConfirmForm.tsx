@@ -1,6 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { burstAt } from "@/components/vote/Fx";
 
 // V-03 投票確認: ルール同意 → 投票する（1ステップ）
 export default function ConfirmForm({ no }: { no: string }) {
@@ -12,7 +13,7 @@ export default function ConfirmForm({ no }: { no: string }) {
     setBusy(true); setErr("");
     const r = await fetch("/api/v26/vote", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ no, agree }) });
     const j = await r.json().catch(() => ({}));
-    if (j.ok) { router.push(`/moments/${no}/done`); router.refresh(); return; }
+    if (j.ok) { const b = document.querySelector(".v26-page .primary")?.getBoundingClientRect(); if (b) burstAt(b.left + b.width / 2, b.top + b.height / 2, { strong: true }); setTimeout(() => { router.push(`/moments/${no}/done`); router.refresh(); }, 420); return; }
     setBusy(false);
     setErr(j.error === "already" ? "本日はすでに投票済みです。明日また投票できます。" : j.error === "closed" ? "投票受付は終了しています。" : "投票できませんでした。時間をおいてお試しください。");
   };

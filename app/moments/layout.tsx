@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./vote.css";
 import Header from "@/components/vote/Header";
+import Fx from "@/components/vote/Fx";
 import { phase, VOTE_END, fmtMD } from "@/lib/vote/data";
 
 export const metadata: Metadata = {
@@ -15,6 +16,7 @@ export default function MomentsLayout({ children }: { children: React.ReactNode 
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+JP:wght@400;700;900&display=swap" />
       <Header phase={phase()} voteEnd={fmtMD(VOTE_END)} />
       {children}
+      <Fx />
     </div>
   );
 }

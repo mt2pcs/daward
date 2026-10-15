@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default function MomentsTop() {
   const ph = phase();
   const v = votedToday();
-  const items = MOMENTS.map((m) => ({ no: m.no, title: m.title, group: m.group, sportLabel: m.sportLabel, thumb: media(m)?.thumb || null, hasVideo: m.hasVideo }));
+  const items = MOMENTS.map((m) => ({ no: m.no, title: m.title, group: m.group, sportLabel: m.sportLabel, thumb: media(m)?.thumb || null, hasVideo: m.hasVideo, loop: media(m)?.loop || null, webm: media(m)?.webm || null }));
   return (
     <main>
       {ph === "closed" && <div className="v26-banner">投票受付は終了しました。結果は <b>12/21 TOYOTA ARENA TOKYO</b> の授賞式で発表 <Link href="/awards#event">授賞式について →</Link></div>}

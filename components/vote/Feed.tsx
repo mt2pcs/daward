@@ -43,7 +43,7 @@ export default function Feed({ items, start, phase, votedNo }: Props) {
         const same = items.map((x, j) => ({ x, j })).filter(({ x }) => x.group === m.group);
         const next = items[i + 1];
         return (
-          <section className="v26-slide" key={m.no} data-i={i}>
+          <section className={"v26-slide" + (i === cur ? " active" : "")} key={m.no} data-i={i}>
             {near && m.poster && <div className="bg" style={{ backgroundImage: `url(${m.poster})` }} />}
             <div className="rays" />
             <div className="col">
