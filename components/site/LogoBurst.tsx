@@ -22,6 +22,7 @@ uniform sampler2D uTex;
 uniform vec2 uRes;      // キャンバスの画素
 uniform vec4 uLogo;     // ロゴ画像の位置（キャンバス画素）x, y, 縮尺(画素/ロゴ画素), 0
 uniform float uT, uScroll, uPtrA, uPtrK, uStill;
+// 開始の振り付け（uT は開始からの秒）: 0〜1.4 フレームと文字が黒から浮かぶ → 0.7〜2.7 破片がフレームの裏からゆっくり開く → 3.0〜 拍動
 out vec4 o;
 const vec2 C = vec2(${C[0]}.0, ${C[1]}.0);
 const vec4 FR = vec4(${FRAME.join(".0, ")}.0);
@@ -35,14 +36,15 @@ void main(){
   vec2 f = vec2(gl_FragCoord.x, uRes.y - gl_FragCoord.y);
   vec2 P = (f - uLogo.xy) / uLogo.z;
   vec2 d = P - C; float th = atan(d.y, d.x);
-  // 読み込み: 角度ごとに遅れて、フレームの裏から伸びる
-  float dl = 0.05 + 0.12 * (0.5 + 0.5 * sin(th * 2.0 + 1.1)) + 0.06 * (0.5 + 0.5 * sin(th * 5.0 + 0.3));
-  float k = clamp((uT - dl) / 1.1, 0.0, 1.0);
-  float e = 1.0 - pow(2.0, -10.0 * k);
+  float fadeIn = smoothstep(0.0, 1.4, uT);
+  // 破片: 角度ごとに少し遅れて、フレームの裏からゆっくり開く（減速して止まる）
+  float dl = 0.7 + 0.16 * (0.5 + 0.5 * sin(th * 2.0 + 1.1)) + 0.08 * (0.5 + 0.5 * sin(th * 5.0 + 0.3));
+  float k = clamp((uT - dl) / 1.8, 0.0, 1.0);
+  float e = 1.0 - pow(1.0 - k, 3.0);
   float s = mix(0.34, 1.0, e);
   // 拍動が円周を回る（3.4秒ごと）＋ゆっくりした呼吸
-  float life = smoothstep(1.2, 2.2, uT) * (1.0 - uStill);
-  s += life * (0.07 * pulse((uT - 1.8) / 3.4 - th / 6.2832 * 0.32) + 0.015 * sin(uT * 0.7 + th * 2.0));
+  float life = smoothstep(3.0, 4.2, uT) * (1.0 - uStill);
+  s += life * (0.07 * pulse((uT - 3.4) / 3.4 - th / 6.2832 * 0.32) + 0.015 * sin(uT * 0.7 + th * 2.0));
   // カーソルの方向の破片が伸びる
   float da = abs(mod(th - uPtrA + 3.14159, 6.28318) - 3.14159);
   s += 0.11 * uPtrK * exp(-pow(da / 0.55, 2.0));
@@ -57,13 +59,13 @@ void main(){
     vec2 Q = C + d / s;
     if (inR(Q, BU) && !inR(Q, FRx)) {
       vec3 b = tx(Q).rgb;
-      if (Q.y < float(${WORD_Y}) || sat(b) > 0.15) col = b * smoothstep(0.0, 0.06, k) * (1.0 - smoothstep(0.45, 1.0, uScroll));
+      if (Q.y < float(${WORD_Y}) || sat(b) > 0.15) col = b * smoothstep(0.0, 0.3, k) * (1.0 - smoothstep(0.45, 1.0, uScroll));
     }
     if (P.y > float(${WORD_Y})) { vec3 w = tx(P).rgb; if (sat(w) < 0.12) col = max(col, w); }
   }
   // ロゴは黒地の上の色なので、そのまま乗算済みの色として扱い、黒い所だけ透かす
   if (a < 0.0) a = max(max(col.r, col.g), col.b);
-  o = vec4(col, a);
+  o = vec4(col, a) * fadeIn;
 }`;
 
 export default function LogoBurst({ img, src }: { img: string; src: string }) {
@@ -74,7 +76,7 @@ export default function LogoBurst({ img, src }: { img: string; src: string }) {
     // その場合は開く演出を省いて最初から開いた形にし、拍動を弱め、カーソルとスクロールには反応させない。
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const gl = cv.getContext("webgl2", { antialias: false, premultipliedAlpha: true, alpha: true });
-    if (!gl) return;
+    if (!gl) { (window as any).__kvT0 = performance.now(); cv.parentElement?.classList.add("kv-go"); return; }
     const sh = (type: number, s: string) => { const x = gl.createShader(type)!; gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x) || "shader"); return x; };
     let prog: WebGLProgram;
     try {
@@ -102,6 +104,8 @@ export default function LogoBurst({ img, src }: { img: string; src: string }) {
       ready = true; raf = requestAnimationFrame(frame);
     };
     im.src = src;
+    // 開始時刻はロゴの絵が用意できた瞬間（空間 SpaceStream もこれに合わせて始まる）。WebGL が無い・読み込めないときは 2.5 秒で文字と静止ロゴを出す
+    const fallback = setTimeout(() => { const h = cv.parentElement; if (h && !h.classList.contains("kv-go")) { (window as any).__kvT0 = performance.now(); h.classList.add("kv-go"); } }, 2500);
     const onMove = (e: PointerEvent) => { ptrX = e.clientX; ptrY = e.clientY; ptrTarget = e.pointerType === "mouse" ? 1 : 0; };
     const onLeave = () => { ptrTarget = 0; };
     addEventListener("pointermove", onMove, { passive: true }); document.addEventListener("pointerleave", onLeave);
@@ -112,9 +116,9 @@ export default function LogoBurst({ img, src }: { img: string; src: string }) {
       if (!logo) return;
       const rc = cv.getBoundingClientRect();
       if (rc.bottom < 0 || rc.top > innerHeight) return; // 画面外では描かない
-      if (!t0) t0 = now;
+      if (!t0) { t0 = now; (window as any).__kvT0 = now; host.classList.add("kv-go"); }
       const fz = (window as any).__lbT; // 検証用: 時刻を止めて撮る
-      const t = typeof fz === "number" ? fz : (reduce ? 10 : 0) + Math.max(0, (now - t0) / 1000);
+      const t = typeof fz === "number" ? fz : Math.max(0, (now - t0) / 1000);
       const dt = Math.min(0.05, Math.max(0, (now - (last || now)) / 1000)); last = now;
       const dpr = Math.min(2, devicePixelRatio || 1);
       const W = Math.round(rc.width * dpr), H = Math.round(rc.height * dpr);
@@ -136,7 +140,7 @@ export default function LogoBurst({ img, src }: { img: string; src: string }) {
       if (!host.classList.contains("gl-on")) host.classList.add("gl-on");
     };
     (window as any).__logoBurst = { ready: () => ready };
-    return () => { dead = true; cancelAnimationFrame(raf); removeEventListener("pointermove", onMove); document.removeEventListener("pointerleave", onLeave); };
+    return () => { dead = true; clearTimeout(fallback); cancelAnimationFrame(raf); removeEventListener("pointermove", onMove); document.removeEventListener("pointerleave", onLeave); };
   }, [img, src]);
   return <canvas ref={ref} className="is-logo-gl" aria-hidden />;
 }

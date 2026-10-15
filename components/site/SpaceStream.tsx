@@ -70,7 +70,9 @@ export default function SpaceStream({ logo }: { logo: string }) {
       s.mat.uniforms.uColor.value.set(COLORS[Math.floor(r(12) * COLORS.length)]);
       s.cyc = cyc;
     };
-    const travel = (t: number) => SPEED * t + SPEED * 6 * 0.7 * (1 - Math.exp(-t / 0.7)); // 読み込み時はロゴの炸裂と一緒に勢いよく流れ、すぐ巡航へ
+    // 進んだ距離: 0.8 秒から 3.2 秒かけて静止から巡航まで滑らかに加速（速さが smoothstep で上がる＝その積分）
+    const A = 0.8, D = 3.2;
+    const travel = (t: number) => { const x = Math.min(1, Math.max(0, (t - A) / D)); return SPEED * (D * (x * x * x - (x * x * x * x) / 2) + Math.max(0, t - A - D)); };
     let raf = 0, t0 = 0, px = 0, py = 0, tx = 0, ty = 0, last = 0, extra = 0;
     const onMove = (e: PointerEvent) => { if (e.pointerType !== "mouse") return; tx = e.clientX / innerWidth - 0.5; ty = e.clientY / innerHeight - 0.5; };
     addEventListener("pointermove", onMove, { passive: true });
@@ -81,9 +83,11 @@ export default function SpaceStream({ logo }: { logo: string }) {
       if (rc.bottom < 0 || rc.top > innerHeight) return;
       const lg = document.querySelector(logo) as HTMLElement | null;
       if (!lg) return;
-      if (!t0) t0 = now;
+      // ロゴ（LogoBurst）と同じ時刻から始める
+      const k0 = (window as any).__kvT0 as number | undefined;
+      if (!k0) return;
       const fz = (window as any).__lbT;
-      const t = typeof fz === "number" ? fz : Math.max(0, (now - t0) / 1000);
+      const t = typeof fz === "number" ? fz : Math.max(0, (now - k0) / 1000);
       const dt = Math.min(0.05, Math.max(0, (now - (last || now)) / 1000)); last = now;
       const dpr = Math.min(1.75, devicePixelRatio || 1);
       const W = rc.width, H = rc.height;
@@ -99,8 +103,8 @@ export default function SpaceStream({ logo }: { logo: string }) {
       camera.position.set(px * 3.2, -py * 2.4, 0); camera.lookAt(look);
       const scroll = Math.min(1, Math.max(0, -rc.top / Math.max(1, rc.height)));
       if (typeof fz !== "number" && !reduce) extra += dt * SPEED * 2.5 * scroll; // スクロール中は少し速く
-      const fade = reduce ? 1 : Math.min(1, Math.max(0, (t - 0.25) / 0.9));
-      const dist = reduce && typeof fz !== "number" ? SPEED * 0.4 * t + 40 : travel(t) + extra;
+      const fx = Math.min(1, Math.max(0, (t - 1.0) / 2.2)), fade = fx * fx * (3 - 2 * fx); // 1.0〜3.2 秒で黒から浮かぶ
+      const dist = (reduce ? 0.4 : 1) * travel(t) + extra;
       for (const s of shards) {
         const w = s.ph * ZF + dist;
         const cyc = Math.floor(w / ZF);
