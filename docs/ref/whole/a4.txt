@@ -1,0 +1,9 @@
+Cinematic key frame, photoreal, for a premium real-time 3D web experience "DAZN AWARDS 2026 / 100 MOMENTS". Art direction like a high-end film title sequence or an Apple product film: restrained, dark, precise, expensive.
+
+Scene: a vast black hall with a faintly glossy black floor that reflects light. Inside it float about 700 different single-second broadcast frames from the year's sports (rugby, football, baseball, basketball, boxing, motor racing), each a thin borderless glowing screen-like pane (the image itself is the only light source; no added glow). They spread outward from a distant vanishing point along the straight radial directions of the supplied DAZN AWARDS burst logo, so that from afar the field of frames reads as the burst.
+
+Camera: low, slightly off-axis, wide lens, shallow depth of field. Clear hierarchy: ONE frame in the middle distance is in sharp focus and well framed (use the supplied photo of the crying veteran); two or three very large frames in the extreme foreground are heavily out of focus (soft bokeh shapes of image colour); the far field is dense, tiny and hazy in atmospheric fog. Reflections of the frames on the floor. Asymmetric, generous negative space.
+
+ABSOLUTELY NO: lines, threads, dots, particles, dust, sparkles, bloom, halos, light streaks, lens flares, neon, borders, bezels, drop shadows, stacked cards, staircases, grids, collage, labels, words. Only a hairline input field at the bottom centre with no text.
+Vertical phone composition: the vanishing point sits in the upper third; the field of frames fills the screen from top to bottom; the sharp focused frame is in the middle third; one huge out-of-focus frame crosses the lower edge.
+Do NOT draw any logo, letters, DAZN mark or square frame anywhere. Do NOT make a spiral or vortex: straight radial directions only. No glow around anything.
