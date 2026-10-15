@@ -104,8 +104,9 @@ export default function LogoBurst({ img, src }: { img: string; src: string }) {
       ready = true; raf = requestAnimationFrame(frame);
     };
     im.src = src;
-    // 開始時刻はロゴの絵が用意できた瞬間（空間 SpaceStream もこれに合わせて始まる）。WebGL が無い・読み込めないときは 2.5 秒で文字と静止ロゴを出す
-    const fallback = setTimeout(() => { const h = cv.parentElement; if (h && !h.classList.contains("kv-go")) { (window as any).__kvT0 = performance.now(); h.classList.add("kv-go"); } }, 2500);
+    // 開始時刻はロゴの絵が用意できた瞬間（空間 SpaceStream もこれに合わせて始まる）。用意が 4 秒を過ぎたら静止ロゴで先に始め、
+    // 後から WebGL が間に合ったら同じ時刻の続きから描く（最初からやり直さない＝文字がロゴより先に出る逆転を起こさない）
+    const fallback = setTimeout(() => { const h = cv.parentElement; if (h && !h.classList.contains("kv-go")) { (window as any).__kvT0 = performance.now(); h.classList.add("kv-go"); } }, 4000);
     const onMove = (e: PointerEvent) => { ptrX = e.clientX; ptrY = e.clientY; ptrTarget = e.pointerType === "mouse" ? 1 : 0; };
     const onLeave = () => { ptrTarget = 0; };
     addEventListener("pointermove", onMove, { passive: true }); document.addEventListener("pointerleave", onLeave);
@@ -116,7 +117,7 @@ export default function LogoBurst({ img, src }: { img: string; src: string }) {
       if (!logo) return;
       const rc = cv.getBoundingClientRect();
       if (rc.bottom < 0 || rc.top > innerHeight) return; // 画面外では描かない
-      if (!t0) { t0 = now; (window as any).__kvT0 = now; host.classList.add("kv-go"); }
+      if (!t0) { const k0 = (window as any).__kvT0; t0 = k0 && k0 < now ? k0 : now; (window as any).__kvT0 = t0; host.classList.add("kv-go"); }
       const fz = (window as any).__lbT; // 検証用: 時刻を止めて撮る
       const t = typeof fz === "number" ? fz : Math.max(0, (now - t0) / 1000);
       const dt = Math.min(0.05, Math.max(0, (now - (last || now)) / 1000)); last = now;
