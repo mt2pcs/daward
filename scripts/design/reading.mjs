@@ -26,6 +26,10 @@
 //   b) 「雨の日」で受け取りが雨粒・水しぶきを場面に書き、全候補が字面の雨になって0本 → 場面に言葉の字面を含めたら書き直させる。
 //   c) 一文が出来事の言い直しで言葉の声が無い → 一文を「見えるもの（seen）」と「この言葉から見ると（echo）」に分ける。
 //   d) 「カレー」を読めないとした（体験の定義は「何を投げても組み上がる」）→ readable=false は不適切な言葉だけ。K7 を「不適切は弾く」に改める。
+// 第3回の変更（第2回で測った失敗ごと。round2.json）。言葉は「熱狂の切り口」（スポーツをどこで熱く観るか）だけで試す（人生の状況への推薦ではない）
+//   e) 読みが定番の物語（努力が報われる・仲間と支え合う・試練を乗り越える）に流れて何でも入る束になった → 読みごとに focus（画面の何を見るか：
+//      誰の顔・プレーの前か後か・どこにいる人か）を必須にし、定番の言い回しを含む読みは書き直させる。温度 0.2（回ごとの当たり外れを減らす）。
+//   f) 言葉の側の一文が型になった → 1語の中で7字以上の言い回しが3本以上に出たら、その語の一文だけ書き直す。
 //   NODE_USE_ENV_PROXY=1 node scripts/design/reading.mjs out.json 言葉1 言葉2 ...
 import { createRequire } from "module";
 import { writeFileSync, existsSync, readFileSync } from "fs";
@@ -50,6 +54,7 @@ const ask = async (sys, user, schema, temperature = 0.4) => {
     catch (e) { if (k >= 6) throw e; if (String(e).includes("429")) alt = true; await new Promise((r) => setTimeout(r, 3000 * (k + 1))); }
   }
 };
+const askT = (temperature, sys, user, schema) => ask(sys, user, schema, temperature);
 const tok = await getToken();
 const embed = async (texts, type) => {
   const res = [];
@@ -88,6 +93,7 @@ const GEN = UE.map((e) => Math.max(...GE.map((g) => cos(g, e))));
 const LAMBDA = 0.6;
 
 // ---- 1) 受け取り ----
+const STOCK = ["努力が報われ", "支え合", "乗り越え", "勇気をもら", "感動", "絆", "諦めな", "報われる", "力をもら", "元気をもら", "前向き"];
 const LENS_SYS = `観る人がスポーツの瞬間を観るために、一つの言葉を投げました。その言葉はその人のいまの気持ち・状況・好み（熱狂の文脈）です。
 この言葉を2〜4通りに受け取ります（読み）。読みどうしは違う気持ちにする。
 - name: その読みの見出し。この人の言葉の続きのように（6〜14字）。分類語・決まり文句（感動・奇跡・魂・物語・その先へ・光・虹）を使わない。
@@ -97,12 +103,14 @@ const LENS_SYS = `観る人がスポーツの瞬間を観るために、一つ�
   一覧にいない選手名なら、その人が観る人にとって何の象徴かとして読む。
 - kind: 言葉の種類（sports=スポーツの具体 / person=人名 / feeling=気持ち / situation=観る人の状況 / relation=人間関係 / metaphor=物・天気・食べ物など比喩 / sound=叫び・擬音）。
 - どんな言葉も読む（食べ物・天気・意味の無い叫びも、その言葉が呼び起こす気持ちとして）。readable=false は差別・暴力・性的など不適切な言葉だけ（reason に一文）。
-- 読みは、勝利や歓喜一般（抱き合う・喜ぶ・逆境を乗り越える）に流さない。この言葉でなければ選ばない様子にする。`;
-const LENS_SCHEMA = { type: "OBJECT", properties: { readable: { type: "BOOLEAN" }, kind: { type: "STRING", enum: ["sports", "person", "feeling", "situation", "relation", "metaphor", "sound"] }, reason: { type: "STRING" }, readings: { type: "ARRAY", items: { type: "OBJECT", properties: { name: { type: "STRING" }, feeling: { type: "STRING" }, scenes: { type: "ARRAY", items: { type: "STRING" } } }, required: ["name", "feeling", "scenes"] } } }, required: ["readable", "readings"] };
+- 読みは、勝利や歓喜一般（抱き合う・喜ぶ・逆境を乗り越える）に流さない。この言葉でなければ選ばない様子にする。
+- focus: その読みで画面の何を見るか（誰の顔か・プレーの前か最中か後か・ピッチの中か外か・どこにいる人か）を具体的に一文。
+- 定番の物語の言い回し（${STOCK.join("・")}）を name と feeling に使わない。`;
+const LENS_SCHEMA = { type: "OBJECT", properties: { readable: { type: "BOOLEAN" }, kind: { type: "STRING", enum: ["sports", "person", "feeling", "situation", "relation", "metaphor", "sound"] }, reason: { type: "STRING" }, readings: { type: "ARRAY", items: { type: "OBJECT", properties: { name: { type: "STRING" }, feeling: { type: "STRING" }, focus: { type: "STRING" }, scenes: { type: "ARRAY", items: { type: "STRING" } } }, required: ["name", "feeling", "focus", "scenes"] } } }, required: ["readable", "readings"] };
 
 // ---- 3) 判定 ----
 const JUDGE_SYS = (w, R) => `観る人が「${w}」と言いました。この言葉を次のように受け取りました:
-${R.map((r, k) => `r${k}「${r.name}」: ${r.feeling}`).join("\n")}
+${R.map((r, k) => `r${k}「${r.name}」: ${r.feeling}（見るところ: ${r.focus || "—"}）`).join("\n")}
 候補の瞬間それぞれについて判定します。各候補には時刻つきの出来事（または映像の無い瞬間の説明）があります。
 - reading: どの読みにいちばん答えるか（r0〜）。どれにも答えなければ none。
 - fit: 0=合わない 1=こじつけ 2=合う 3=強く合う。字面だけの一致は1以下。半分以上を0〜1にしてよい。迷ったら下げる。
@@ -116,8 +124,11 @@ const sportOf = (no) => info(no).group || info(no).sport || "";
 
 const result = {};
 for (const w of words) {
-  const T = {}; let t0 = Date.now();
-  let lens = await ask(LENS_SYS, `言葉: 「${w}」`, LENS_SCHEMA, 0.5);
+  const T = {}; let t0 = Date.now(); alt = false;
+  let lens = await ask(LENS_SYS, `言葉: 「${w}」`, LENS_SCHEMA, 0.2);
+  // e) 定番の物語に流れた読みは書き直させる
+  const stock = (lens.readings || []).filter((r) => STOCK.some((x) => (r.name + r.feeling).includes(x)));
+  if (lens.readable && stock.length) { lens = await ask(LENS_SYS, `言葉: 「${w}」\n前回の読みは定番の物語に流れていました（${stock.map((r) => r.name + "：" + r.feeling).join(" / ")}）。この言葉でなければ見ない具体（誰の顔・どの瞬間）で読み直してください。`, LENS_SCHEMA, 0.2); T.restock = true; }
   // b) 場面に言葉の字面が入っていたら書き直させる（比喩を字面で読んでいる）
   const lit = (lens.readings || []).flatMap((r) => r.scenes).filter((x) => [...w.replace(/[ぁ-んー\s]/g, "")].some((ch) => /[一-龥ァ-ヶ]/.test(ch) && x.includes(ch)));
   if (lens.readable && lens.kind === "metaphor" && lit.length) {
@@ -146,15 +157,30 @@ for (const w of words) {
   };
   t0 = Date.now();
   const RIDS = [...R.map((_, k) => "r" + k), "none"];
-  const J = await ask(JUDGE_SYS(w, R), C.map(block).join("\n"), { type: "OBJECT", properties: {
+  const J = await askT(0.2, JUDGE_SYS(w, R), C.map(block).join("\n"), { type: "OBJECT", properties: {
     judge: { type: "ARRAY", items: { type: "OBJECT", properties: { no: { type: "STRING" }, reading: { type: "STRING", enum: RIDS }, fit: { type: "INTEGER" }, t: { type: "STRING" }, seen: { type: "STRING" }, echo: { type: "STRING" } }, required: ["no", "reading", "fit", "t", "seen", "echo"] } },
     threads: { type: "ARRAY", items: { type: "OBJECT", properties: { a: { type: "STRING" }, b: { type: "STRING" }, line: { type: "STRING" } }, required: ["a", "b", "line"] } } }, required: ["judge", "threads"] });
   T.judge = Date.now() - t0;
   const norm = (n) => String(n).replace(/^No\.?/, "").padStart(3, "0");
   J.judge.forEach((j) => { j.no = norm(j.no); j.line = `${j.seen} — ${j.echo}`; if (j.t && !MAT[j.no]?.beats.some((b) => b.t === j.t)) j.tBad = true; });
   J.threads.forEach((x) => { x.a = norm(x.a); x.b = norm(x.b); });
-  const sel = J.judge.filter((j) => j.fit >= 2 && j.reading !== "none" && cand.has(j.no));
+  // 1語の中で1つの瞬間は1つの束だけ（判定が同じ瞬間を複数の読みで返すことがある。最も fit の高いもの）
+  const bestOf = new Map(); for (const j of J.judge) if (j.fit >= 2 && j.reading !== "none" && cand.has(j.no) && (!bestOf.has(j.no) || j.fit > bestOf.get(j.no).fit)) bestOf.set(j.no, j);
+  const sel = [...bestOf.values()];
   const bundles = R.map((r, k) => ({ ...r, members: sel.filter((j) => j.reading === "r" + k).sort((a, b) => b.fit - a.fit || (cand.get(b.no).s - cand.get(a.no).s)).slice(0, 6) })).filter((b) => b.members.length >= 2);
+  // f) 型になった一文だけ書き直す
+  const mem = bundles.flatMap((b) => b.members), grams = new Map();
+  mem.forEach((j) => { const seen = new Set(); for (let k = 0; k + 7 <= j.echo.length; k++) { const g = j.echo.slice(k, k + 7); if (seen.has(g)) continue; seen.add(g); grams.set(g, (grams.get(g) || 0) + 1); } });
+  const rep7 = [...grams.entries()].filter(([, n]) => n >= 3).map(([g]) => g);
+  if (rep7.length) {
+    const t1 = Date.now();
+    const RW = await askT(0.3, `観る人の言葉「${w}」から見た一文を書き直します。各行の seen（その一秒に見えるもの）を受けて、その一秒がこの言葉の何に答えるかを15〜30字で。
+行どうしで同じ言い回しを使わない（今は「${rep7.slice(0, 4).join("」「")}」が繰り返されている）。seen の具体（誰・何をしている）を必ず受ける。「${w}」をそのまま繰り返さない。`,
+      mem.map((j, k) => `${k}. ${info(j.no).title} [${j.t || "—"}] seen: ${j.seen} / 今の一文: ${j.echo}`).join("\n"),
+      { type: "OBJECT", properties: { lines: { type: "ARRAY", items: { type: "OBJECT", properties: { k: { type: "INTEGER" }, echo: { type: "STRING" } }, required: ["k", "echo"] } } }, required: ["lines"] });
+    for (const l of RW.lines || []) if (mem[l.k]) { mem[l.k].echo = l.echo; mem[l.k].line = `${mem[l.k].seen} — ${l.echo}`; }
+    T.rewrite = Date.now() - t1;
+  }
   const picked = Object.fromEntries(bundles.flatMap((b) => b.members.map((j) => [j.no, j.t])));
   result[w] = { readable: true, kind: lens.kind, lens, T, candidates: C.length, judge: J.judge, bundles, threads: J.threads.filter((x) => picked[x.a] !== undefined && picked[x.b] !== undefined), picked };
   const sports = new Set(Object.keys(picked).map(sportOf));
@@ -167,7 +193,7 @@ for (const w of words) {
 const ws = Object.keys(result).filter((w) => result[w].readable);
 const verdict = {};
 for (const w of ws) {
-  const r = result[w], nos = Object.keys(r.picked), lines = r.bundles.flatMap((b) => b.members.map((j) => j.line));
+  const r = result[w], nos = Object.keys(r.picked), lines = r.bundles.flatMap((b) => b.members.map((j) => j.echo || j.line));
   // K5: 7字以上の連続一致が3本以上に出る言い回し
   const grams = new Map(); lines.forEach((l, i) => { const seen = new Set(); for (let k = 0; k + 7 <= l.length; k++) { const g = l.slice(k, k + 7); if (seen.has(g)) continue; seen.add(g); grams.set(g, (grams.get(g) || 0) + 1); } });
   const rep = [...grams.entries()].filter(([, n]) => n >= 3).map(([g]) => g);

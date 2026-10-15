@@ -14,7 +14,7 @@ async function generate(model, body, loc = 'global') {
 async function json(system, user, opts = {}) {
   const j = await generate(opts.model || TEXT_MODEL, {
     systemInstruction: { parts: [{ text: system }] },
-    contents: [{ role: 'user', parts: [{ text: user }] }],
+    contents: [{ role: 'user', parts: Array.isArray(user) ? user : [{ text: user }] }], // user は文字列か parts の配列（画像を渡すとき）
     generationConfig: { responseMimeType: 'application/json', temperature: opts.temperature ?? 0.7, ...(opts.schema ? { responseSchema: opts.schema } : {}), ...(opts.thinkingBudget !== undefined ? { thinkingConfig: { thinkingBudget: opts.thinkingBudget } } : {}) },
   });
   const text = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
