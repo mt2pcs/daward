@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { SITE } from "@/lib/site/flags";
 import Grid from "@/components/vote/Grid";
-import LogoBurst from "@/components/site/LogoBurst";
 import { MOMENTS, media, phase, VOTE_END, fmtMD } from "@/lib/vote/data";
 import { votedToday } from "@/lib/vote/store";
 
@@ -17,8 +16,6 @@ export default function MomentsTop() {
       {ph === "closed" && <div className="v26-banner">投票受付は終了しました。結果は <b>12/21 TOYOTA ARENA TOKYO</b> の授賞式で発表 <Link href="/#event">授賞式について →</Link></div>}
       {v.voted && ph === "open" && <div className="v26-banner">本日は <b>No.{v.no}</b> に投票済みです。明日また投票できます</div>}
       <section className="v26-kv">
-        {/* 支給ロゴ（DAZN AWARDS 2026）の破片を、DAZN フレームの位置に 100 MOMENTS のロゴを据えて描く */}
-        <LogoBurst img=".v26-kv .logo img" src="/brand/awards2026_logo.webp" mode="frame" clip=".v26-kv .lead" />
         <div className="in">
           <h1 className="logo"><img src="/brand/100moments_stack.webp" alt="DAZN 100 MOMENTS" width={2000} height={1640} /></h1>
           <p className="lead">2026年、心が震えた100の瞬間</p>

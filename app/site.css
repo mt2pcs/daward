@@ -196,5 +196,5 @@
 .is-copy{margin-top:26px;font:500 12px/1 var(--num);letter-spacing:.14em;color:var(--dim)}
 
 /* KV: 支給ロゴの破片そのものを動かす（LogoBurst） */
-.is-logo-gl{position:absolute;inset:0;width:100%;height:100%;display:block}
+.is-space,.is-logo-gl{position:absolute;inset:0;width:100%;height:100%;display:block}
 .is-kv.gl-on .is-kv-logo{opacity:0}

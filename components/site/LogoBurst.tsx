@@ -6,10 +6,11 @@ import { useEffect, useRef } from "react";
 // 動き: 読み込みでフレームの裏から破片が伸びて開く（角度ごとに少しずらす）→ 拍動が円周を回る（歓声の波）→ カーソルの方向の破片が伸びる
 // → スクロールで外へ広がりながら消える。WebGL が無い・動きを減らす設定のときは <img> のまま（静止ロゴ）。
 // 座標はロゴ画像の画素（下の数値は支給画像を計測した値）。
-const LOGO = { w: 1214, h: 2000 };
-const C = [606, 611]; // DAZN フレームの中心
+// ロゴの外は透明に描き、後ろの空間（SpaceStream）が見えるようにする。
+export const LOGO = { w: 1214, h: 2000 };
+export const C = [606, 611]; // DAZN フレームの中心
 const FRAME = [411, 416, 801, 806]; // フレーム（白枠）の外接矩形 x0,y0,x1,y1
-const BURST = [194, 113, 1020, 1109]; // 炸裂の範囲
+export const BURST = [194, 113, 1020, 1109]; // 炸裂の範囲
 const WORD_Y = 1062; // これより下はワードマーク（DAZN AWARDS 2026）
 
 const VERT = `#version 300 es
@@ -20,7 +21,7 @@ precision highp float;
 uniform sampler2D uTex;
 uniform vec2 uRes;      // キャンバスの画素
 uniform vec4 uLogo;     // ロゴ画像の位置（キャンバス画素）x, y, 縮尺(画素/ロゴ画素), 0
-uniform float uT, uScroll, uPtrA, uPtrK, uStill, uHollow, uClipY;
+uniform float uT, uScroll, uPtrA, uPtrK, uStill;
 out vec4 o;
 const vec2 C = vec2(${C[0]}.0, ${C[1]}.0);
 const vec4 FR = vec4(${FRAME.join(".0, ")}.0);
@@ -48,28 +49,29 @@ void main(){
   // スクロールで外へ広がる
   s *= 1.0 + 2.6 * pow(uScroll, 1.3);
   vec3 col = vec3(0.0);
+  float a = -1.0;
   vec4 FRx = FR + vec4(-5.0, -5.0, 5.0, 5.0); // 白枠の縁のにじみ
-  if (inR(P, uHollow > 0.5 ? FRx : FR)) {
-    col = uHollow > 0.5 ? vec3(0.0) : tx(P).rgb;
+  if (inR(P, FR)) {
+    col = tx(P).rgb; a = 1.0; // フレームの中は黒のまま不透明
   } else {
     vec2 Q = C + d / s;
     if (inR(Q, BU) && !inR(Q, FRx)) {
       vec3 b = tx(Q).rgb;
       if (Q.y < float(${WORD_Y}) || sat(b) > 0.15) col = b * smoothstep(0.0, 0.06, k) * (1.0 - smoothstep(0.45, 1.0, uScroll));
     }
-    if (uHollow < 0.5 && P.y > float(${WORD_Y})) { vec3 w = tx(P).rgb; if (sat(w) < 0.12) col = max(col, w); }
+    if (P.y > float(${WORD_Y})) { vec3 w = tx(P).rgb; if (sat(w) < 0.12) col = max(col, w); }
   }
-  if (f.y > uClipY) col = vec3(0.0); // 下の文字の帯で水平に切る（ロゴの炸裂がワードマークで切れているのと同じ）
-  o = vec4(col, 1.0);
+  // ロゴは黒地の上の色なので、そのまま乗算済みの色として扱い、黒い所だけ透かす
+  if (a < 0.0) a = max(max(col.r, col.g), col.b);
+  o = vec4(col, a);
 }`;
 
-// mode="frame": ロゴのフレームの位置に別の要素（img）を据え、破片だけを描く（フレームの中は黒）。clip の要素の上端より下は描かない。
-export default function LogoBurst({ img, src, mode = "logo", clip }: { img: string; src: string; mode?: "logo" | "frame"; clip?: string }) {
+export default function LogoBurst({ img, src }: { img: string; src: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current!;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const gl = cv.getContext("webgl2", { antialias: false, premultipliedAlpha: false });
+    const gl = cv.getContext("webgl2", { antialias: false, premultipliedAlpha: true, alpha: true });
     if (!gl) return;
     const sh = (type: number, s: string) => { const x = gl.createShader(type)!; gl.shaderSource(x, s); gl.compileShader(x); if (!gl.getShaderParameter(x, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(x) || "shader"); return x; };
     let prog: WebGLProgram;
@@ -82,7 +84,7 @@ export default function LogoBurst({ img, src, mode = "logo", clip }: { img: stri
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, "aPos"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
     const U = (n: string) => gl.getUniformLocation(prog, n);
-    const uRes = U("uRes"), uLogo = U("uLogo"), uT = U("uT"), uScroll = U("uScroll"), uPtrA = U("uPtrA"), uPtrK = U("uPtrK"), uStill = U("uStill"), uHollow = U("uHollow"), uClipY = U("uClipY");
+    const uRes = U("uRes"), uLogo = U("uLogo"), uT = U("uT"), uScroll = U("uScroll"), uPtrA = U("uPtrA"), uPtrK = U("uPtrK"), uStill = U("uStill");
 
     let raf = 0, t0 = 0, ready = false, dead = false;
     let ptrA = 0, ptrK = 0, ptrTarget = 0, ptrX = 0, ptrY = 0, last = 0;
@@ -116,26 +118,23 @@ export default function LogoBurst({ img, src, mode = "logo", clip }: { img: stri
       const W = Math.round(rc.width * dpr), H = Math.round(rc.height * dpr);
       if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
       const lr = logo.getBoundingClientRect();
-      let scale: number, cx: number, cy: number;
-      if (mode === "frame") { cx = lr.left + lr.width / 2; cy = lr.top + lr.height / 2; scale = (Math.max(lr.width, lr.height) * 1.04 * dpr) / (FRAME[2] - FRAME[0]); }
-      else { scale = (lr.height * dpr) / LOGO.h; cx = lr.left + (C[0] / LOGO.w) * lr.width; cy = lr.top + (C[1] / LOGO.h) * lr.height; }
+      const scale = (lr.height * dpr) / LOGO.h;
+      const cx = lr.left + (C[0] / LOGO.w) * lr.width, cy = lr.top + (C[1] / LOGO.h) * lr.height;
       const lx = (cx - rc.left) * dpr - C[0] * scale, ly = (cy - rc.top) * dpr - C[1] * scale;
-      const ce = clip ? document.querySelector(clip) : null;
-      const clipY = ce ? (ce.getBoundingClientRect().top - rc.top - 8) * dpr : 1e9;
       // カーソル: フレーム中心からの角度。KV の中にあるときだけ効く
       const inside = ptrY >= rc.top && ptrY <= rc.bottom;
       const tgtA = Math.atan2(ptrY - cy, ptrX - cx);
       let dA = tgtA - ptrA; dA = Math.atan2(Math.sin(dA), Math.cos(dA)); ptrA += dA * (1 - Math.exp(-dt / 0.25));
       ptrK += ((reduce ? 0 : ptrTarget * (inside ? 1 : 0)) - ptrK) * (1 - Math.exp(-dt / 0.6));
       const scroll = Math.min(1, Math.max(0, -rc.top / Math.max(1, rc.height * 0.7)));
-      gl.viewport(0, 0, W, H);
+      gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.uniform2f(uRes, W, H); gl.uniform4f(uLogo, lx, ly, scale, 0);
-      gl.uniform1f(uT, t); gl.uniform1f(uScroll, reduce ? 0 : scroll); gl.uniform1f(uPtrA, ptrA); gl.uniform1f(uPtrK, ptrK); gl.uniform1f(uStill, reduce ? 1 : 0); gl.uniform1f(uHollow, mode === "frame" ? 1 : 0); gl.uniform1f(uClipY, clipY);
+      gl.uniform1f(uT, t); gl.uniform1f(uScroll, reduce ? 0 : scroll); gl.uniform1f(uPtrA, ptrA); gl.uniform1f(uPtrK, ptrK); gl.uniform1f(uStill, reduce ? 1 : 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       if (!host.classList.contains("gl-on")) host.classList.add("gl-on");
     };
     (window as any).__logoBurst = { ready: () => ready };
     return () => { dead = true; cancelAnimationFrame(raf); removeEventListener("pointermove", onMove); document.removeEventListener("pointerleave", onLeave); };
-  }, [img, src, mode, clip]);
+  }, [img, src]);
   return <canvas ref={ref} className="is-logo-gl" aria-hidden />;
 }
