@@ -26,9 +26,15 @@ const toMoment = (m: ExpMoment, i: number, heat: number): MomentWithStats => ({
   id: m.no, index: i + 1, youtubeId: "", title: m.title, sport: m.sportLabel, event: m.sportLabel, year: 2026,
   description: "", emotions: ["歓喜"], votes: Math.round(20 + heat * 80), commentCount: 0, thumbUrl: m.thumb || undefined,
 });
+// 炸裂の帯に出す見出し: 一目で読める長さにする。「ベテラン引退、最後の雄姿」→「ベテラン引退」（前半だけで中身の値を言っている）。
+// 前半が短すぎる・腕どうしで重なるなら元のまま。全文はフォーカス時の見出しに出す
+const headlines = (names: string[]) => {
+  const s = names.map((n) => { const p = n.split(/[、，,]/)[0].trim(); return Array.from(p).length >= 3 ? p : n; });
+  return new Set(s).size === s.length ? s : names;
+};
 const toArms = (c: Cut): Interpretation => ({
   text: c.status === "default" ? "" : c.q, theme: c.q.slice(0, 4), primary: "歓喜", vec: new Array(8).fill(0.5),
-  arms: c.arms.map((a, i) => ({ name: a.name, color: COLORS[i % COLORS.length], ids: a.moments.map((m) => m.no) })),
+  arms: headlines(c.arms.map((a) => a.name)).map((name, i) => ({ name, color: COLORS[i % COLORS.length], ids: c.arms[i].moments.map((m) => m.no) })),
   scores: Object.fromEntries(c.arms.flatMap((a) => a.moments.map((m) => [m.no, m.s]))), next: c.next, source: "llm",
 });
 // 入力欄の上の一行: どの言葉で読んだか、いくつの切り口・瞬間・競技になったか
@@ -53,7 +59,8 @@ export default function ExperienceApp({ moments: raw }: { moments: ExpMoment[] }
   const [cut, setCut] = useState<Cut | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null); // 読めなかった・弾いた時の一言（腕は変えない）
-  const [reveal, setReveal] = useState<{ q: string; line: string } | null>(null);
+  const [reveal, setReveal] = useState<{ q: string; line: string; out?: boolean } | null>(null);
+  const revealTimer = useRef<ReturnType<typeof setTimeout>[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [tour, setTour] = useState<TourState | null>(null);
@@ -85,8 +92,12 @@ export default function ExperienceApp({ moments: raw }: { moments: ExpMoment[] }
       await new Promise((res) => setTimeout(res, wait));
       if (r.status === "unreadable" || r.status === "refused") { setNote(r.message); return; }
       setCut(r); setText("");
-      setReveal({ q: v, line: r.status === "metaphor" || r.status === "nearest" ? (r.message || "") : readLine(r, byNo).split(" — ")[0] });
-      setTimeout(() => setReveal(null), 2600);
+      setReveal({ q: v, line: (r.status === "metaphor" || r.status === "nearest" ? r.message || "" : readLine(r, byNo).split(" — ")[0]).replace(`「${r.q}」を`, "").replace(`「${v}」を`, "") });
+      // 炸裂側の演出（ラベルが中央に立つ 2.6 秒 → 新しい腕へ放たれる）が終わるまで出し、ゆっくり消す。
+      // 立ち上がりはアニメーションにしない（フレームが落ちる端末で最初の数百msが透明のまま残るため）
+      if (revealTimer.current) revealTimer.current.forEach(clearTimeout);
+      const hold = +(new URLSearchParams(location.search).get("revealms") || 2600) + 1000; // 炸裂側の REVEAL_MS に合わせる
+      revealTimer.current = [setTimeout(() => setReveal((r) => (r ? { ...r, out: true } : r)), hold), setTimeout(() => setReveal(null), hold + 800)];
       getCrowd().swell(0.7);
     } catch { setNote("いま組み替えられませんでした。もう一度投げてください"); }
     finally { setPending(null); }
@@ -116,7 +127,7 @@ export default function ExperienceApp({ moments: raw }: { moments: ExpMoment[] }
       )}
       {/* 組み替えの瞬間: 投げた言葉と、どう読んだか */}
       {reveal && (
-        <div className="exp-reveal" key={reveal.q}>
+        <div className={`exp-reveal${reveal.out ? " out" : ""}`} key={reveal.q}>
           <div className="q">「{reveal.q}」</div>
           {reveal.line && <div className="line"><span>{reveal.line}</span></div>}
         </div>
@@ -134,14 +145,15 @@ export default function ExperienceApp({ moments: raw }: { moments: ExpMoment[] }
       {tour && (
         <div className="exp-tour">
           <button onClick={() => api.current?.tourPrev()} aria-label="前へ">‹</button>
-          <div><b>{tour.armName}</b> {tour.index + 1}/{tour.total} — {tour.moment.title}</div>
+          <div className="t"><b>{tour.armName}</b><span>{tour.index + 1}/{tour.total}</span><em>{tour.moment.title}</em></div>
           <a href={`/moments/${tour.moment.id}`}>観る</a>
           <button onClick={() => api.current?.tourNext()} aria-label="次へ">›</button>
           <button className="end" onClick={() => api.current?.endTour()}>終える</button>
         </div>
       )}
       {viewDirty && !tour && !selected && phase === "space" && <button className="view-reset" onClick={() => api.current?.resetView()}>⟲ 視点を戻す</button>}
-      {/* 言葉を投げる */}
+      {/* 言葉を投げる（手前に流れてくるカードの上でも読めるよう、下端だけ暗く敷く） */}
+      {phase === "space" && <div className="exp-shade" />}
       {phase === "space" && (
         <div className={`exp-bar${pending ? " busy" : ""}`}>
           <div className="read">{note ? <span className="note">{note}</span> : pending ? `「${pending}」を読んでいます…` : line}</div>
@@ -153,7 +165,7 @@ export default function ExperienceApp({ moments: raw }: { moments: ExpMoment[] }
         </div>
       )}
       {phase === "entry" || leaving ? <Entrance leaving={leaving} onEnter={enter} visual="burst" /> : null}
-      <div className="rev-tag">rev cut1</div>
+      <div className="rev-tag">rev cut2</div>
     </div>
   );
 }

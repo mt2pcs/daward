@@ -208,19 +208,20 @@ const SYN_OF: Record<string, string[]> = {}; for (const a of LEX.axes) for (cons
 const grounded = (name: string, keys: string[]) => keys.some((k) => (SYN_OF[k] || [k]).some((w) => name.includes(w)));
 const POETIC = /夜空|閃光|希望|予感|胎動|風|雨|虹|月|光|輝|軌跡|華|舞|囁|煌|彩|響|宿命|運命|物語|ドラマ|伝説|奇跡|魂|鼓動|旋律|咆哮|頂|翼|星|空|夢/;
 const NCACHE = new Map<string, string[]>();
-async function nameArms(q: string, arms: { keys: string[]; byName?: boolean; moments: CutMoment[] }[]): Promise<{ names: string[]; source: "llm" | "template" }> {
-  const tmpl = arms.map((a) => (a.byName ? `${q}の瞬間` : template(a.keys)));
+async function nameArms(q: string, arms: { keys: string[]; byName?: boolean; moments: CutMoment[] }[], person = ""): Promise<{ names: string[]; source: "llm" | "template" }> {
+  // 人名で束ねた腕は、その名前そのもの（入力文をそのまま見出しにすると長文がラベルになる）
+  const tmpl = arms.map((a) => (a.byName ? person || q : template(a.keys)));
   const key = q + "::" + arms.map((a) => a.keys.join("+")).join("/");
   if (NCACHE.has(key)) return { names: NCACHE.get(key)!, source: "llm" };
   if (!gcpAvailable()) return { names: tmpl, source: "template" };
   const sys = `スポーツ誌の見出しを付ける編集者です。観る人が投げた言葉で組んだハイライトの束（腕）に、短い見出しを付けます。
 - 見出しは中身を言う。各腕の「中身の値」の言葉（またはその言い換え）を必ず含める。例: 中身=ベテラン×引退 →「ベテラン、最後の打席」「引退の日の一振り」
-- 4〜12文字。スポーツ新聞・実況が使う、具体的で強い言葉。投げた言葉の口調は受けてよい。
+- 4〜8文字（炸裂の帯に一目で読める長さ）。読点で二つに分けない。スポーツ新聞・実況が使う、具体的で強い言葉。投げた言葉の口調は受けてよい。
 - 禁止: 詩的・抽象的な比喩（空・光・風・雨・夢・奇跡・魂・物語・運命 など）、人名・チーム名・大会名・数字、腕どうしの重複。`;
   const user = (q ? `言葉: 「${q}」\n` : "（言葉には触れず、中身だけで見出しを付ける）\n") + arms.map((a, i) => `腕${i + 1}: 中身の値=${a.keys.join("×")} / 例=${a.moments.slice(0, 3).map((m) => MOM.find((x) => x.no === m.no)!.title).join("、")}`).join("\n");
   try {
     const r = await vertexChain(sys, user, { type: "OBJECT", properties: { names: { type: "ARRAY", items: { type: "STRING" } } }, required: ["names"] }, 3000);
-    const bad = (n: string, keys: string[]) => n.length < 3 || n.length > 14 || /\d/.test(n) || POETIC.test(n) || !grounded(n, keys) || NAMES.some((x) => x.name.length >= 2 && n.includes(x.name));
+    const bad = (n: string, keys: string[]) => n.length < 3 || n.length > 11 || /\d/.test(n) || POETIC.test(n) || !grounded(n, keys) || NAMES.some((x) => x.name.length >= 2 && n.includes(x.name));
     const names = arms.map((a, i) => { if (a.byName) return tmpl[i]; const n = String(r.names?.[i] || "").trim(); return !n || bad(n, a.keys) ? tmpl[i] : n; });
     if (new Set(names).size !== names.length) return { names: tmpl, source: "template" };
     NCACHE.set(key, names); return { names, source: "llm" };
@@ -291,7 +292,7 @@ export async function resolve(raw: string): Promise<Cut> {
     }
   }
   const armsRaw = buildArms(cands, read);
-  const nm = await nameArms(status === "nearest" ? "" : q, armsRaw);
+  const nm = await nameArms(status === "nearest" ? "" : q, armsRaw, read.names[0]?.name || "");
   const cut = done({ status, message, read, source, arms: armsRaw.map((a, i) => ({ name: nm.names[i], nameSource: nm.source, ...a })), threads: threads(armsRaw), next: nextWords(armsRaw, read) });
   CCACHE.set(q, cut);
   return cut;

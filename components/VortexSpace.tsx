@@ -261,6 +261,15 @@ function drawCard(c: HTMLCanvasElement, m: MomentWithStats, img: HTMLImageElemen
     g.addColorStop(1, "#0d0d11");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
+    if (noTitle) {
+      // 映像の無い瞬間（炸裂）: 大きな番号を腕の色で。タイトルは下に出す
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.9;
+      ctx.font = "700 150px 'Oswald', 'Helvetica Neue', sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.fillText(m.id, 18, H * 0.4);
+      ctx.globalAlpha = 1;
+    }
   }
   const shade = ctx.createLinearGradient(0, H * 0.45, 0, H);
   shade.addColorStop(0, "rgba(0,0,0,0)");
@@ -274,7 +283,7 @@ function drawCard(c: HTMLCanvasElement, m: MomentWithStats, img: HTMLImageElemen
   ctx.shadowBlur = 8;
   let title = m.title;
   while (ctx.measureText(title).width > W - 32 && title.length > 2) title = title.slice(0, -2) + "…";
-  if (!noTitle) ctx.fillText(title, 16, H - 14);
+  if (!noTitle || !(img && img.naturalWidth)) ctx.fillText(title, 16, H - 14);
   ctx.shadowBlur = 0;
   ctx.restore();
   ctx.strokeStyle = color;
@@ -287,7 +296,11 @@ function makeLabelTexture(text: string, color: string, count: number): THREE.Can
   const c = document.createElement("canvas");
   c.width = 1024; c.height = 320;
   const ctx = c.getContext("2d")!;
-  ctx.font = "900 112px 'Helvetica Neue', 'Hiragino Sans', 'Noto Sans JP', sans-serif";
+  // 長い名前は文字を縮めて帯の中に収める（はみ出すと帯の外に黒い字が出る）
+  let fs = 112;
+  ctx.font = `900 ${fs}px 'Helvetica Neue', 'Hiragino Sans', 'Noto Sans JP', sans-serif`;
+  const raw = ctx.measureText(text).width;
+  if (raw > 800) { fs = Math.max(54, Math.floor((fs * 800) / raw)); ctx.font = `900 ${fs}px 'Helvetica Neue', 'Hiragino Sans', 'Noto Sans JP', sans-serif`; }
   const tw = Math.min(880, ctx.measureText(text).width + 90);
   const x0 = 512 - tw / 2;
   ctx.save();
@@ -324,6 +337,7 @@ function makeLabelTexture(text: string, color: string, count: number): THREE.Can
   ctx.fillText(`${count} MOMENTS  ▶`, x0 + tw + 8, 268);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  t.userData = { frac: (tw + 40) / 1024 }; // 板の幅のうち帯が占める割合（画面内に収める計算に使う）
   return t;
 }
 function makeWordTexture(text: string): THREE.CanvasTexture {
@@ -798,6 +812,7 @@ export default function VortexSpace({
       return { g, path, glow, tp, alpha: 0 };
     });
     const pa = new THREE.Vector3(), pb = new THREE.Vector3();
+    const lp = new THREE.Vector3(), lq = new THREE.Vector3(), camRight = new THREE.Vector3();
 
 
     // ---- ラベル（腕の名前。流れに沿って傾く板）----
@@ -829,8 +844,13 @@ export default function VortexSpace({
     let camFree = true;
     let currentArms: Interpretation | null = null;
     let homeZ = 30;
-    const HOME_Y = -24;
-    const LOOK_Y = 14;
+    // 炸裂は軸の上から消失点（DAZNフレーム）を正面に見る＝放射が左右上下に対称に広がる（参照: docs/ref/exp_pc_cut.jpg）。
+    // 渦は漏斗の内側・下の壁寄りから目を見上げる
+    const HOME_Y = burstMode ? -3 : -24;
+    const LOOK_Y = burstMode ? 2 : 14;
+    // 炸裂で腕のカードを置く帯（画面に見える深さ）。縦画面は左右が狭いので奥寄り
+    const bandLo = () => (portrait() ? 0.24 : 0.12), bandHi = () => (portrait() ? 0.78 : 0.62);
+    const flyDist = (c: Card) => c.size * (burstMode ? (portrait() ? 2.2 : 2.3) : portrait() ? 1.25 : 1.0);
     camera.position.set(0, 4, 96);
 
     const tmp = new THREE.Vector3(), tmp2 = new THREE.Vector3(), tmp3 = new THREE.Vector3();
@@ -855,10 +875,11 @@ export default function VortexSpace({
     };
 
     // ---- 腕の割当 ----
-    const REVEAL_MS = 2600;
+    const REVEAL_MS = +(params.get("revealms") || 2600); // 検証で引き伸ばせる（?revealms=20000）
     let releaseTimer: ReturnType<typeof setTimeout> | null = null;
     const applyArms = (a: Interpretation | null, dramatic: boolean) => {
       currentArms = a;
+      armsSincePending = true;
       if (releaseTimer) { clearTimeout(releaseTimer); releaseTimer = null; }
       endTour();
       const maxVotes = Math.max(1, ...st.momentsRef.map((m) => m.votes));
@@ -883,7 +904,9 @@ export default function VortexSpace({
             const c = cards.get(id);
             if (!c) return;
             inArm.add(id);
-            const s = 0.04 + 0.72 * Math.min(1, (k + 0.5) / Math.max(n, 7)); // 目の奥には置かない（山にならない）
+            const s = burstMode
+              ? bandLo() + (bandHi() - bandLo()) * ((k + 0.5) / Math.max(n, 4)) // 炸裂: 画面に見える帯に並べる
+              : 0.04 + 0.72 * Math.min(1, (k + 0.5) / Math.max(n, 7)); // 目の奥には置かない（山にならない）
             const sc = a.text ? 0.55 + 0.65 * (a.scores[id] ?? 0.5) : 0.75 + 0.45 * votesOf(id);
             const ro = 2 + (hash(id, 5) - 0.5) * 8;
             c.tdim = 1;
@@ -979,8 +1002,16 @@ export default function VortexSpace({
     };
     st.setPhase = setPhase;
 
+    let armsSincePending = false;
     const setPending = (text: string | null) => {
+      const was = pendingNow;
       pendingNow = text;
+      if (text) armsSincePending = false;
+      if (!text && was !== null && !armsSincePending) {
+        // 読めなかった・弾いた: 腕は変わらない。言葉を消し、吸い込んだ映像を元の腕へ戻す
+        wordTarget = 0;
+        applyArms(currentArms, false);
+      }
       if (text) {
         if (wordMesh) { scene.remove(wordMesh); (wordMesh.material as THREE.MeshBasicMaterial).map?.dispose(); }
         const wm = new THREE.MeshBasicMaterial({ map: makeWordTexture(text), transparent: true, depthWrite: false, opacity: 0 });
@@ -1010,7 +1041,7 @@ export default function VortexSpace({
       flyingTo = c;
       const p = c.pos.clone();
       const dir = new THREE.Vector3().subVectors(camera.position, p).normalize();
-      const to = p.clone().add(dir.multiplyScalar(c.size * (portrait() ? 1.25 : 1.0)));
+      const to = p.clone().add(dir.multiplyScalar(flyDist(c)));
       camFree = false;
       flash(0.3);
       sfx.whoosh(1);
@@ -1133,13 +1164,14 @@ export default function VortexSpace({
     const pointer = new THREE.Vector2();
     let dragging = false, lastX = 0, lastY = 0, downX = 0;
     let rayTimer = 0;
+    let lastLabelDist = 0, lastCardDist = 0;
     const pick = (x: number, y: number): Card | null => {
       pointer.set((x / W()) * 2 - 1, -(y / H()) * 2 + 1);
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObjects(cardGroup.children, false);
       for (const h of hits) {
         const c = cards.get(h.object.userData.id as string);
-        if (c && c.dim > 0.35 && c.s > -0.05) return c;
+        if (c && c.dim > 0.35 && c.s > -0.05) { lastCardDist = h.distance; return c; }
       }
       return null;
     };
@@ -1157,12 +1189,20 @@ export default function VortexSpace({
         const v = l.pos.clone().project(camera);
         return { x: ((v.x + 1) / 2) * W(), y: ((1 - v.y) / 2) * H(), z: v.z };
       },
+      pickAt: (x: number, y: number) => ({ label: pickLabel(x, y), card: pick(x, y)?.id ?? null }),
+      // 検証用: 腕に入っているカードの画面上の位置と大きさ（px）
+      cardStats: () => cardList.filter((c) => c.inArm).map((c) => {
+        const v = c.pos.clone().project(camera);
+        const d = c.pos.distanceTo(camera.position);
+        const px = (c.size / (2 * d * Math.tan((camera.fov * Math.PI) / 360))) * H();
+        return { id: c.id, x: Math.round(((v.x + 1) / 2) * W()), y: Math.round(((1 - v.y) / 2) * H()), px: Math.round(px), on: v.z < 1 && Math.abs(v.x) < 1 && Math.abs(v.y) < 1, s: +c.s.toFixed(2), dim: +c.dim.toFixed(2), img: !!c.img };
+      }),
       bestCard: () => {
         let best: { x: number; y: number; id: string; a: number } | null = null;
         for (const c of Array.from(cards.values())) {
           if (c.dim < 0.5 || c.s < 0.02) continue;
           const v = c.pos.clone().project(camera);
-          if (v.z > 1 || Math.abs(v.x) > 0.8 || Math.abs(v.y) > 0.7) continue;
+          if (v.z > 1 || Math.abs(v.x) > 0.8 || v.y > 0.7 || v.y < -0.5) continue; // 下は入力欄
           const a = c.size / c.pos.distanceTo(camera.position);
           if (!best || a > best.a) best = { x: ((v.x + 1) / 2) * W(), y: ((1 - v.y) / 2) * H(), id: c.id, a };
         }
@@ -1193,7 +1233,14 @@ export default function VortexSpace({
       pointer.set((x / W()) * 2 - 1, -(y / H()) * 2 + 1);
       raycaster.setFromCamera(pointer, camera);
       const hits = raycaster.intersectObjects(labels.map((l) => l.mesh), false);
-      return hits.length ? (hits[0].object.userData.arm as number) : null;
+      // 板の透明な余白では拾わない（帯と「N MOMENTS」の範囲だけ）。余白が手前のカードのタップを奪っていた
+      for (const h of hits) {
+        const m = (h.object as THREE.Mesh).material as THREE.MeshBasicMaterial;
+        const frac = ((m.map?.userData as { frac?: number })?.frac ?? 0.9);
+        if (!h.uv || m.opacity < 0.3) continue;
+        if (Math.abs(h.uv.x - 0.5) <= frac / 2 + 0.02 && h.uv.y >= 0.1 && h.uv.y <= 0.74) { lastLabelDist = h.distance; return h.object.userData.arm as number; }
+      }
+      return null;
     };
     const onUp = (e: PointerEvent) => {
       const wasDrag = dragMoved > 6;
@@ -1213,9 +1260,10 @@ export default function VortexSpace({
         return;
       }
       if (flyingTo) return;
+      // 帯とカードが重なっていたら手前にある方（見えている方）を取る
       const la = pickLabel(e.clientX, e.clientY);
-      if (la !== null) { startTour(la); return; }
       const c = pick(e.clientX, e.clientY);
+      if (la !== null && (!c || lastLabelDist < lastCardDist)) { startTour(la); return; }
       if (c) flyTo(c, () => st.onSelect(c.m));
     };
     const onKey = (e: KeyboardEvent) => {
@@ -1392,7 +1440,7 @@ export default function VortexSpace({
         if (flyingTo) {
           camTween.lookTo.copy(flyingTo.pos);
           camDir.subVectors(camTween.from, flyingTo.pos).normalize();
-          camTween.to.copy(flyingTo.pos).add(camDir.multiplyScalar(flyingTo.size * (portrait() ? 1.25 : 1.0)));
+          camTween.to.copy(flyingTo.pos).add(camDir.multiplyScalar(flyDist(flyingTo)));
         }
         camera.position.lerpVectors(camTween.from, camTween.to, e);
         camLook.lerpVectors(camTween.lookFrom, camTween.lookTo, e);
@@ -1421,6 +1469,7 @@ export default function VortexSpace({
       }
       camera.lookAt(camLook);
       if (diving) camera.rotateZ(diveRoll);
+      camera.updateMatrixWorld(); // ラベルの画面内クランプと糸の投影はこのフレームの視点で（render 前なので自分で更新）
 
       // カード
       const cam = camera.position;
@@ -1429,7 +1478,11 @@ export default function VortexSpace({
       for (const c of cardList) {
         if (phaseNow === "space" && !diving && c.inArm && c !== flying && !tour) {
           c.ts -= dt * flow * 0.4;
-          if (c.ts < S_MIN) { c.ts += S_MAX - S_MIN; c.s = c.ts; c.size = 1; }
+          if (burstMode) {
+            // 炸裂: 帯の手前で抜けたら奥から出直す（画面の外へ流れ去って空になるのを防ぐ）。出入りはフェード
+            const lo = bandLo() - 0.08, hi = bandHi() + 0.14;
+            if (c.ts < lo) { c.ts += hi - lo; c.s = c.ts; c.size = 1; c.dim = 0; }
+          } else if (c.ts < S_MIN) { c.ts += S_MAX - S_MIN; c.s = c.ts; c.size = 1; }
         }
         const tauT = tourSet && tourSet.has(c.id) ? 0.55 : 1.0; // ツアーの腕はカメラと同じ速さでレーンへ
         c.base = damp(c.base, c.tbase, dt, tour ? 0.6 : 1.1);
@@ -1442,7 +1495,13 @@ export default function VortexSpace({
         posOf(c.base, c.s, c.ro, c.aj, spinAll, c.pos);
         c.pos.y += Math.sin(t * 0.8 + c.base * 3) * 0.5;
         c.mesh.position.copy(c.pos);
-        if (tourSet && tourSet.has(c.id)) {
+        if (burstMode && (c.inArm || c === flying)) {
+          // 炸裂: 腕のカードは正立してカメラを向き、放射の向きへ少しだけ振る（横倒し・逆さで番号や顔が読めなくならない）
+          const th = c.base + c.aj + spinAll;
+          c.mesh.up.set(-Math.cos(th) * 0.12, 1, 0);
+          c.mesh.lookAt(cam);
+          if (c !== flying) c.mesh.rotateY(Math.cos(th) * 0.32);
+        } else if (tourSet && tourSet.has(c.id)) {
           c.mesh.up.set(0, 1, 0);
           c.mesh.lookAt(cam); // ツアー中の腕は正立してカメラを向く（傾き・横倒しで読めなくならない）
         } else {
@@ -1454,7 +1513,7 @@ export default function VortexSpace({
         const inTourArm = tourSet ? tourSet.has(c.id) : true;
         const b = c.stage ? 1.2 : (0.3 + 0.7 * fog) * (c.inArm ? 1 : 0.7) * (tour ? (inTourArm ? 0.9 : 0.22) : 1);
         if (c.mat.color.r <= 1.2) c.mat.color.setScalar(b);
-        c.mat.opacity = c.dim;
+        c.mat.opacity = c.dim * (burstMode && c.inArm && !tour && phaseNow === "space" ? Math.max(0, Math.min(1, (c.s - (bandLo() - 0.08)) / 0.08)) : 1);
         c.mesh.visible = c.dim > 0.02;
       }
       for (const l of labels) {
@@ -1463,9 +1522,12 @@ export default function VortexSpace({
         if (l.centerAt >= 0) {
           // 登場: 画面中央に一枚ずつ、縦に並んで立つ
           const nL = labels.length;
-          tmp.set(0, (nL - 1) * 7.5 - l.centerAt * 15, -52).applyQuaternion(camera.quaternion).add(cam);
+          // 上に「投げた言葉」の帯（DOM）が出るので、段は詰めて少し下へ
+          // 段の間隔は本数で詰め、上の言葉の帯と下の入力欄の間（視野のほぼ中央の 1/2）に収める
+          const gap = burstMode ? Math.min(10.5, 33 / nL) : 15;
+          tmp.set(0, ((nL - 1) * gap) / 2 - l.centerAt * gap - (burstMode ? 2 : 0), -52).applyQuaternion(camera.quaternion).add(cam);
           l.pos.lerp(tmp, 1 - Math.exp(-dt / 0.25));
-          l.mesh.scale.setScalar(1.6);
+          l.mesh.scale.setScalar(burstMode ? Math.min(1.15, gap / 9) : 1.6);
         } else {
           posOf(l.base, l.s, -2, 0.3, spinAll, tmp);
           l.pos.lerp(tmp, 1 - Math.exp(-dt / 0.7));
@@ -1473,9 +1535,66 @@ export default function VortexSpace({
         }
         l.mesh.position.copy(l.pos);
         l.mesh.lookAt(cam); // ラベルは常に読める向き
-        const hide = phaseNow === "entry" || diving || (pendingNow !== null && l.centerAt < 0) || !born || (tour !== null && l.arm === tour.arm); // ツアー中の腕の名前は見出しに出す（壁の帯は手前に来て巨大化するので消す）
+        {
+          // 帯は画面幅の 42%（縦画面 80%）まで。カメラが寄ると帯だけ巨大化して画面を塞ぐのを防ぐ
+          const d = Math.max(1, lq.copy(l.pos).sub(cam).length());
+          const viewW = 2 * d * Math.tan((camera.fov * Math.PI) / 360) * camera.aspect;
+          const frac = ((l.mat.map?.userData as { frac?: number })?.frac ?? 0.8);
+          const maxS = (viewW * (portrait() ? 0.8 : 0.42)) / (32 * frac);
+          if (l.mesh.scale.x > maxS) l.mesh.scale.setScalar(maxS);
+        }
+        if (l.centerAt < 0) {
+          // 画面の端で切れないよう、帯の幅ぶん内側へ寄せる（下は入力欄、上はヘッダーを避ける）
+          lp.copy(l.pos).project(camera);
+          if (lp.z < 1) {
+            l.mesh.updateMatrixWorld();
+            camRight.setFromMatrixColumn(l.mesh.matrixWorld, 0).normalize();
+            const frac = ((l.mat.map?.userData as { frac?: number })?.frac ?? 0.8);
+            const hw = 16 * l.mesh.scale.x * frac;
+            const xa = lq.copy(l.pos).addScaledVector(camRight, hw).project(camera).x;
+            const xb = lq.copy(l.pos).addScaledVector(camRight, -hw).project(camera).x;
+            const lo = Math.min(xa, xb), hi = Math.max(xa, xb);
+            let nx = lp.x;
+            if (hi - lo > 1.9) nx = 0; else if (lo < -0.96) nx += -0.96 - lo; else if (hi > 0.96) nx -= hi - 0.96;
+            const yMin = portrait() ? -0.4 : -0.5, yMax = portrait() ? 0.78 : 0.76;
+            const ny = Math.max(yMin, Math.min(yMax, lp.y));
+            if (nx !== lp.x || ny !== lp.y) l.mesh.position.copy(lq.set(nx, ny, lp.z).unproject(camera));
+          }
+        }
+        const hide = phaseNow === "entry" || diving || (pendingNow !== null && l.centerAt < 0) || !born || (tour !== null && l.arm === tour.arm) || (burstMode && flyingTo !== null && l.centerAt < 0); // 炸裂: 1本に寄っている間は帯を消す（寄った視点では帯が画面上部に積み重なる） // ツアー中の腕の名前は見出しに出す（壁の帯は手前に来て巨大化するので消す）
         // ツアー中は他の腕のラベルを薄くする（主役から目が逸れない）
         l.mat.opacity = damp(l.mat.opacity, hide ? 0 : tour !== null ? 0.08 : 0.98, dt, hide ? 0.4 : 0.25);
+      }
+      if (burstMode && phaseNow === "space") {
+        // 帯どうしが画面上で重なったら上下に押し離す（縦画面は横幅が狭く、5本の帯が上部で重なりやすい）
+        const rs: { l: Label; x: number; y: number; z: number; hw: number; hh: number }[] = [];
+        for (const l of labels) {
+          if (l.centerAt >= 0 || l.mat.opacity < 0.05) continue;
+          lp.copy(l.mesh.position).project(camera);
+          if (lp.z >= 1) continue;
+          l.mesh.updateMatrixWorld();
+          const frac = ((l.mat.map?.userData as { frac?: number })?.frac ?? 0.8);
+          camRight.setFromMatrixColumn(l.mesh.matrixWorld, 0);
+          const hw = Math.abs(lq.copy(l.mesh.position).addScaledVector(camRight, 16 * frac).project(camera).x - lp.x);
+          camRight.setFromMatrixColumn(l.mesh.matrixWorld, 1);
+          const hh = Math.abs(lq.copy(l.mesh.position).addScaledVector(camRight, 3.4).project(camera).y - lp.y);
+          rs.push({ l, x: lp.x, y: lp.y, z: lp.z, hw, hh });
+        }
+        const yMin = portrait() ? -0.4 : -0.5, yMax = portrait() ? 0.78 : 0.76;
+        for (let it = 0; it < 6; it++) {
+          for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) {
+            const A = rs[i], B = rs[j];
+            if (Math.abs(A.x - B.x) >= A.hw + B.hw) continue;
+            const ov = A.hh + B.hh - Math.abs(A.y - B.y);
+            if (ov <= 0) continue;
+            const up = A.y >= B.y ? A : B, dn = up === A ? B : A;
+            // 端に当たった側の残りは相手が引き受ける
+            const upRoom = yMax - up.y, dnRoom = dn.y - yMin;
+            const u = Math.min(upRoom, Math.max(ov / 2, ov - dnRoom)), d = Math.min(dnRoom, ov - u);
+            up.y += u; dn.y -= d;
+          }
+        }
+        for (const r of rs) r.l.mesh.position.copy(lq.set(r.x, r.y, r.z).unproject(camera));
       }
       dimMat.opacity = damp(dimMat.opacity, tour !== null && tour.idx >= 0 ? 0.66 : 0, dt, tour ? 0.35 : 0.25);
       dimQuad.visible = dimMat.opacity > 0.01;
@@ -1505,7 +1624,8 @@ export default function VortexSpace({
       {
         const showAll = phaseNow === "space" && !diving && pendingNow === null && tour === null;
         const list = st.threads;
-        const w = W(), h = H();
+        const w = W(), h = H(), mn = Math.min(w, h);
+        let shown = 0;
         for (let i = 0; i < MAX_T; i++) {
           const el = tEls[i], th = list[i];
           let target = 0;
@@ -1516,6 +1636,12 @@ export default function VortexSpace({
               if (pa.z < 1 && pb.z < 1 && Math.abs(pa.x) < 1.15 && Math.abs(pb.x) < 1.15 && Math.abs(pa.y) < 1.15 && Math.abs(pb.y) < 1.15) {
                 let ax = (pa.x * 0.5 + 0.5) * w, ay = (-pa.y * 0.5 + 0.5) * h, bx = (pb.x * 0.5 + 0.5) * w, by = (-pb.y * 0.5 + 0.5) * h;
                 if (ax > bx) { [ax, bx] = [bx, ax]; [ay, by] = [by, ay]; } // 文字が逆さにならないよう左→右
+                // 読める糸だけ: 両端が離れている・消失点の小さなカードどうしでない・入力欄の下に潜らない。同時に4本まで
+                const focusHit0 = hoverId !== null && (hoverId === th.a || hoverId === th.b);
+                const nearEye = (x: number, y: number) => Math.hypot(x - w / 2, y - h / 2) < mn * 0.2;
+                const readable = Math.hypot(bx - ax, by - ay) > mn * 0.18 && !nearEye(ax, ay) && !nearEye(bx, by) && ay < h * 0.74 && by < h * 0.74 && ay > 70 && by > 70;
+                if (readable && (focusHit0 || shown < 4)) {
+                shown++;
                 const mx = (ax + bx) / 2, my = (ay + by) / 2, dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1;
                 const bend = Math.min(90, len * 0.18);
                 const cx = mx + (dy / len) * bend, cy = my - (dx / len) * bend * (my < h / 2 ? -1 : 1);
@@ -1525,6 +1651,7 @@ export default function VortexSpace({
                 const focusHit = hoverId !== null && (hoverId === th.a || hoverId === th.b);
                 target = hoverId ? (focusHit ? 1 : 0.15) : i < 4 ? 0.8 : 0.45;
                 el.g.classList.toggle("hot", focusHit);
+                }
               }
             }
           }
