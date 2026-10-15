@@ -5,7 +5,7 @@ export const SITE = {
   // ドメイン直下が情報サイト TOP（ワイヤー I-01）。投票サイトは /moments
   infoPath: "/",
   votePath: "/moments",
-  // 体験（熱狂の中を回遊する・リッチコンテンツ）は最後に作る（2026-10-15 決定）。出来るまで導線を出さない
+  // 体験（熱狂の中を回遊する・リッチコンテンツ）は最後に作る（2026-10-15 決定）。ただし遷移ボタンはワイヤー通り常に出す（開発の順番と導線の有無は別）
   experienceReady: false,
   experiencePath: "/experience",
 };

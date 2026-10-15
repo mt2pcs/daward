@@ -54,7 +54,7 @@ export default function Header({ phase, voteEnd }: { phase: Phase; voteEnd: stri
             <Link href="/moments" onClick={() => setMenu(false)}>100 MOMENTS 一覧</Link>
             <a href="/#campaign">ご招待キャンペーン</a>
             <a href="/#faq">FAQ</a>
-            {SITE.experienceReady && <a href={SITE.experiencePath}>熱狂の中を回遊する</a>}
+            <a href={SITE.experiencePath}>熱狂の中を回遊する</a>
             <button className="close" onClick={() => setMenu(false)}>閉じる</button>
           </div>
         </div>

@@ -1,5 +1,5 @@
 /* 投票サイト「DAZN 100 MOMENTS」— リファレンス docs/ref/vote_*.jpg に合わせる。黒・白・黄1色、巨大な番号、直線の放射 */
-.v26{--acc:#ebff00;--line:rgba(255,255,255,.14);--dim:#9a9aa0;--num:"Oswald","Helvetica Neue",Arial,sans-serif;--jp:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;min-height:100%;background:#000;color:#f4f4f2;font-family:var(--jp)}
+.v26{--acc:#ffff00;--line:rgba(255,255,255,.14);--dim:#9a9aa0;--num:"Archivo","Helvetica Neue",Arial,sans-serif;--jp:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;min-height:100%;background:#000;color:#f4f4f2;font-family:var(--jp)}
 .v26 a{color:inherit;text-decoration:none}
 .v26 .wrap{max-width:1280px;margin:0 auto;padding:0 16px}
 @media(min-width:900px){.v26 .wrap{padding:0 40px}}
@@ -41,7 +41,7 @@
 .v26-kv h1.logo img{height:clamp(140px,24vh,240px);width:auto;display:block;margin:0 auto}
 .v26-kv .lead{margin:10px auto 0;font:900 clamp(15px,4.2vw,24px)/1.4 var(--jp);color:#fff;text-shadow:0 2px 20px rgba(0,0,0,.9)}
 .v26-kv .tiny{margin-top:12px;font:500 11px/1 var(--num);letter-spacing:.3em;color:#ddd}
-.v26-kv .go{display:inline-flex;align-items:center;gap:10px;margin-top:22px;padding:14px 26px;background:var(--acc);color:#050505;font:900 15px/1 var(--jp);border-radius:999px;box-shadow:0 10px 40px rgba(235,255,0,.25)}
+.v26-kv .go{display:inline-flex;align-items:center;gap:10px;margin-top:22px;padding:14px 26px;background:var(--acc);color:#050505;font:900 15px/1 var(--jp);border-radius:999px;box-shadow:0 10px 40px rgba(255,255,0,.25)}
 .v26-kv .go::after{content:"→";font-family:var(--num)}
 .v26-kv .result{margin:18px auto 0;max-width:520px;background:rgba(0,0,0,.7);border:1px solid var(--acc);padding:16px;text-align:left}
 /* ---- フィルタ・グリッド */
@@ -149,9 +149,9 @@
 .v26-fx-host{position:fixed;inset:0;pointer-events:none;z-index:60;overflow:hidden}
 .v26-fx{position:absolute;width:0;height:0}
 .v26-fx i{position:absolute;left:0;top:0;transform:translate(-50%,-50%);border-radius:50%}
-.v26-fx .rays{width:240vmax;height:240vmax;background:repeating-conic-gradient(from 7deg,transparent 0 2.2deg,rgba(255,255,255,.9) 2.2deg 2.6deg,transparent 2.6deg 5deg,rgba(235,255,0,.9) 5deg 5.35deg,transparent 5.35deg 9deg,rgba(255,45,155,.8) 9deg 9.3deg,transparent 9.3deg 13deg,rgba(47,107,255,.85) 13deg 13.4deg,transparent 13.4deg 17deg);-webkit-mask:radial-gradient(circle,transparent 0,transparent 8%,#000 14%,#000 30%,transparent 46%);mask:radial-gradient(circle,transparent 0,transparent 8%,#000 14%,#000 30%,transparent 46%);animation:v26-rays .62s cubic-bezier(.1,.8,.2,1) forwards}
+.v26-fx .rays{width:240vmax;height:240vmax;background:repeating-conic-gradient(from 7deg,transparent 0 2.2deg,rgba(255,255,255,.9) 2.2deg 2.6deg,transparent 2.6deg 5deg,rgba(255,255,0,.9) 5deg 5.35deg,transparent 5.35deg 9deg,rgba(255,45,155,.8) 9deg 9.3deg,transparent 9.3deg 13deg,rgba(47,107,255,.85) 13deg 13.4deg,transparent 13.4deg 17deg);-webkit-mask:radial-gradient(circle,transparent 0,transparent 8%,#000 14%,#000 30%,transparent 46%);mask:radial-gradient(circle,transparent 0,transparent 8%,#000 14%,#000 30%,transparent 46%);animation:v26-rays .62s cubic-bezier(.1,.8,.2,1) forwards}
 .v26-fx .ring{width:60px;height:60px;border:3px solid var(--acc);animation:v26-ring .55s cubic-bezier(.1,.8,.2,1) forwards}
-.v26-fx .flash{width:120vmax;height:120vmax;background:radial-gradient(circle,rgba(255,255,255,.9),rgba(235,255,0,.35) 20%,transparent 55%);animation:v26-flash .5s ease-out forwards}
+.v26-fx .flash{width:120vmax;height:120vmax;background:radial-gradient(circle,rgba(255,255,255,.9),rgba(255,255,0,.35) 20%,transparent 55%);animation:v26-flash .5s ease-out forwards}
 .v26-fx.strong .rays{animation-duration:.85s}.v26-fx.strong .flash{animation-duration:.7s}
 @keyframes v26-rays{0%{transform:translate(-50%,-50%) scale(.02) rotate(0);opacity:1}100%{transform:translate(-50%,-50%) scale(1) rotate(8deg);opacity:0}}
 @keyframes v26-ring{0%{transform:translate(-50%,-50%) scale(.2);opacity:1}100%{transform:translate(-50%,-50%) scale(14);opacity:0}}
@@ -163,7 +163,7 @@
 .v26-kv .tiny{animation:v26-up .7s .5s cubic-bezier(.2,.9,.2,1) both}
 .v26-kv .go{animation:v26-pop .6s .65s cubic-bezier(.2,.9,.2,1) both}
 .v26-kv .go:hover{transform:scale(1.04)}
-@keyframes v26-frame{0%{transform:scale(.2) rotate(-6deg);opacity:0;box-shadow:0 0 0 8px #050505,0 0 80px 30px rgba(235,255,0,.6)}60%{opacity:1}100%{transform:none;opacity:1;box-shadow:0 0 0 8px #050505}}
+@keyframes v26-frame{0%{transform:scale(.2) rotate(-6deg);opacity:0;box-shadow:0 0 0 8px #050505,0 0 80px 30px rgba(255,255,0,.6)}60%{opacity:1}100%{transform:none;opacity:1;box-shadow:0 0 0 8px #050505}}
 @keyframes v26-up{0%{transform:translateY(26px);opacity:0}100%{transform:none;opacity:1}}
 @keyframes v26-pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.06)}100%{transform:none;opacity:1}}
 /* 一覧: スクロールで現れる・ホバーで映像が動く・押すと打ち上がる */
@@ -188,11 +188,14 @@
 @keyframes v26-media{0%{opacity:0;transform:scale(1.05);filter:brightness(2)}100%{opacity:1;transform:none;filter:none}}
 @keyframes v26-slam{0%{opacity:0;transform:translateX(-40px) scale(1.25);letter-spacing:.1em}100%{opacity:1;transform:none;letter-spacing:-.02em}}
 @keyframes v26-why{0%{opacity:0;clip-path:inset(0 100% 0 0)}100%{opacity:1;clip-path:inset(0 0 0 0)}}
-.v26-slide .nexthint{transition:background .25s,transform .25s}.v26-slide .nexthint:hover{background:rgba(235,255,0,.12);transform:translateY(-2px)}
-.v26-vote{transition:transform .2s,box-shadow .2s}.v26-vote:not(.off):not(.done):hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(235,255,0,.3)}
+.v26-slide .nexthint{transition:background .25s,transform .25s}.v26-slide .nexthint:hover{background:rgba(255,255,0,.12);transform:translateY(-2px)}
+.v26-vote{transition:transform .2s,box-shadow .2s}.v26-vote:not(.off):not(.done):hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(255,255,0,.3)}
 /* 完了 */
 .v26-page .thumb.pop{animation:v26-pop .7s cubic-bezier(.2,.9,.2,1) both}
 .v26-page h1.in{animation:v26-up .6s .1s cubic-bezier(.2,.9,.2,1) both}
 .v26-page .share.in{animation:v26-up .6s .45s cubic-bezier(.2,.9,.2,1) both}
 @media(prefers-reduced-motion:reduce){.v26 *{animation:none !important;transition:none !important}.v26-card{opacity:1;transform:none}.v26-slide .media,.v26-slide .no,.v26-slide .chips,.v26-slide h2,.v26-slide .desc,.v26-slide .why,.v26-slide .crowd,.v26-slide .acts,.v26-slide .dazn,.v26-slide .nexthint{opacity:1}}
 .v26-kv .lead2{margin-top:18px;font:700 14px/1.6 var(--jp);color:#ddd;text-shadow:0 2px 16px rgba(0,0,0,.9)}
+
+/* 支給ロゴの文法の炸裂（ShardBurst） */
+.is-shards{position:absolute;inset:0;width:100%;height:100%;display:block}

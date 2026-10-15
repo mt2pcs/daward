@@ -1,12 +1,11 @@
 import "@/app/site.css";
-import BurstHero from "@/components/vote/BurstHero";
+import ShardBurst from "@/components/site/ShardBurst";
 import SiteHeader from "@/components/site/SiteHeader";
 import NomineeTabs from "@/components/site/NomineeTabs";
 import { byNo, media, VOTE_END, fmtMD } from "@/lib/vote/data";
 import { SITE, BRAND, EVENT, KV_VIDEO, NEWS, ABOUT, CATEGORIES, NOMINEES, CAST, CAMPAIGN, LINKS, FAQ, sitePhase } from "@/lib/site/content";
 
-// KV の破片はロゴの色で（ロゴの DAZN マークから放射）
-const LOGO_PALETTE = ["#ff3b5c", "#ff8a65", "#4de1ff", "#d9f04a", "#8e2a92", "#ff1f3d", "#ffd34d", "#ffffff"];
+
 
 // 情報サイト DAZN AWARDS 2026（ワイヤー I-00〜I-02）。1ページに上から KV / NEWS / ABOUT / AWARDS / 選考方法 / NOMINEES / CAST / EVENT / CAMPAIGN / FAQ。
 // 文言・公開フラグは lib/site/content.ts、時期（公開→ノミネート発表→投票締切→受賞発表）は投票サイトと共通の phase で切り替える。
@@ -26,14 +25,15 @@ export default function InfoSite() {
   const castPublic = CAST.filter((c) => c.public);
   return (
     <div className="is" id="top">
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" />
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" />
       <SiteHeader phase={phase} votePath={vote} />
 
       {/* I-01 ① KV */}
       <section className="is-kv" aria-label="DAZN AWARDS 2026">
-        {KV_VIDEO ? <video className="is-kv-video" src={KV_VIDEO} autoPlay muted loop playsInline /> : <BurstHero palette={LOGO_PALETTE} alpha={0.55} density={0.8} anchor={{ sel: ".is-kv-logo", x: 0.5, y: 0.305 }} />}
+        {KV_VIDEO ? <video className="is-kv-video" src={KV_VIDEO} autoPlay muted loop playsInline /> : <ShardBurst anchor={{ sel: ".is-kv-logo", x: 0.5, y: 0.305, core: 0.34, avoid: { sel: ".is-kv-text" } }} />}
         <div className="is-kv-in">
           <h1 className="is-kv-h1"><img className="is-kv-logo" src={BRAND.awardsLogo} alt="DAZN AWARDS 2026" width={1214} height={2000} /></h1>
+          <div className="is-kv-text">
           <p className="is-kv-tag">{SITE.tagline}</p>
           <p className="is-kv-date">{EVENT.dateLabel}<i />{EVENT.venue}</p>
           <div className="is-kv-btns">
@@ -42,6 +42,7 @@ export default function InfoSite() {
           </div>
           {phase === "open" && <p className="is-kv-note">一般投票 受付中　〜{end}</p>}
           {phase === "pre" && <p className="is-kv-note">一般投票は11月上旬スタート</p>}
+          </div>
         </div>
       </section>
 

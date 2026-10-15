@@ -1,7 +1,7 @@
 /* 情報サイト DAZN AWARDS 2026 — リファレンス docs/ref/gen/info_pc_kv1.png / info_pc_awards1.png。
    黒・白・黄1色、角は立てる、巨大なコンデンス数字、DAZN フレームから直線の破片が放射（投票サイトと同じ言語） */
-.is{--acc:#ebff00;--bg:#000;--fg:#f4f4f2;--dim:#9a9aa0;--line:rgba(255,255,255,.14);--panel:#0e0e10;
-  --num:"Oswald","Helvetica Neue",Arial,sans-serif;--jp:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+.is{--acc:#ffff00;--bg:#000;--fg:#f4f4f2;--dim:#9a9aa0;--line:rgba(255,255,255,.14);--panel:#0e0e10;
+  --num:"Archivo","Helvetica Neue",Arial,sans-serif;--jp:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
   background:var(--bg);color:var(--fg);font-family:var(--jp);min-height:100%;overflow-x:clip}
 .is a{color:inherit;text-decoration:none}
 .is-wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -11,7 +11,7 @@
 .is-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;padding:15px 24px;font:900 15px/1 var(--jp);border:2px solid transparent;white-space:nowrap;transition:transform .15s,background .2s}
 .is-btn span{font-family:var(--num)}
 .is a.is-btn-y,.is .is-btn-y{background:var(--acc);color:#050505;border-color:var(--acc)}
-.is a.is-btn-y:hover{transform:translateY(-1px);background:#f4ff4d}
+.is a.is-btn-y:hover{transform:translateY(-1px);background:#ffff66}
 .is a.is-btn-o{border-color:#fff;color:#fff}
 .is a.is-btn-o:hover{background:#fff;color:#050505}
 .is-btn-off{border-color:var(--line);color:var(--dim);cursor:default}
@@ -102,7 +102,7 @@
 .is-cat{position:relative;aspect-ratio:16/10;background:#141416 center/cover;display:flex;flex-direction:column;justify-content:flex-end;padding:16px 18px;overflow:hidden;isolation:isolate}
 .is-cat::before{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(5,5,5,.92) 8%,rgba(5,5,5,.3) 50%,rgba(5,5,5,.1) 70%,rgba(5,5,5,.75));z-index:-1}
 .is-cat.tba{background:#0b0b0d;border:1px dashed var(--line)}
-.is-cat.tba::before{background:repeating-linear-gradient(115deg,transparent 0 22px,rgba(235,255,0,.05) 22px 24px)}
+.is-cat.tba::before{background:repeating-linear-gradient(115deg,transparent 0 22px,rgba(255,255,0,.05) 22px 24px)}
 .is-cat .en{position:absolute;left:18px;top:16px;font:500 11px/1 var(--num);letter-spacing:.22em;color:#e9e9e4}
 .is-cat .num{font:700 clamp(64px,8vw,96px)/.85 var(--num);letter-spacing:-.01em}
 .is-cat h3{margin-top:6px;font:900 clamp(17px,1.7vw,21px)/1.3 var(--jp)}
@@ -169,7 +169,7 @@
 .is-map iframe{width:100%;height:100%;border:0;filter:grayscale(1) invert(.92) contrast(.9)}
 
 /* ---- CAMPAIGN */
-.is-camp{position:relative;overflow:hidden;border:2px solid var(--acc);padding:clamp(24px,4vw,48px);background:linear-gradient(120deg,rgba(235,255,0,.07),transparent 50%)}
+.is-camp{position:relative;overflow:hidden;border:2px solid var(--acc);padding:clamp(24px,4vw,48px);background:linear-gradient(120deg,rgba(255,255,0,.07),transparent 50%)}
 .is-camp .hl{margin-top:16px;font:900 clamp(26px,3.6vw,46px)/1.25 var(--jp);text-wrap:balance}
 .is-camp p{margin-top:10px;font-size:15px;line-height:1.7;color:#ddd}
 .is-camp .is-btn{margin-top:24px}
@@ -194,3 +194,6 @@
 .is-foot-row{margin-top:30px;display:flex;flex-wrap:wrap;gap:12px 26px;font:500 13px/1 var(--jp);color:#cfcfcb}
 .is-foot-row a:hover{color:#fff}
 .is-copy{margin-top:26px;font:500 12px/1 var(--num);letter-spacing:.14em;color:var(--dim)}
+
+/* 支給ロゴの文法の炸裂（ShardBurst） */
+.is-shards{position:absolute;inset:0;width:100%;height:100%;display:block}
