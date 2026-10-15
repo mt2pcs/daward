@@ -40,7 +40,12 @@ const schema = {
 async function one(m) {
   const c = m.clips[0];
   const parts = [];
-  if (c?.detail) parts.push({ fileData: { fileUri: c.detail.replace("https://storage.googleapis.com/", "gs://"), mimeType: "video/mp4" } });
+  if (c?.detail) {
+    // 2分を超える映像は、山場（音量最大）の60秒前から2分間だけ読ませる（全編は遅く、要点は山場の前後にある）
+    const vp = { fileData: { fileUri: c.detail.replace("https://storage.googleapis.com/", "gs://"), mimeType: "video/mp4" } };
+    if ((c.srcDuration || 0) > 130) { const st = Math.max(0, Math.min((c.peakSec || 0) - 60, c.srcDuration - 120)); vp.videoMetadata = { startOffset: `${Math.floor(st)}s`, endOffset: `${Math.floor(st + 120)}s` }; }
+    parts.push(vp);
+  }
   else if (c?.poster) parts.push({ fileData: { fileUri: c.poster.replace("https://storage.googleapis.com/", "gs://"), mimeType: "image/webp" } });
   parts.push({ text: `番号: ${m.no}\n競技: ${m.sportLabel}\n日付: ${m.date || "不明"}\nシートの説明: ${m.description}\n${parts.length ? "" : "（映像なし。説明だけで判断し、事実は説明にあるものだけ）"}` });
   const body = { systemInstruction: { parts: [{ text: SYS }] }, contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.2, mediaResolution: "MEDIA_RESOLUTION_LOW" } };
