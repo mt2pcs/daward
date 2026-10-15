@@ -189,20 +189,29 @@ function nextWords(arms: { moments: CutMoment[] }[], read: Read): string[] {
 }
 
 // ---------- 4. 腕の名前（言葉の声で。事実を書かせない・人名を入れさせない・長さ検査。落ちたら値の組み合わせ）
-const template = (keys: string[]) => (keys.length >= 2 ? `${keys[1]}の${keys[0]}` : keys[0] || "近い熱狂").replace(/・/g, "");
+// 値ラベルの短い言い方（テンプレと、名前の検査に使う）
+const SHORT: Record<string, string> = { "引退・最後": "引退", "記録・偉業": "記録", "王者の証明": "王者", "優勝の瞬間": "優勝", "満員の熱狂": "大歓声", "静寂から爆発": "静寂", "涙の場面": "涙", "海外の日本人": "海外組", "投手の快投": "快投" };
+const short = (v: string) => SHORT[v] || v;
+const template = (keys: string[]) => (keys.length >= 2 ? `${short(keys[0])} × ${short(keys[1])}` : short(keys[0] || "近い熱狂"));
+// 名前が中身を言っているか: 腕の値のラベル・短縮・同義語のどれかを含む
+const SYN_OF: Record<string, string[]> = {}; for (const a of LEX.axes) for (const v of a.values) SYN_OF[v.v] = [v.v, short(v.v), ...v.syn].filter((x) => x.length >= 2 || /[一-龥]/.test(x));
+const grounded = (name: string, keys: string[]) => keys.some((k) => (SYN_OF[k] || [k]).some((w) => name.includes(w)));
+const POETIC = /夜空|閃光|希望|予感|胎動|風|雨|虹|月|光|輝|軌跡|華|舞|囁|煌|彩|響|宿命|運命|物語|ドラマ|伝説|奇跡|魂|鼓動|旋律|咆哮|頂|翼|星|空|夢/;
 const NCACHE = new Map<string, string[]>();
 async function nameArms(q: string, arms: { keys: string[]; moments: CutMoment[] }[]): Promise<{ names: string[]; source: "llm" | "template" }> {
   const tmpl = arms.map((a) => template(a.keys));
   const key = q + "::" + arms.map((a) => a.keys.join("+")).join("/");
   if (NCACHE.has(key)) return { names: NCACHE.get(key)!, source: "llm" };
   if (!gcpAvailable()) return { names: tmpl, source: "template" };
-  const sys = `観る人が投げた言葉を受けて、ハイライトの束（腕）に名前を付けます。名前は4〜10文字の日本語。その言葉の気分を受けた、情景が浮かぶ言い回し。
-禁止: 人名・チーム名・大会名・数字・事実の断定・「感動」「熱狂」など単語1つの総称・腕どうしの重複。`;
+  const sys = `スポーツ誌の見出しを付ける編集者です。観る人が投げた言葉で組んだハイライトの束（腕）に、短い見出しを付けます。
+- 見出しは中身を言う。各腕の「中身の値」の言葉（またはその言い換え）を必ず含める。例: 中身=ベテラン×引退 →「ベテラン、最後の打席」「引退の日の一振り」
+- 4〜12文字。スポーツ新聞・実況が使う、具体的で強い言葉。投げた言葉の口調は受けてよい。
+- 禁止: 詩的・抽象的な比喩（空・光・風・雨・夢・奇跡・魂・物語・運命 など）、人名・チーム名・大会名・数字、腕どうしの重複。`;
   const user = `言葉: 「${q}」\n` + arms.map((a, i) => `腕${i + 1}: 中身の値=${a.keys.join("×")} / 例=${a.moments.slice(0, 3).map((m) => MOM.find((x) => x.no === m.no)!.title).join("、")}`).join("\n");
   try {
     const r = await vertexChain(sys, user, { type: "OBJECT", properties: { names: { type: "ARRAY", items: { type: "STRING" } } }, required: ["names"] }, 3000);
-    const bad = (n: string) => n.length < 3 || n.length > 12 || /\d/.test(n) || NAMES.some((x) => x.name.length >= 2 && n.includes(x.name));
-    const names = arms.map((_, i) => { const n = String(r.names?.[i] || "").trim(); return !n || bad(n) ? tmpl[i] : n; });
+    const bad = (n: string, keys: string[]) => n.length < 3 || n.length > 14 || /\d/.test(n) || POETIC.test(n) || !grounded(n, keys) || NAMES.some((x) => x.name.length >= 2 && n.includes(x.name));
+    const names = arms.map((a, i) => { const n = String(r.names?.[i] || "").trim(); return !n || bad(n, a.keys) ? tmpl[i] : n; });
     if (new Set(names).size !== names.length) return { names: tmpl, source: "template" };
     NCACHE.set(key, names); return { names, source: "llm" };
   } catch { return { names: tmpl, source: "template" }; }
@@ -249,7 +258,11 @@ export async function resolve(raw: string): Promise<Cut> {
   }
   // (e) 軸足で絞って少ない → 軸足を外す。まだ少ない → 競技の絞り込みを外して広げる
   if (cands.length < MIN_MOMENTS && anchorOf(read)) { const loose = score(read, false); if (loose.length > cands.length) cands = loose; }
-  if (cands.length < MIN_MOMENTS && read.sports.length && read.values.length) { const wide = score({ ...read, sports: [] }); if (wide.length > cands.length) { cands = wide; message = (message ? message + "。" : "") + `${read.sports.join("・")}の外にも広げました`; } }
+  if (cands.length < MIN_MOMENTS && read.sports.length && read.values.length) {
+    const inSport = cands;
+    const wide = score({ ...read, sports: [] }).filter((c) => !inSport.some((x) => x.m.no === c.m.no));
+    if (wide.length) { cands = [...inSport.map((c) => ({ ...c, s: Math.min(1, c.s + 0.5) })), ...wide]; message = (message ? message + "。" : "") + `${read.sports.join("・")}の外にも広げました`; }
+  }
   if (!cands.length) return { ...(await defaultCut()), q, status: "unreadable", message: `「${q}」に当てはまる瞬間が見つかりませんでした。たとえば…`, ms: Date.now() - t0 };
   const armsRaw = buildArms(cands, read);
   const nm = await nameArms(q, armsRaw);
