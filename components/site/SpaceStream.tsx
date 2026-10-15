@@ -28,6 +28,7 @@ export default function SpaceStream({ logo }: { logo: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current!;
+    // 動きを減らす設定のときは止めずにゆっくり流す（速さ 40%、読み込み時の勢いと視差なし）
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     let renderer: THREE.WebGLRenderer;
     try { renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: false, premultipliedAlpha: true }); }
@@ -82,7 +83,7 @@ export default function SpaceStream({ logo }: { logo: string }) {
       if (!lg) return;
       if (!t0) t0 = now;
       const fz = (window as any).__lbT;
-      const t = typeof fz === "number" ? fz : reduce ? 6 : Math.max(0, (now - t0) / 1000);
+      const t = typeof fz === "number" ? fz : Math.max(0, (now - t0) / 1000);
       const dt = Math.min(0.05, Math.max(0, (now - (last || now)) / 1000)); last = now;
       const dpr = Math.min(1.75, devicePixelRatio || 1);
       const W = rc.width, H = rc.height;
@@ -99,7 +100,7 @@ export default function SpaceStream({ logo }: { logo: string }) {
       const scroll = Math.min(1, Math.max(0, -rc.top / Math.max(1, rc.height)));
       if (typeof fz !== "number" && !reduce) extra += dt * SPEED * 2.5 * scroll; // スクロール中は少し速く
       const fade = reduce ? 1 : Math.min(1, Math.max(0, (t - 0.25) / 0.9));
-      const dist = travel(t) + extra;
+      const dist = reduce && typeof fz !== "number" ? SPEED * 0.4 * t + 40 : travel(t) + extra;
       for (const s of shards) {
         const w = s.ph * ZF + dist;
         const cyc = Math.floor(w / ZF);

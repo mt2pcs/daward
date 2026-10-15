@@ -70,6 +70,8 @@ export default function LogoBurst({ img, src }: { img: string; src: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current!;
+    // 「視差効果/アニメーションを減らす」設定のときも止めない（会社の PC では既定で入っていることが多く、止めると壊れて見える）。
+    // その場合は開く演出を省いて最初から開いた形にし、拍動を弱め、カーソルとスクロールには反応させない。
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const gl = cv.getContext("webgl2", { antialias: false, premultipliedAlpha: true, alpha: true });
     if (!gl) return;
@@ -112,7 +114,7 @@ export default function LogoBurst({ img, src }: { img: string; src: string }) {
       if (rc.bottom < 0 || rc.top > innerHeight) return; // 画面外では描かない
       if (!t0) t0 = now;
       const fz = (window as any).__lbT; // 検証用: 時刻を止めて撮る
-      const t = typeof fz === "number" ? fz : reduce ? 10 : Math.max(0, (now - t0) / 1000);
+      const t = typeof fz === "number" ? fz : (reduce ? 10 : 0) + Math.max(0, (now - t0) / 1000);
       const dt = Math.min(0.05, Math.max(0, (now - (last || now)) / 1000)); last = now;
       const dpr = Math.min(2, devicePixelRatio || 1);
       const W = Math.round(rc.width * dpr), H = Math.round(rc.height * dpr);
@@ -129,7 +131,7 @@ export default function LogoBurst({ img, src }: { img: string; src: string }) {
       const scroll = Math.min(1, Math.max(0, -rc.top / Math.max(1, rc.height * 0.7)));
       gl.viewport(0, 0, W, H); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
       gl.uniform2f(uRes, W, H); gl.uniform4f(uLogo, lx, ly, scale, 0);
-      gl.uniform1f(uT, t); gl.uniform1f(uScroll, reduce ? 0 : scroll); gl.uniform1f(uPtrA, ptrA); gl.uniform1f(uPtrK, ptrK); gl.uniform1f(uStill, reduce ? 1 : 0);
+      gl.uniform1f(uT, t); gl.uniform1f(uScroll, reduce ? 0 : scroll); gl.uniform1f(uPtrA, ptrA); gl.uniform1f(uPtrK, ptrK); gl.uniform1f(uStill, reduce ? 0.5 : 0);
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
       if (!host.classList.contains("gl-on")) host.classList.add("gl-on");
     };
