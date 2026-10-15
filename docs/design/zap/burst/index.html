@@ -1,0 +1,203 @@
+<title>かけらの炸裂</title>
+<meta charset="utf-8">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700;900&display=swap">
+<style>
+:root{--bg:#000;--fg:#fff;--dim:#9a9aa2;--y:#ffff00;color-scheme:dark}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--fg)}
+body{font-family:"Noto Sans JP","Hiragino Sans",sans-serif;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%;touch-action:none}
+#again{position:fixed;z-index:5;left:max(12px,env(safe-area-inset-left,0px));top:calc(12px + env(safe-area-inset-top,0px));font:700 12px/1 "Noto Sans JP",sans-serif;
+  color:var(--dim);background:rgba(0,0,0,.5);border:1px solid #333;border-radius:999px;padding:8px 12px;cursor:pointer}
+#trail{position:fixed;z-index:5;right:max(12px,env(safe-area-inset-right,0px));top:calc(12px + env(safe-area-inset-top,0px));display:flex;gap:6px;max-width:60vw;overflow:hidden;justify-content:flex-end}
+#trail img{height:34px;aspect-ratio:16/9;object-fit:cover;opacity:.55;border:1px solid #333;cursor:pointer}
+#trail img:last-child{opacity:1;border-color:var(--y)}
+.nl{position:fixed;left:0;top:0;z-index:3;pointer-events:none;transform:translate(-50%,0);text-align:center;white-space:nowrap;line-height:1.25;text-shadow:0 1px 3px #000,0 0 6px #000}
+.nl b{display:block;font-weight:900;font-size:var(--nf,13px)}
+.nl span{display:block;font-weight:700;font-size:calc(var(--nf,13px)*.78);color:var(--dim)}
+.nl.c b{color:var(--y);font-size:calc(var(--nf,13px)*1.35)}
+#view{position:fixed;inset:0;z-index:9;background:rgba(0,0,0,.86);display:none;place-items:center;padding:16px}
+#view.on{display:grid}
+#view figure{margin:0;width:min(92vw,960px)}
+#view img{width:100%;display:block}
+#view figcaption{margin-top:10px;font-weight:700;font-size:14px;color:var(--dim);line-height:1.6}
+#view b{color:var(--fg);font-size:18px;font-weight:900;display:block}
+</style>
+<canvas id="c"></canvas>
+<button id="again">↺ 最初から</button>
+<div id="trail"></div>
+<div id="view"><figure><img alt=""><figcaption></figcaption></figure></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(async () => {
+  const F = [{"i":0,"no":"090","t":"0:11","nm":"ノーサイドの蹴り出し","side":"決めた側","body":"決める","time":"決まる瞬間","age":null,"title":"神戸スティーラーズ初制覇","sport":"リーグワン"},{"i":1,"no":"090","t":"0:18","nm":"跳びはねる巨漢たち","side":"決めた側","body":"抱き合う","time":"直後","age":null,"title":"神戸スティーラーズ初制覇","sport":"リーグワン"},{"i":2,"no":"090","t":"0:39","nm":"去りゆくHCの抱擁","side":"指揮官","body":"抱き合う","time":"余韻","age":null,"title":"神戸スティーラーズ初制覇","sport":"リーグワン"},{"i":3,"no":"090","t":"0:51","nm":"倒れ込んだ敗者","side":"敗れた側","body":"倒れ込む","time":"直後","age":null,"title":"神戸スティーラーズ初制覇","sport":"リーグワン"},{"i":4,"no":"090","t":"0:55","nm":"40歳の男泣き","side":"決めた側","body":"泣く","time":"余韻","age":"ベテラン","title":"神戸スティーラーズ初制覇","sport":"リーグワン"},{"i":5,"no":"090","t":"1:04","nm":"膝をつくクボタ","side":"敗れた側","body":"膝をつく","time":"余韻","age":null,"title":"神戸スティーラーズ初制覇","sport":"リーグワン"},{"i":6,"no":"010","t":"0:03","nm":"祈る決勝点の主","side":"決めた側","body":"膝をつく","time":"直後","age":null,"title":"田中碧のボールロストと涙","sport":"FIFAワールドカップ"},{"i":7,"no":"010","t":"0:16","nm":"拳を芝に押す日本","side":"敗れた側","body":"膝をつく","time":"直後","age":null,"title":"田中碧のボールロストと涙","sport":"FIFAワールドカップ"},{"i":8,"no":"010","t":"0:21","nm":"泣き崩れる少年","side":"スタンド","body":"泣く","time":"直後","age":"若手","title":"田中碧のボールロストと涙","sport":"FIFAワールドカップ"},{"i":9,"no":"010","t":"0:53","nm":"号泣する田中碧","side":"敗れた側","body":"泣く","time":"余韻","age":null,"title":"田中碧のボールロストと涙","sport":"FIFAワールドカップ"},{"i":10,"no":"010","t":"1:11","nm":"一点を見つめる伊藤","side":"敗れた側","body":"立ち尽くす","time":"余韻","age":null,"title":"田中碧のボールロストと涙","sport":"FIFAワールドカップ"},{"i":11,"no":"010","t":"1:23","nm":"ネイマールの抱擁","side":"決めた側","body":"寄り添う","time":"余韻","age":"ベテラン","title":"田中碧のボールロストと涙","sport":"FIFAワールドカップ"},{"i":12,"no":"030","t":"0:04","nm":"もみくちゃの監督陣","side":"指揮官","body":"抱き合う","time":"直後","age":null,"title":"町田のACL準優勝","sport":"ACL"},{"i":13,"no":"030","t":"0:07","nm":"膝から崩れる勝者","side":"決めた側","body":"膝をつく","time":"直後","age":null,"title":"町田のACL準優勝","sport":"ACL"},{"i":14,"no":"030","t":"0:16","nm":"泣き笑いの監督","side":"指揮官","body":"泣く","time":"余韻","age":null,"title":"町田のACL準優勝","sport":"ACL"},{"i":15,"no":"030","t":"0:22","nm":"大の字の守護神","side":"敗れた側","body":"倒れ込む","time":"直後","age":null,"title":"町田のACL準優勝","sport":"ACL"},{"i":16,"no":"030","t":"0:25","nm":"絶叫するトーブ姿","side":"スタンド","body":"叫ぶ","time":"直後","age":null,"title":"町田のACL準優勝","sport":"ACL"},{"i":17,"no":"030","t":"0:40","nm":"静止する町田サポ","side":"スタンド","body":"立ち尽くす","time":"余韻","age":null,"title":"町田のACL準優勝","sport":"ACL"},{"i":18,"no":"088","t":"0:27","nm":"20番に飛びつく","side":"決めた側","body":"抱き合う","time":"直後","age":null,"title":"日本代表ＰＮＣ制覇","sport":"ラグビー日本代表"},{"i":19,"no":"088","t":"0:32","nm":"エディーの笑顔","side":"指揮官","body":"笑う","time":"直後","age":"ベテラン","title":"日本代表ＰＮＣ制覇","sport":"ラグビー日本代表"},{"i":20,"no":"088","t":"0:39","nm":"膝をつくフィジー","side":"敗れた側","body":"膝をつく","time":"直後","age":null,"title":"日本代表ＰＮＣ制覇","sport":"ラグビー日本代表"},{"i":21,"no":"088","t":"0:47","nm":"総立ちの日の丸","side":"スタンド","body":"突き上げる","time":"直後","age":null,"title":"日本代表ＰＮＣ制覇","sport":"ラグビー日本代表"},{"i":22,"no":"071","t":"0:12","nm":"天へ吠える馬場","side":"決めた側","body":"叫ぶ","time":"直後","age":null,"title":"長崎ヴェルカ悲願の初優勝","sport":"Bリーグ"},{"i":23,"no":"071","t":"0:20","nm":"なだれ込むベンチ","side":"ベンチ","body":"抱き合う","time":"直後","age":null,"title":"長崎ヴェルカ悲願の初優勝","sport":"Bリーグ"},{"i":24,"no":"071","t":"0:38","nm":"うつむく岸本","side":"敗れた側","body":"立ち尽くす","time":"直後","age":"ベテラン","title":"長崎ヴェルカ悲願の初優勝","sport":"Bリーグ"},{"i":25,"no":"071","t":"1:23","nm":"抱き合う長崎の選手","side":"決めた側","body":"抱き合う","time":"余韻","age":null,"title":"長崎ヴェルカ悲願の初優勝","sport":"Bリーグ"},{"i":26,"no":"071","t":"1:46","nm":"口元が緩む岸本","side":"敗れた側","body":"笑う","time":"余韻","age":"ベテラン","title":"長崎ヴェルカ悲願の初優勝","sport":"Bリーグ"},{"i":27,"no":"038","t":"0:00","nm":"PKを待つ守護神","side":"敗れた側","body":"見つめる","time":"決まる前","age":null,"title":"イタリア三度目の予選敗退","sport":"海外サッカー"},{"i":28,"no":"038","t":"0:09","nm":"肩を組むボスニア","side":"決めた側","body":"見つめる","time":"決まる前","age":null,"title":"イタリア三度目の予選敗退","sport":"海外サッカー"},{"i":29,"no":"038","t":"0:13","nm":"逆を突くPK","side":"決めた側","body":"決める","time":"決まる瞬間","age":null,"title":"イタリア三度目の予選敗退","sport":"海外サッカー"},{"i":30,"no":"038","t":"0:21","nm":"頭を抱えるドンナルンマ","side":"敗れた側","body":"顔を覆う","time":"直後","age":null,"title":"イタリア三度目の予選敗退","sport":"海外サッカー"},{"i":31,"no":"038","t":"0:29","nm":"座り込むイタリア","side":"敗れた側","body":"膝をつく","time":"直後","age":null,"title":"イタリア三度目の予選敗退","sport":"海外サッカー"},{"i":32,"no":"038","t":"0:48","nm":"顔を覆う英雄","side":"決めた側","body":"泣く","time":"余韻","age":null,"title":"イタリア三度目の予選敗退","sport":"海外サッカー"},{"i":33,"no":"038","t":"0:52","nm":"手を引くガットゥーゾ","side":"指揮官","body":"寄り添う","time":"余韻","age":null,"title":"イタリア三度目の予選敗退","sport":"海外サッカー"},{"i":34,"no":"089","t":"0:23","nm":"流の最後のスピーチ","side":"決めた側","body":"語る","time":"余韻","age":"ベテラン","title":"サントリー引退セレモニー","sport":"リーグワン"},{"i":35,"no":"089","t":"1:25","nm":"両手を掲げる流","side":"決めた側","body":"突き上げる","time":"余韻","age":"ベテラン","title":"サントリー引退セレモニー","sport":"リーグワン"},{"i":36,"no":"089","t":"1:30","nm":"手作りボードの客席","side":"スタンド","body":"突き上げる","time":"余韻","age":null,"title":"サントリー引退セレモニー","sport":"リーグワン"},{"i":37,"no":"089","t":"1:57","nm":"涙をこらえる中村","side":"決めた側","body":"泣く","time":"余韻","age":"ベテラン","title":"サントリー引退セレモニー","sport":"リーグワン"},{"i":38,"no":"089","t":"2:08","nm":"天を仰ぐ中村","side":"決めた側","body":"顔を覆う","time":"余韻","age":"ベテラン","title":"サントリー引退セレモニー","sport":"リーグワン"},{"i":39,"no":"051","t":"0:05","nm":"兄へ捧ぐフルスイング","side":"決めた側","body":"決める","time":"決まる瞬間","age":null,"title":"近藤急死の兄へ捧ぐ先制8号","sport":"プロ野球"},{"i":40,"no":"051","t":"0:12","nm":"跳ねるライトスタンド","side":"スタンド","body":"突き上げる","time":"直後","age":null,"title":"近藤急死の兄へ捧ぐ先制8号","sport":"プロ野球"},{"i":41,"no":"051","t":"0:18","nm":"帽子を目深に","side":"敗れた側","body":"立ち尽くす","time":"直後","age":"若手","title":"近藤急死の兄へ捧ぐ先制8号","sport":"プロ野球"},{"i":42,"no":"051","t":"0:32","nm":"唇を結ぶ近藤","side":"決めた側","body":"見つめる","time":"余韻","age":"ベテラン","title":"近藤急死の兄へ捧ぐ先制8号","sport":"プロ野球"},{"i":43,"no":"051","t":"0:36","nm":"拍手で迎えるベンチ","side":"ベンチ","body":"見つめる","time":"余韻","age":null,"title":"近藤急死の兄へ捧ぐ先制8号","sport":"プロ野球"},{"i":44,"no":"052","t":"0:00","nm":"坂本タオルの声援","side":"スタンド","body":"突き上げる","time":"決まる前","age":null,"title":"坂本勇人劇的サヨナラ300号","sport":"プロ野球"},{"i":45,"no":"052","t":"0:04","nm":"息を吐く坂本","side":"決めた側","body":"見つめる","time":"決まる前","age":"ベテラン","title":"坂本勇人劇的サヨナラ300号","sport":"プロ野球"},{"i":46,"no":"052","t":"0:26","nm":"サヨナラの一振り","side":"決めた側","body":"決める","time":"決まる瞬間","age":"ベテラン","title":"坂本勇人劇的サヨナラ300号","sport":"プロ野球"},{"i":47,"no":"052","t":"0:35","nm":"拳を突き上げる坂本","side":"決めた側","body":"突き上げる","time":"直後","age":"ベテラン","title":"坂本勇人劇的サヨナラ300号","sport":"プロ野球"},{"i":48,"no":"052","t":"0:44","nm":"飛び出すナイン","side":"ベンチ","body":"突き上げる","time":"直後","age":null,"title":"坂本勇人劇的サヨナラ300号","sport":"プロ野球"},{"i":49,"no":"093","t":"0:09","nm":"逆転の右","side":"決めた側","body":"決める","time":"決まる瞬間","age":null,"title":"ジョシュア逆転ＴＫＯ勝ち","sport":"ボクシング"},{"i":50,"no":"093","t":"0:11","nm":"崩れ落ちるプレンガ","side":"敗れた側","body":"倒れ込む","time":"決まる瞬間","age":null,"title":"ジョシュア逆転ＴＫＯ勝ち","sport":"ボクシング"},{"i":51,"no":"093","t":"0:18","nm":"ふらつく足","side":"敗れた側","body":"立ち尽くす","time":"直後","age":null,"title":"ジョシュア逆転ＴＫＯ勝ち","sport":"ボクシング"},{"i":52,"no":"093","t":"0:25","nm":"笑ってセコンドと","side":"決めた側","body":"抱き合う","time":"直後","age":null,"title":"ジョシュア逆転ＴＫＯ勝ち","sport":"ボクシング"},{"i":53,"no":"093","t":"1:35","nm":"カメラへの雄叫び","side":"決めた側","body":"叫ぶ","time":"余韻","age":null,"title":"ジョシュア逆転ＴＫＯ勝ち","sport":"ボクシング"},{"i":54,"no":"020","t":"0:06","nm":"16歳のスライディング","side":"決めた側","body":"決める","time":"決まる瞬間","age":"若手","title":"１６歳三井寺眞の衝撃先制弾","sport":"Jリーグ"},{"i":55,"no":"020","t":"0:13","nm":"叫ぶ16歳","side":"決めた側","body":"叫ぶ","time":"直後","age":"若手","title":"１６歳三井寺眞の衝撃先制弾","sport":"Jリーグ"},{"i":56,"no":"020","t":"0:26","nm":"もみくちゃの控え","side":"ベンチ","body":"抱き合う","time":"直後","age":null,"title":"１６歳三井寺眞の衝撃先制弾","sport":"Jリーグ"},{"i":57,"no":"020","t":"1:05","nm":"白髪の指揮官の咆哮","side":"指揮官","body":"叫ぶ","time":"直後","age":"ベテラン","title":"１６歳三井寺眞の衝撃先制弾","sport":"Jリーグ"},{"i":58,"no":"020","t":"1:16","nm":"轟くサポーター","side":"スタンド","body":"突き上げる","time":"直後","age":null,"title":"１６歳三井寺眞の衝撃先制弾","sport":"Jリーグ"},{"i":59,"no":"098","t":"1:12","nm":"ポール確定","side":"決めた側","body":"決める","time":"決まる瞬間","age":null,"title":"福住仁嶺５年ぶりの３勝目","sport":"モータースポーツ"},{"i":60,"no":"098","t":"1:29","nm":"拳を合わせるピット","side":"指揮官","body":"笑う","time":"直後","age":null,"title":"福住仁嶺５年ぶりの３勝目","sport":"モータースポーツ"}];
+  // 観点（かけらの「顔」）。炸裂の一本一本の光線になる
+  const AX = [["side", ""], ["body", ""], ["time", ""], ["age", ""]];
+  const COLORS = ["#ff3366", "#4de6ff", "#dff257", "#ff8866", "#922a88", "#66ccff"];
+  try { await document.fonts.load('900 40px "Noto Sans JP"'); await document.fonts.load('700 40px "Noto Sans JP"'); } catch (e) {}
+
+  const cv = document.getElementById("c");
+  const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+  R.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 2000);
+  cam.position.set(0, 0, 100);
+  let W = 1, H = 1, por = false, vw = 1, vh = 1;
+  function size() {
+    W = innerWidth; H = innerHeight; por = W / H < 1;
+    R.setSize(W, H, false); cam.aspect = W / H; cam.fov = por ? 62 : 45; cam.updateProjectionMatrix();
+    vh = 2 * Math.tan((cam.fov * Math.PI) / 360) * 100; vw = vh * cam.aspect; // z=0 で見える幅・高さ
+    document.documentElement.style.setProperty("--nf", (por ? 11 : 13) + "px");
+  }
+  size();
+
+  const loader = new THREE.TextureLoader();
+  const textCanvas = (lines, w, h, opt = {}) => {
+    const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d");
+    if (opt.bg) { g.fillStyle = opt.bg; g.fillRect(0, 0, w, h); }
+    let y = opt.pad || 0;
+    for (const [txt, font, col] of lines) { g.font = font; g.fillStyle = col; g.textBaseline = "top"; g.shadowColor = "rgba(0,0,0,.9)"; g.shadowBlur = opt.bg ? 0 : 8;
+      g.fillText(txt, opt.padx || 0, y); y += parseInt(font.match(/(\d+)px/)[1]) * 1.25; }
+    const t = new THREE.CanvasTexture(c); t.anisotropy = 4; return t;
+  };
+
+  // かけら = 実際の1秒のコマの板＋名前
+  const P = 16, PH = 9;
+  const plates = F.map((f) => {
+    const grp = new THREE.Group();
+    const tex = loader.load(`f/${f.i}.jpg`); tex.minFilter = THREE.LinearFilter;
+    const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0 });
+    const img = new THREE.Mesh(new THREE.PlaneGeometry(P, PH), m); img.userData.f = f; grp.add(img);
+    const edge = new THREE.Mesh(new THREE.PlaneGeometry(P + 0.9, PH + 0.9), new THREE.MeshBasicMaterial({ color: 0xffff00, transparent: true, opacity: 0 }));
+    edge.position.z = -0.05; grp.add(edge);
+    // 名前は画面の文字（3D の中の文字はスマホで小さすぎて読めない）
+    const lab = document.createElement("div"); lab.className = "nl"; lab.innerHTML = `<b>${f.nm}</b><span>${f.sport}　${f.t}</span>`; document.body.appendChild(lab);
+    scene.add(grp);
+    const s = { f, grp, img, edge, lab, cur: { x: 0, y: 0, z: -900, s: 0.3, o: 0, lo: 0, eo: 0 }, tgt: null, t0: 0 };
+    // 奥の宇宙での居場所（選ばれていない間はここを漂う）
+    const a = Math.random() * Math.PI * 2, r = 0.25 + Math.random() * 0.75;
+    s.home = { a, r, z: -220 - Math.random() * 260, sp: (Math.random() - 0.5) * 0.05 };
+    return s;
+  });
+
+  // 炸裂の光線（観点ごとの面の破片）とその読み
+  let rays = [];
+  function makeRay(ang, len, col, label, n, k) {
+    const g = new THREE.Group();
+    const w0 = 0.6, w1 = por ? 5 : 7, r0 = 4;
+    const geo = new THREE.BufferGeometry();
+    const v = new Float32Array([r0, -w0, -2, len, -w1, -14, len, w1, -14, r0, w0, -2]);
+    geo.setAttribute("position", new THREE.BufferAttribute(v, 3)); geo.setIndex([0, 1, 2, 0, 2, 3]);
+    const sh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+    g.add(sh); g.rotation.z = ang;
+    const lt = textCanvas([[label, '900 46px "Noto Sans JP"', "#000"]], 40 + label.length * 48, 72, { bg: "#ffff00", pad: 10, padx: 20 });
+    const lw = (40 + label.length * 48) / 72 * 3.0;
+    const lab = new THREE.Mesh(new THREE.PlaneGeometry(lw, 3.0), new THREE.MeshBasicMaterial({ map: lt, transparent: true, opacity: 0, depthWrite: false }));
+    scene.add(g); scene.add(lab);
+    return { g, sh, lab, ang, len, t0: performance.now() + k * 140, grow: 0, dead: false, n };
+  }
+
+  let center = null, history = [];
+  const ease = (k) => 1 - Math.pow(1 - Math.min(1, Math.max(0, k)), 3);
+  function focus(f) {
+    center = f; history.push(f); if (history.length > 8) history.shift(); drawTrail();
+    const now = performance.now();
+    rays.forEach((r) => { r.dead = true; r.t0 = now; });
+    const axes = AX.map(([k]) => k).filter((k) => f[k]);
+    const n = axes.length;
+    // 光線は画面の長い方向へ（PC は左右、スマホは上下）。かけらは向きと大きさから重ならない間隔で並べる
+    const ANG = por ? { 2: [90, 270], 3: [100, 80, 270], 4: [100, 80, 260, 280] } : { 2: [180, 0], 3: [160, 20, 270], 4: [152, 28, 208, 332] };
+    const cs = por ? 1.45 : 1.6, cw = (P * cs) / 2, ch = (PH * cs) / 2 + (por ? 5.2 : 4.2); // 中心のかけら（名前の分を含む）
+    const ps = por ? 0.66 : 0.78, pw = P * ps, ph = PH * ps + (por ? 9.2 : 8.0); // 名前は下にだけ付くが、上下どちらの向きでも重ならないよう両側に取る           // 光線の上のかけら（名前の分を含む）
+    const clear = (hw, hh, dx, dy) => Math.min(hw / Math.max(1e-3, Math.abs(dx)), hh / Math.max(1e-3, Math.abs(dy)));
+    const used = new Set([f.i]);
+    const place = new Map();
+    axes.forEach((key, k) => {
+      const ang = (ANG[n][k] * Math.PI) / 180, dx = Math.cos(ang), dy = Math.sin(ang);
+      const lim = clear(vw / 2 - pw / 2 - 1, vh / 2 - ph / 2 - (por ? 5 : 3), dx, dy);
+      const lab = `${f[key]}`, lw = (40 + lab.length * 48) / 72 * 3.0;
+      const dLab = clear(cw, ch, dx, dy) + clear(lw / 2, 1.5, dx, dy) + 1.2;
+      const step = clear(pw / 2 + 1.2, ph / 2 + 0.8, dx, dy) * 2;
+      const d0 = dLab + clear(lw / 2, 1.5, dx, dy) + step / 2 + 0.6;
+      const fit = Math.max(1, Math.min(por ? 4 : 4, Math.floor((lim - d0) / step) + 1));
+      const mates = F.filter((g) => g !== f && g[key] === f[key] && !used.has(g.i))
+        .sort((p, q) => (q.no !== f.no) - (p.no !== f.no) || AX.reduce((s, [a]) => s + (q[a] && q[a] === f[a]) - (p[a] && p[a] === f[a]), 0));
+      const take = mates.slice(0, fit);
+      const all = F.filter((g) => g !== f && g[key] === f[key]).length;
+      // スマホで上（下）に2本並ぶときは、隣の列と重ならないよう横へ押し出す
+      const pair = por && Math.abs(dx) > 0.01 && Math.abs(dx) < 0.5;
+      const sx = (v, half) => (pair ? Math.sign(dx) * Math.max(Math.abs(v), half + 0.8) : v);
+      const r = makeRay(ang, Math.max(d0 + (take.length - 0.4) * step, dLab + 6), COLORS[k % COLORS.length], lab, all, k); r.dLab = dLab; r.lx = sx(dx * dLab, lw / 2); r.ly = dy * dLab; rays.push(r);
+      take.forEach((g, j) => { used.add(g.i); const d = d0 + j * step;
+        place.set(g.i, { x: sx(dx * d, pw / 2), y: dy * d, z: 0, s: ps, o: 1, lo: 1, eo: 0, delay: 380 + k * 140 + j * 110 }); });
+    });
+    plates.forEach((p) => {
+      if (p.f === f) { p.tgt = { x: 0, y: 0, z: 0, s: por ? 1.45 : 1.6, o: 1, lo: 1, eo: 1, delay: 0 }; }
+      else if (place.has(p.f.i)) p.tgt = place.get(p.f.i);
+      else { const h = p.home; p.tgt = { x: Math.cos(h.a) * h.r * vw * 1.4, y: Math.sin(h.a) * h.r * vh * 1.4, z: h.z, s: 1, o: 0.22, lo: 0, eo: 0, delay: 0, drift: true }; }
+      p.t0 = now + (p.tgt.delay || 0);
+    });
+  }
+
+  // 操作: かけらを押す → そのかけらが中心へ、炸裂がそのかけらの読みで組み直される
+  const ray = new THREE.Raycaster(), mp = new THREE.Vector2();
+  let hover = null;
+  const pick = (e) => { mp.x = (e.clientX / W) * 2 - 1; mp.y = -(e.clientY / H) * 2 + 1; ray.setFromCamera(mp, cam);
+    const hit = ray.intersectObjects(plates.filter((p) => p.cur.o > 0.5).map((p) => p.img))[0]; return hit ? hit.object.userData.f : null; };
+  let down = null;
+  cv.addEventListener("pointerdown", (e) => (down = [e.clientX, e.clientY]));
+  cv.addEventListener("pointerup", (e) => { if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 10) return; const f = pick(e); if (!f) return;
+    if (f === center) openView(f); else focus(f); });
+  cv.addEventListener("pointermove", (e) => { if (e.pointerType !== "mouse") return; hover = pick(e); cv.style.cursor = hover ? "pointer" : "default"; par.x = (e.clientX / W - 0.5); par.y = (e.clientY / H - 0.5); });
+  const par = { x: 0, y: 0 };
+
+  function openView(f) { const v = document.getElementById("view"); v.querySelector("img").src = `f/${f.i}.jpg`;
+    v.querySelector("figcaption").innerHTML = `<b>${f.nm}</b>${f.title}（${f.sport}）　この1秒（${f.t}）から映像を再生します。※試作では静止画`; v.classList.add("on"); }
+  document.getElementById("view").onclick = (e) => e.currentTarget.classList.remove("on");
+  function drawTrail() { const t = document.getElementById("trail"); t.innerHTML = history.map((f) => `<img src="f/${f.i}.jpg" data-i="${f.i}" title="${f.nm}">`).join("");
+    t.querySelectorAll("img").forEach((im) => (im.onclick = () => { const f = F[+im.dataset.i]; if (f !== center) focus(f); })); }
+  document.getElementById("again").onclick = () => { history = []; start(); };
+
+  // 描画
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const k = 1 - Math.exp(-dt / 0.34);
+    plates.forEach((p) => {
+      if (!p.tgt) return;
+      const t = p.tgt, c = p.cur;
+      if (now >= p.t0) {
+        if (t.drift) { p.home.a += p.home.sp * dt; t.x = Math.cos(p.home.a) * p.home.r * vw * 1.4; t.y = Math.sin(p.home.a) * p.home.r * vh * 1.4; }
+        for (const key of ["x", "y", "z", "s", "o", "lo", "eo"]) c[key] += (t[key] - c[key]) * (key === "z" ? k * 0.9 : k);
+      }
+      const hv = hover === p.f && p.f !== center ? 1.12 : 1;
+      p.grp.position.set(c.x, c.y, c.z); p.grp.scale.setScalar(c.s * hv);
+      p.img.material.opacity = c.o; p.edge.material.opacity = c.eo;
+      const lo = c.lo * Math.min(1, c.o); p.lab.style.opacity = lo;
+      if (lo > 0.02) { const v = new THREE.Vector3(c.x, c.y - (PH / 2) * c.s * hv - 0.3, c.z).project(cam); p.lab.style.transform = `translate(-50%,0) translate(${((v.x + 1) / 2) * W}px,${((1 - v.y) / 2) * H + 3}px)`; }
+      p.lab.classList.toggle("c", p.f === center);
+    });
+    rays = rays.filter((r) => {
+      const age = (now - r.t0) / 1000;
+      if (r.dead) { r.grow = Math.max(0, r.grow - dt * 3.2); if (r.grow <= 0.001) { scene.remove(r.g); scene.remove(r.lab); return false; } }
+      else if (age > 0) r.grow = ease(age / 0.75);
+      r.g.scale.set(Math.max(0.001, r.grow), 1, 1); r.sh.material.opacity = 0.34 * Math.min(1, r.grow * 1.4);
+      r.lab.position.set(r.lx, r.ly, 1); r.lab.material.opacity = Math.max(0, (r.grow - 0.4) / 0.6);
+      return true;
+    });
+    cam.position.x += (par.x * 6 - cam.position.x) * k * 0.5; cam.position.y += (-par.y * 4 - cam.position.y) * k * 0.5; cam.lookAt(0, 0, 0);
+    R.render(scene, cam);
+    requestAnimationFrame(frame);
+  }
+  function start() {
+    const now = performance.now();
+    plates.forEach((p) => { const h = p.home; p.cur = { x: Math.cos(h.a) * h.r * vw * 1.4, y: Math.sin(h.a) * h.r * vh * 1.4, z: -900, s: 1, o: 0, lo: 0, eo: 0 }; p.tgt = { x: p.cur.x, y: p.cur.y, z: h.z, s: 1, o: 0.22, lo: 0, eo: 0, drift: true }; p.t0 = now; });
+    rays.forEach((r) => { scene.remove(r.g); scene.remove(r.lab); }); rays = [];
+    setTimeout(() => focus(F.find((f) => f.nm === "倒れ込んだ敗者")), 1400);
+  }
+  addEventListener("resize", () => { size(); if (center) { const c = center; history.pop(); focus(c); } });
+  start(); requestAnimationFrame(frame);
+  window.__b = { focus: (i) => focus(F[i]), get center() { return center && center.i; }, plates, cam, F,
+    screen: (i) => { const p = plates[i]; const v = new THREE.Vector3(); p.img.getWorldPosition(v); v.project(cam); return [(v.x + 1) / 2 * W, (1 - v.y) / 2 * H, p.cur.o]; } };
+})();
+</script>

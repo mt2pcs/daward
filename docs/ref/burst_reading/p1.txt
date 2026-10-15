@@ -1,0 +1,13 @@
+Key visual frame of an interactive web experience for "DAZN AWARDS 2026", rendered as a high-end real-time 3D scene (Unreal Engine 5 cinematic quality, 2026 motion design), 16:9.
+
+Concept: one selected sports moment sits at the center, and the whole space bursts outward from it, organised by how that moment can be read.
+
+Visual grammar must follow the supplied logo: a pure black void; from the centre radiate large flat translucent shards (long wedges and parallelograms, straight hard edges, no curves) in the logo palette (magenta red, coral, deep purple, cyan, sky blue, acid yellow-green, warm yellow). Shards overlap and become denser where they overlap. They recede strongly in depth with real perspective, some reaching past the camera and cut by the frame edge.
+
+At the centre, slightly toward the viewer: a large, crisp panel showing the first supplied photo (a defeated rugby player lying on his back on the grass), like a sheet of glass, thin yellow edge, real thickness and subtle reflection.
+
+Riding on three of the shards, at different depths along each shard: other photo panels (use the other supplied photos: a footballer on his knees fists on the turf, a goalkeeper lying spread-eagled, a rugby player kneeling head down), each a thin pane of glass carrying the image, angled to follow the shard's direction, nearer ones large and sharp, farther ones smaller with depth-of-field blur. Panels on the same shard read as one flowing line of moments.
+
+Lighting: no neon, no glow lines, no particles, no lens flares. Clean, editorial, cinematic. Light comes from the photos themselves. Deep blacks.
+Typography: at most three small bold labels in black text on yellow tags placed at the root of three shards near the centre panel; keep them short and legible; no other text.
+Camera: slightly low, slightly off-axis, wide lens, strong parallax, sense of being inside the burst.
