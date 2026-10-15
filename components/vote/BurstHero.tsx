@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 
 // KV: DAZN のフレームから直線の破片が放射する（ロゴのモチーフ）。Canvas 2D、軽量。破片はゆっくり外へ流れて生まれ変わる
 const PAL = ["#ebff00", "#ffffff", "#ff2d9b", "#2f6bff", "#ebff00", "#ffffff", "#ff8a3d"];
-export default function BurstHero({ density = 1 }: { density?: number }) {
+export default function BurstHero({ density = 1, center }: { density?: number; center?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const c = ref.current!; const ctx = c.getContext("2d")!;
@@ -19,7 +19,7 @@ export default function BurstHero({ density = 1 }: { density?: number }) {
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.05, (t - last) / 1000); last = t;
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
-      const cx = W / 2, cy = H * 0.5 - (W < 700 ? H * 0.12 : H * 0.1), R = Math.hypot(W, H) * 0.62, core = Math.min(W, H) * 0.125;
+      const cx = W / 2, cy = center != null ? H * center : H * 0.5 - (W < 700 ? H * 0.12 : H * 0.1), R = Math.hypot(W, H) * 0.62, core = Math.min(W, H) * 0.125;
       for (const s of shards) {
         const boost = 1 + 7 * Math.max(0, 1 - (t - t0) / 1800);
         if (!reduce) { s.r += dt * s.v * boost; if (s.r > 1.1) Object.assign(s, mk(false)); }
@@ -34,6 +34,6 @@ export default function BurstHero({ density = 1 }: { density?: number }) {
     };
     raf = requestAnimationFrame(frame);
     return () => { cancelAnimationFrame(raf); removeEventListener("resize", resize); };
-  }, [density]);
+  }, [density, center]);
   return <canvas ref={ref} className="v26-burst" aria-hidden />;
 }

@@ -21,10 +21,10 @@ export default function VoteDone({ params }: { params: { no: string } }) {
       <div className="share in">
         <h2>#DAZNAWARDS2026 でシェアして<br />ご招待キャンペーンに応募</h2>
         <ShareButtons no={m.no} title={m.title} />
-        <a className="terms" href="/awards#terms">応募規約を見る</a>
-        <a className="campaign" href="/awards#campaign">DAZN AWARDS ご招待キャンペーン →</a>
+        <a className="terms" href="/#terms">応募規約を見る</a>
+        <a className="campaign" href="/#campaign">DAZN AWARDS ご招待キャンペーン →</a>
       </div>
-      <div className="row"><Link className="ghost" href="/moments">ほかのモーメントを見る</Link><Link className="ghost" href="/awards">DAZN AWARDSについて</Link></div>
+      <div className="row"><Link className="ghost" href="/moments">ほかのモーメントを見る</Link><Link className="ghost" href="/">DAZN AWARDSについて</Link></div>
     </main>
   );
 }

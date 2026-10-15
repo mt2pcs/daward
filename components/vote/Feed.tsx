@@ -31,7 +31,7 @@ export default function Feed({ items, start, phase, votedNo }: Props) {
   useEffect(() => { const onKey = (e: KeyboardEvent) => { if (["ArrowRight", "ArrowDown"].includes(e.key)) { e.preventDefault(); go(1); } if (["ArrowLeft", "ArrowUp"].includes(e.key)) { e.preventDefault(); go(-1); } }; addEventListener("keydown", onKey); return () => removeEventListener("keydown", onKey); }, [go]);
 
   const share = async (m: FeedItem) => {
-    const url = `${location.origin}/moments/${m.no}`; const text = `No.${m.no} ${m.title} | DAZN 100 MOMENTS #DAZNAWARDS2026 #DAZN100MOMENTS`;
+    const url = `${location.origin}/moments/${m.no}`; const text = `2026年、心が震えた瞬間「${m.title}」\nあなたの1票は？\n#DAZNAWARDS2026 #DAZN100MOMENTS`;
     if (navigator.share) { try { await navigator.share({ title: text, url }); return; } catch {} }
     open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, "_blank");
   };
@@ -69,7 +69,7 @@ export default function Feed({ items, start, phase, votedNo }: Props) {
                   {phase === "open" && votedNo && votedNo !== m.no && <span className="v26-vote off">本日は投票済み（No.{votedNo}）</span>}
                   {phase === "open" && !votedNo && <Link href={`/moments/${m.no}/vote`} className="v26-vote">このモーメントに投票</Link>}
                   {phase === "pre" && <span className="v26-vote off">投票は11月上旬に開始</span>}
-                  {phase === "closed" && <Link href="/awards#event" className="v26-vote off">投票受付終了・授賞式は12/21</Link>}
+                  {phase === "closed" && <Link href="/#event" className="v26-vote off">投票受付終了・授賞式は12/21</Link>}
                   {phase === "result" && <span className="v26-vote off">結果発表中</span>}
                   <button className="v26-icon" onClick={() => share(m)} aria-label="シェア"><IconShare />SHARE</button>
                   <Link href="/moments" className="v26-icon" aria-label="一覧へ"><IconList />一覧</Link>

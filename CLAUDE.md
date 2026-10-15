@@ -630,6 +630,26 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
   → 中身（エンジンが返す束）の当たり外れの判定は私の仕事なのに、点検表を渡して判断を委ねた。報告も英語で書いた（**報告は必ず日本語**）。
   ユーザーに見せるのは体験（台本→1場面）であって点検表ではない。点検は自分で済ませ、結論だけ伝える。
 
+- **決定（2026-10-15 ユーザー）: 体験（炸裂・言葉の組み替え）の開発は最後にする。先に作っていないページ（情報サイト・投票サイト）を作る。**
+  体験の芯（切り口の言葉→100本がその言葉に答える一秒で組み替わる）と素材（material.json・秒の補正）は保留のまま残す。
+
+## 情報サイト DAZN AWARDS 2026（2026-10-15・info1）
+
+- ワイヤー I-00〜I-02 を1ページで実装。**ドメイン直下 `/`（VISUAL_MODE=burst）＝情報サイト TOP**、`/awards` も同じもの（既存リンク用）。投票サイトは `/moments`。
+  体験は最後に作るので `/experience` に退避し、投票サイトの「熱狂の中を回遊する」導線は `lib/site/flags.ts` の `experienceReady=false` で隠す。
+- 構成: `components/site/InfoSite.tsx`（KV / NEWS / ABOUT / AWARDS / 選考方法 / NOMINEES / CAST / EVENT / CAMPAIGN / FAQ / FOOTER）、
+  `SiteHeader.tsx`（PC 横並び＋投票ボタン、SP メニュー、SP 追従ボタンは投票期間中かつ KV を過ぎてから）、`NomineeTabs.tsx`、`app/site.css`（`.is-*`）。
+- **文言・未確定事項・公開フラグは `lib/site/content.ts` の1か所**（要確認の印つき）: NEWS（日付・文言は仮）、ABOUT 本文（仮）、トロフィー画像（未支給）、
+  第6部門名、ノミネート（`NOMINEES_PUBLISHED=1` で公開）、出演者（`public:false` の人は名前を出さず COMING SOON）、キャンペーンのエントリー URL・応募期間、
+  公式 SNS の URL（@DAZN_JPN / dazn_jpn は未確認）、規約・プライバシーは DAZN 公式トップへ（正確な URL 未確認）、KV の告知映像（`KV_VIDEO`、未支給の間は炸裂の Canvas）。
+- 時期の切り替え（I-02）は投票サイトと同じ `phase()`（VOTE_PHASE）: KV の主ボタン（受付中→投票／締切後→12/21 授賞式／発表後→受賞結果）、
+  SP 追従は受付中のみ、一般投票部門の状態、NOMINEES→WINNERS、EVENT のアーカイブ案内、CAMPAIGN は締切後に応募終了・発表後は非表示。
+- リファレンス: `docs/ref/gen/info_pc_kv1.png`（採用）, `info_pc_awards1.png`（右半分を採用）。プロンプト `docs/ref/info_*.txt`。SP のリファレンスは 429 で未生成。
+- 部門カードの写真は 100 MOMENTS の山場ポスター（1280px）から寄りの画を目視で選んだ（005 / 031 / 061 / 087 / 071）。
+- **落とし穴**: `.is a{color:inherit}` がボタンの `color:#050505` より強く、黄色ボタンの文字が白になった（投票サイトでも起きた不良）。ボタンは `.is a.is-btn-y` で指定する。
+- 投票サイトの変更: 「AWARDSについて」等のリンクを `/`（#faq / #campaign / #terms / #event）へ、シェア文をワイヤー P12 の案に。
+- 検証: `scratchpad/info/shot.mjs <base> <path> <tag>`（PC 1440 / SP 390 でセクションごとに実寸で撮る・SP メニュー）。
+
 ## 投票サイト（2026-10-14 着手・vote1）
 
 作業の順番（ユーザー指示で確定）: ①素材処理を完了 → ②投票サイトの骨格 → ③情報サイト → ④体験（炸裂）へ本番素材と意味データを接続。体験の核に先に手を付けない。

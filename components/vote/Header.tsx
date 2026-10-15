@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Phase } from "@/lib/vote/data";
+import { SITE } from "@/lib/site/flags";
 
 // V-00 共通パーツ: ロゴ / ？（投票ルール） / ≡（メニュー） / PC は投票期間を常時表示
 export default function Header({ phase, voteEnd }: { phase: Phase; voteEnd: string }) {
@@ -19,7 +20,7 @@ export default function Header({ phase, voteEnd }: { phase: Phase; voteEnd: stri
           <nav className="v26-nav">
             <span className="period">{phase === "open" ? `投票期間：〜${voteEnd}` : phase === "pre" ? "投票は11月上旬開始" : phase === "closed" ? "投票受付終了" : "結果発表"}</span>
             <a className="txt" href="#" onClick={(e) => { e.preventDefault(); setRules(true); }}>投票ルール</a>
-            <a className="txt" href="/awards">AWARDSについて</a>
+            <a className="txt" href="/">AWARDSについて</a>
             <button className="sp" aria-label="投票ルール" onClick={() => setRules(true)}>？</button>
             <button className="sp" aria-label="メニュー" onClick={() => setMenu(true)}>≡</button>
           </nav>
@@ -37,7 +38,7 @@ export default function Header({ phase, voteEnd }: { phase: Phase; voteEnd: stri
               <li>結果は12/21の授賞式で発表</li>
               <li>会員登録は不要</li>
             </ul>
-            <div className="links"><a href="/awards#faq">FAQ</a><a href="/awards#terms">応募規約（情報サイト）</a></div>
+            <div className="links"><a href="/#faq">FAQ</a><a href="/#terms">応募規約（情報サイト）</a></div>
             <button className="close" onClick={() => setRules(false)}>閉じる</button>
           </div>
         </div>
@@ -45,10 +46,10 @@ export default function Header({ phase, voteEnd }: { phase: Phase; voteEnd: stri
       {menu && (
         <div className="v26-modal v26-menu" role="dialog" aria-modal="true" onClick={() => setMenu(false)}>
           <div className="box" onClick={(e) => e.stopPropagation()}>
-            <a href="/awards">DAZN AWARDSについて</a>
-            <a href="/awards#campaign">ご招待キャンペーン</a>
-            <a href="/awards#faq">FAQ</a>
-            <a href="/">熱狂の中を回遊する</a>
+            <a href="/">DAZN AWARDSについて</a>
+            <a href="/#campaign">ご招待キャンペーン</a>
+            <a href="/#faq">FAQ</a>
+            {SITE.experienceReady && <a href={SITE.experiencePath}>熱狂の中を回遊する</a>}
             <button className="close" onClick={() => setMenu(false)}>閉じる</button>
           </div>
         </div>

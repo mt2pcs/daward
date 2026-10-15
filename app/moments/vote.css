@@ -187,3 +187,4 @@
 .v26-page h1.in{animation:v26-up .6s .1s cubic-bezier(.2,.9,.2,1) both}
 .v26-page .share.in{animation:v26-up .6s .45s cubic-bezier(.2,.9,.2,1) both}
 @media(prefers-reduced-motion:reduce){.v26 *{animation:none !important;transition:none !important}.v26-card{opacity:1;transform:none}.v26-slide .media,.v26-slide .no,.v26-slide .chips,.v26-slide h2,.v26-slide .desc,.v26-slide .why,.v26-slide .crowd,.v26-slide .acts,.v26-slide .dazn,.v26-slide .nexthint{opacity:1}}
+.v26-kv .lead2{margin-top:18px;font:700 14px/1.6 var(--jp);color:#ddd;text-shadow:0 2px 16px rgba(0,0,0,.9)}
