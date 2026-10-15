@@ -2120,3 +2120,12 @@ textarea {
   .exp-tour .t { flex: 1 0 100%; justify-content: center; }
   .exp-shade { height: 280px; }
 }
+
+/* CONTEXT MAP 2026（/graph）: 文脈・根拠の1秒・つながりの一文 */
+.cm-reason { border-top: 1px solid rgba(255,255,255,.08); padding: 8px 0; }
+.cm-ctx { display: inline-block; background: #ebff00; color: #07070a; border: 0; font: 900 12px/1.4 "Noto Sans JP", system-ui, sans-serif; padding: 4px 8px; cursor: pointer; text-align: left; }
+.cm-t { margin-top: 6px; font: 500 12px/1.6 "Noto Sans JP", system-ui, sans-serif; color: #d9d9d4; }
+.cm-flag { margin-top: 4px; font: 500 11px/1.5 "Noto Sans JP", system-ui, sans-serif; color: #ff8a80; }
+.cm-pair { border-top: 1px solid rgba(255,255,255,.08); padding: 6px 0; }
+.cm-pline { font: 500 12px/1.65 "Noto Sans JP", system-ui, sans-serif; color: #e8e8e3; margin-top: 4px; }
+.cm-via { display: inline-block; color: #ebff00; font-weight: 700; margin-right: 8px; }

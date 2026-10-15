@@ -586,6 +586,15 @@ bus→DynamicsCompressor→master(音量)。全SEをピーク −3〜−6dB / �
   例「すべてを出し切った敗者が見せる静かな気高さ」= 090 クボタの選手が大の字（ラグビー）⇄ 071 岸本（Bリーグ）⇄ 038 ガットゥーゾ（サッカー）。
   事実の点検で資料に無い事実（経歴・年数など外部知識）が混ざる→赤で表示し人が確認。AI の時刻が数秒ずれてフレームが説明と合わないもの4件（090-1,098-0,098-1,020-2）。
 - reasons.json には中断した一括実行の途中分（001〜006）も入っている（見本には使っていない）。ユーザー判断待ち。
+- **100本へ拡張（同日・ユーザー「モックと似ていてよい」→ CONTEXT GRAPH として見せる）**: reasons.json は全100本（334理由）。
+  `scripts/contextmap/map_all.mjs reasons.json data/contextmap2026.json`（①文脈の一覧26を全理由から下から作る→②各理由を文脈へ割当→③文脈ごとに
+  違う競技を優先した瞬間の組に一文→④事実の点検）。再開可能（途中保存、`PAR=5` で並列数）。
+  **割当 v1 の失敗**: スキーマが自由文字列だったので文脈名や定義文・別の番号が返り、51本がどの文脈にも入らなかった。v2 は context を ID の enum で縛り、
+  理由は配列の位置で対応させ、数が合わなければやり直す（`assignV: 2`）。gemini-2.5-flash は共有枠で 429 が続き 3.8-flash に落ちる（遅い）。
+  根拠フレーム: `scripts/contextmap/frames.mjs` → `gs://e-mooments-assets/ctx/<no>-<k>.jpg`（時刻のある理由のみ）。
+  画面: `/graph` = `components/ContextMap2026.tsx` + `lib/contextMap2026.ts`（黄=熱狂の文脈、白=瞬間（サムネ）、瞬間→文脈の線＝根拠の1秒と理由、
+  瞬間どうしの線＝一文）。配置のばねは各瞬間の最も強い文脈だけ強く（全部同じだと文脈が中心に固まる）、文脈どうしの反発×5、ラベルは重なりを捨てる。
+  検証 `scratchpad/graph/gt.mjs`（`window.__cm.at(id)` で座標、CDP screencast で連続フレーム。Playwright の recordVideo は ffmpeg が無く使えない）。
 
 ## 投票サイト（2026-10-14 着手・vote1）
 
