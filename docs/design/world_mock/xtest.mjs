@@ -1,0 +1,23 @@
+import { chromium } from "../../exp/node_modules/playwright-core/index.mjs";
+import { readFileSync } from "fs";
+const [w, h, tag] = [+process.argv[2], +process.argv[3], process.argv[4]];
+const px = process.env.HTTPS_PROXY;
+const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell", args: ["--no-sandbox", "--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"], proxy: px ? { server: px } : undefined });
+const ctx = await b.newContext({ viewport: { width: w, height: h }, ignoreHTTPSErrors: true });
+const p = await ctx.newPage();
+const errs = []; p.on("pageerror", (e) => errs.push("PAGE " + String(e).slice(0, 300))); p.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errs.push(m.type() + " " + m.text().slice(0, 300)); });
+await p.setContent(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>${readFileSync("moments_world.html", "utf8")}</body></html>`, { waitUntil: "load", timeout: 120000 });
+await p.waitForFunction(() => !!window.__x, null, { timeout: 120000 });
+await p.click("#start");
+const shot = async (t, n) => { await p.evaluate((t) => window.__x.freeze(t), t); await p.waitForTimeout(2500); await p.screenshot({ path: `${tag}_${n}.png` }); };
+const T = (process.env.TIMES || "1,6,9,10.5,12.5,14.5,16.5,18.5,21,23.5,26.5,29,31.5,35").split(",").map(Number);
+for (const t of T) await shot(t, "t" + String(t).replace(".", "_"));
+// 言葉を投げる
+await p.evaluate(() => { window.__x.freeze(null); });
+const fire = async (wi, n) => { const t0 = await p.evaluate(() => window.__x.t()); await p.evaluate((wi) => window.__x.throwWord(wi), wi); for (const d of [1.2, 3, 5, 9.5]) { await p.evaluate((v) => window.__x.freeze(v), t0 + d); await p.waitForTimeout(2500); await p.screenshot({ path: `${tag}_w${n}_${String(d).replace(".", "_")}.png` }); } await p.evaluate(() => window.__x.freeze(null)); };
+await p.evaluate(() => window.__x.freeze(40));
+await fire(0, 0);
+await p.evaluate(() => window.__x.freeze(60)); await fire(1, 1);
+await p.evaluate(() => window.__x.openFocusFirst()); await p.waitForTimeout(800); await p.screenshot({ path: `${tag}_focus.png` });
+console.log(tag, "errors", errs.slice(0, 8));
+await b.close();

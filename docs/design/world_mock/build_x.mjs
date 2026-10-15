@@ -1,0 +1,21 @@
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
+const X = process.argv[2];
+const W = JSON.parse(readFileSync("docs/design/world.json", "utf8"));
+const AT = JSON.parse(readFileSync(`${X}/atlas.json`, "utf8"));
+const R = JSON.parse(readFileSync("docs/design/mock/reads.json", "utf8"));
+const M = JSON.parse(readFileSync("data/moments2026.json", "utf8")); const A = Array.isArray(M) ? M : M.moments;
+const b64 = (p, t) => `data:${t};base64,` + readFileSync(p).toString("base64");
+const tileOf = new Map(AT.keys.map((k, i) => [k, i]));
+// アトラスにあるコマだけ（取れなかった1秒は除く）。線の番号を付け直す
+const keep = []; const remap = new Map();
+W.units.forEach((u, i) => { const k = u.no + "_" + u.t.replace(":", "-"); if (tileOf.has(k)) { remap.set(i, keep.length); keep.push([u.no, u.t, +u.pos.toFixed(3), (u.feel || u.what).split(" / ")[0].slice(0, 30), tileOf.get(k)]); } });
+const links = W.links.filter((l) => remap.has(l.a) && remap.has(l.b)).map((l) => [remap.get(l.a), remap.get(l.b), l.s]);
+const big = {}; for (const f of readdirSync(`${X}/big`)) big[f.replace(".jpg", "")] = b64(`${X}/big/${f}`, "image/jpeg");
+const media = {}, posters = {};
+const MM = `${X}/../mock/media`;
+const words = Object.entries(R).map(([w, r]) => ({ word: w, arms: r.arms.map((a) => ({ name: a.name, items: a.nos.filter((n) => r.picked[n]).map((n) => { const j = r.judge.find((x) => x.no === n); const key = `${n}_${j.t.replace(":", "-")}`; if (existsSync(`${MM}/${key}.mp4`) && !media[key]) { media[key] = { mp4: b64(`${MM}/${key}.mp4`, "video/mp4"), webm: b64(`${MM}/${key}.webm`, "video/webm") }; posters[key] = b64(`${MM}/${key}.jpg`, "image/jpeg"); } return [n, j.t, j.line, key]; }) })).filter((a) => a.items.length) }));
+const titles = Object.fromEntries(A.map((m) => [m.no, [m.title, m.sportLabel]]));
+const data = { units: keep, links, atlas: { img: b64(`${X}/atlas.jpg`, "image/jpeg"), cols: AT.cols, rows: AT.rows }, big, open: { mp4: b64(`${X}/open.mp4`, "video/mp4"), webm: b64(`${X}/open.webm`, "video/webm") }, crowd: b64("public/crowd.ogg", "audio/ogg"), words, media, posters, titles };
+const out = readFileSync(`${X}/x_template.html`, "utf8").replace("__DATA__", JSON.stringify(data));
+writeFileSync(`${X}/moments_world.html`, out);
+console.log("units", keep.length, "links", links.length, "media", Object.keys(media).length, "size", (out.length / 1e6).toFixed(2), "MB");
