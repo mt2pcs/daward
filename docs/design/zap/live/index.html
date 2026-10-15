@@ -1,0 +1,213 @@
+<title>負けた側の顔</title>
+<meta charset="utf-8">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&display=swap">
+<style>
+:root{--bg:#000;--fg:#fff;--dim:rgba(255,255,255,.62);--y:#ffff00;color-scheme:dark}
+html,body{background:var(--bg);color:var(--fg);margin:0;height:100%;overflow:hidden}
+body{font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic",sans-serif;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#stage{position:fixed;inset:0;overflow:hidden}
+.box{position:absolute;left:0;top:0}
+.ease{transition:left .95s cubic-bezier(.2,.75,.1,1),top .95s cubic-bezier(.2,.75,.1,1),width .95s cubic-bezier(.2,.75,.1,1),height .95s cubic-bezier(.2,.75,.1,1),opacity .7s ease,transform .95s cubic-bezier(.2,.75,.1,1)}
+video,.box img{display:block;width:100%;height:100%;object-fit:cover}
+#kobe{transition:opacity .8s ease}
+#kobe video{transition:filter .9s ease}
+#kobe.dim video{filter:brightness(.26) saturate(.7)}
+#start{position:absolute;inset:0;display:grid;place-items:center;cursor:pointer;z-index:30}
+#start img{position:absolute;object-fit:contain;width:100%;height:100%;filter:brightness(.55)}
+#play{position:relative;width:84px;height:84px;border-radius:50%;border:2px solid var(--fg);display:grid;place-items:center;background:rgba(0,0,0,.35)}
+#play::after{content:"";margin-left:7px;border-left:24px solid var(--fg);border-top:15px solid transparent;border-bottom:15px solid transparent}
+.frag{cursor:pointer;z-index:10;opacity:0}
+.frag .pic{position:absolute;inset:0;overflow:hidden;outline:0 solid var(--y);transition:outline-width .4s ease}
+.frag.on .pic{outline-width:3px}
+.frag.lift .pic{outline-width:3px;animation:breathe 2.6s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
+.frag .lab{position:absolute;left:0;top:100%;padding-top:7px;white-space:nowrap;line-height:1.25;transition:opacity .5s ease}
+.frag .nm{font-weight:900;font-size:var(--nm,17px);text-shadow:0 1px 3px #000}
+.frag .sb{font-weight:700;font-size:var(--sb,11px);color:var(--y);letter-spacing:.04em}
+.frag.small .lab{padding-top:5px}
+.frag.lift .lab{top:calc(100% + 8px);padding:7px 12px 8px;background:rgba(0,0,0,.82)}
+#lens{position:absolute;left:0;right:0;text-align:center;font-weight:900;color:var(--y);letter-spacing:.06em;opacity:0;transition:opacity .8s ease;pointer-events:none;z-index:20}
+.panel{z-index:5;opacity:0;transition:opacity .5s ease;background:#000}
+.panel video{position:absolute;inset:0;opacity:0;transition:opacity .35s ease}
+.panel video.act{opacity:1}
+.tag{position:absolute;left:0;bottom:100%;padding-bottom:6px;font-weight:900;font-size:var(--tag,16px);letter-spacing:.06em}
+.tag.y{color:var(--y)}
+#cap{position:absolute;left:0;right:0;text-align:center;font-weight:700;color:var(--dim);font-size:var(--cap,15px);opacity:0;transition:opacity .4s ease;z-index:6;padding-inline:max(16px,env(safe-area-inset-left,0px))}
+#again{position:absolute;z-index:25;left:max(14px,env(safe-area-inset-left,0px));top:calc(10px + env(safe-area-inset-top,0px));font:700 12px/1 "Noto Sans JP",sans-serif;color:var(--dim);background:none;border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:8px 12px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .5s ease}
+#again.show{opacity:1;pointer-events:auto}
+</style>
+
+<div id="stage">
+  <div id="kobe" class="box"><video playsinline preload="auto"></video></div>
+  <div id="start" role="button" aria-label="再生"><img alt=""><div id="play"></div></div>
+  <div id="pw" class="box panel"><div class="tag">勝った側</div></div>
+  <div id="pl" class="box panel"><div class="tag y">負けた側</div></div>
+  <div id="cap"></div>
+  <div id="lens">負けた側の顔</div>
+  <button id="again">↺ 最初から</button>
+</div>
+
+<script>
+(() => {
+  // 4つのかけら（人 × その1秒）。box は神戸の映像の中の位置（正規化）。組は勝った側・負けた側の映像と、どの試合か。
+  const FR = [
+    { img: "m/f1.jpg", nm: "倒れ込んだ敗者", sb: "ラグビー　0:52", ar: 1241 / 583, box: [0.0, 0.16, 0.97, 0.97], w: "w1", l: "l1", cap: "ラグビー リーグワン決勝　神戸 22-13 クボタ" },
+    { img: "m/f2.jpg", nm: "顔を覆う日本代表", sb: "W杯　0:55", ar: 845 / 562, w: "w2", l: "l2", cap: "W杯　ブラジル 2-1 日本" },
+    { img: "m/f3.jpg", nm: "大の字の守護神", sb: "ACL　0:23", ar: 870 / 490, w: "w3", l: "l3", cap: "ACL決勝　アル・アハリ × 町田" },
+    { img: "m/f4.jpg", nm: "膝をつくフィジー", sb: "ラグビー日本代表　0:40", ar: 640 / 605, w: "w4", l: "l4", cap: "パシフィックネーションズカップ　日本 × フィジー" },
+  ];
+  const $ = (s) => document.querySelector(s);
+  const stage = $("#stage"), kobe = $("#kobe"), kv = kobe.querySelector("video"), start = $("#start");
+  const isSafari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent);
+  const webm = !isSafari && kv.canPlayType('video/webm; codecs="vp9, opus"') === "probably";
+  const src = (n) => `m/${n}.${webm ? "webm" : "mp4"}`;
+  kv.src = src("kobe"); start.querySelector("img").src = "m/kobe_first.jpg";
+
+  // かけらの要素
+  const fe = FR.map((f, i) => {
+    const el = document.createElement("div");
+    el.className = "box frag";
+    el.innerHTML = `<div class="pic"><img alt="" src="${f.img}"></div><div class="lab"><div class="nm">${f.nm}</div><div class="sb">${f.sb}</div></div>`;
+    el.addEventListener("click", () => onFrag(i));
+    stage.appendChild(el); return el;
+  });
+  // 組の映像（先に全部読み込んでおき、押したら同時に頭から再生）
+  const pw = $("#pw"), pl = $("#pl");
+  const vids = FR.map((f) => {
+    const mk = (n, host, vol) => { const v = document.createElement("video"); v.playsInline = true; v.preload = "auto"; v.src = src(n); v.volume = vol; host.appendChild(v); return v; };
+    return { w: mk(f.w, pw, 0.55), l: mk(f.l, pl, 1) };
+  });
+
+  let state = "start", cur = -1;
+  const place = (el, r) => { el.style.left = r[0] + "px"; el.style.top = r[1] + "px"; el.style.width = r[2] + "px"; el.style.height = r[3] + "px"; };
+  const fit = (ar, x, y, w, h) => { let fw = w, fh = w / ar; if (fh > h) { fh = h; fw = h * ar; } return [x + (w - fw) / 2, y + (h - fh) / 2, fw, fh]; };
+
+  // 画面の割り付け（毎回ここから計算する。横長＝PC、縦長＝スマホ）
+  function L() {
+    const W = stage.clientWidth, H = stage.clientHeight, por = W / H < 1;
+    const sT = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("padding-top")) || 0;
+    const o = { W, H, por };
+    o.kobe = fit(16 / 9, 0, 0, W, H);
+    const g = por ? 16 : Math.max(24, W * 0.03);
+    o.lensTop = por ? 18 : 22; o.lensSize = por ? 24 : Math.min(30, W * 0.024);
+    const top = o.lensTop + o.lensSize * 1.6 + (por ? 14 : 18);
+    const labH = por ? 42 : 50;
+    // かけらは同じ高さで並べる（幅は各かけらの縦横比）。行ごとに中央へ寄せる
+    const rows = (R, h, y0, labH, gap) => { const out = []; let y = y0;
+      R.forEach((row) => { const rw = row.reduce((a, i) => a + h * FR[i].ar, 0) + g * (row.length - 1); let x = (W - rw) / 2;
+        row.forEach((i) => { out[i] = [x, y, h * FR[i].ar, h]; x += h * FR[i].ar + g; }); y += h + labH + gap; });
+      return out; };
+    const fitH = (R, avail, labH, gap) => Math.min((avail - R.length * labH - (R.length - 1) * gap) / R.length,
+      ...R.map((row) => (W - g * 2 - g * (row.length - 1)) / row.reduce((a, i) => a + FR[i].ar, 0)));
+    const blockH = (R, h, labH, gap) => R.length * (h + labH) + (R.length - 1) * gap;
+    // 集まったとき: PC は 2 行、スマホは縦に 4 つ
+    { const R = por ? [[0], [1], [2], [3]] : [[0, 1], [2, 3]], gap = por ? 4 : 18, avail = H - top - 14;
+      const h = fitH(R, avail, labH, gap); o.gather = rows(R, h, top + Math.max(0, (avail - blockH(R, h, labH, gap)) / 2), labH, gap); }
+    // 浮かぶとき: 映像の中の位置から、画面の内側へ少し大きく持ち上がる（はみ出さない）
+    { const b = FR[0].box, k = o.kobe, r0 = [k[0] + b[0] * k[2], k[1] + b[1] * k[3], (b[2] - b[0]) * k[2], (b[3] - b[1]) * k[3]];
+      o.box0 = r0;
+      if (por) { const w = W - g * 2, h = w / FR[0].ar; o.lift = [g, k[1] + k[3] / 2 - h / 2 - 30, w, h]; }
+      else { const w = Math.min(r0[2] * 1.06, W - g * 2), h = w / FR[0].ar; let x = r0[0] + r0[2] / 2 - w / 2, y = r0[1] + r0[3] / 2 - h / 2;
+        x = Math.max(g, Math.min(W - g - w, x)); y = Math.max(g, Math.min(H - labH - 10 - h, y)); o.lift = [x, y, w, h]; } }
+    // 並べて流すとき: 映像は 16:9 のまま（切り抜かない）。かけらは下に並ぶ
+    const sLab = por ? 36 : 40, tagH = por ? 26 : 28, capH = por ? 34 : 44;
+    if (!por) {
+      const R = [[0, 1, 2, 3]], sh = Math.min(H * 0.17, 122, fitH(R, 999, 0, 0));
+      const pwid = Math.min((W - g * 3) / 2, ((H - top - tagH - capH - sh - sLab - 20) * 16) / 9), ph = (pwid * 9) / 16;
+      const blk = tagH + ph + capH + sh + sLab, y0 = top + Math.max(0, (H - top - 10 - blk) / 2);
+      const x0 = (W - (pwid * 2 + g)) / 2, py = y0 + tagH;
+      o.pw = [x0, py, pwid, ph]; o.pl = [x0 + pwid + g, py, pwid, ph]; o.capTop = py + ph + 12;
+      o.strip = rows(R, sh, py + ph + capH, sLab, 0);
+    } else {
+      const ph = (W * 9) / 16, py = top + tagH;
+      o.pw = [0, py, W, ph]; o.pl = [0, py + ph + tagH + 8, W, ph]; o.capTop = o.pl[1] + ph + 10;
+      const R = [[0, 1], [2, 3]], sy = o.capTop + capH, avail = H - sy - 8, h = fitH(R, avail, sLab, 6);
+      o.strip = rows(R, h, sy, sLab, 6);
+    }
+    return o;
+  }
+
+  function apply(instant) {
+    const o = L();
+    stage.style.setProperty("--nm", (o.por ? 15 : 18) + "px"); stage.style.setProperty("--sb", (o.por ? 11 : 12) + "px");
+    stage.style.setProperty("--tag", (o.por ? 14 : 16) + "px"); stage.style.setProperty("--cap", (o.por ? 13 : 15) + "px");
+    const lens = $("#lens"); lens.style.top = `calc(${o.lensTop}px + env(safe-area-inset-top,0px))`; lens.style.fontSize = o.lensSize + "px";
+    place(kobe, o.kobe);
+    fe.forEach((el) => el.classList.toggle("ease", !instant));
+    if (state === "lift") place(fe[0], o.lift);
+    if (state === "gather") fe.forEach((el, i) => place(el, o.gather[i]));
+    if (state === "pair") { fe.forEach((el, i) => place(el, o.strip[i])); place(pw, o.pw); place(pl, o.pl); $("#cap").style.top = o.capTop + "px"; }
+    fe.forEach((el) => el.classList.toggle("small", state === "pair"));
+    if (state === "pair") { stage.style.setProperty("--nm", (o.por ? 13 : 14) + "px"); stage.style.setProperty("--sb", (o.por ? 10 : 11) + "px"); }
+  }
+  addEventListener("resize", () => apply(true));
+
+  // ① 再生: 神戸の映像（音あり）。終わりのコマ（倒れ込んだ敗者）で止まる
+  start.addEventListener("click", () => {
+    if (state !== "start") return;
+    state = "play"; start.style.display = "none";
+    kv.currentTime = 0; kv.play().catch(() => {});
+    vids.forEach((p) => { p.w.load(); p.l.load(); });
+  });
+  kv.addEventListener("ended", () => { if (state === "play") lift(); });
+
+  // ② その1秒の、その人がかけらとして浮かぶ（映像の中の位置から）
+  function lift() {
+    state = "lift"; const o = L();
+    const el = fe[0]; el.querySelector(".lab").style.opacity = 0;
+    el.classList.remove("ease"); place(el, o.box0); el.style.opacity = 1; el.offsetWidth;
+    kobe.classList.add("dim");
+    el.classList.add("ease", "lift"); place(el, o.lift);
+    setTimeout(() => { el.querySelector(".lab").style.opacity = 1; }, 700);
+  }
+
+  // ③ かけらを押す → 他の試合の「負けた側」のかけらが奥から集まってくる
+  function gather() {
+    state = "gather"; fe[0].classList.remove("lift");
+    kobe.style.opacity = 0; $("#lens").style.opacity = 1; $("#again").classList.add("show");
+    const o = L();
+    fe.forEach((el, i) => {
+      if (i === 0) { el.classList.add("ease", "on"); place(el, o.gather[0]); return; }
+      const t = o.gather[i], cx = o.W / 2, cy = o.H * 0.5, s = 0.12;
+      el.classList.remove("ease"); el.style.transitionDelay = "";
+      place(el, [cx - (t[2] * s) / 2, cy - (t[3] * s) / 2, t[2] * s, t[3] * s]); el.style.opacity = 0;
+      el.offsetWidth;
+      el.style.transitionDelay = `${0.25 + i * 0.28}s`; el.classList.add("ease");
+      place(el, t); el.style.opacity = 1;
+    });
+    setTimeout(() => fe.forEach((el) => (el.style.transitionDelay = "")), 2200);
+  }
+
+  // ④ 集まったかけらを押す → その試合の勝った側と負けた側が並んで流れる。下のかけらで次へ渡れる
+  function pair(i) {
+    const first = state !== "pair";
+    state = "pair"; apply(false);
+    fe.forEach((el, k) => el.classList.toggle("on", k === i));
+    pw.style.opacity = 1; pl.style.opacity = 1;
+    vids.forEach((p, k) => { if (k !== i) { p.w.pause(); p.l.pause(); } p.w.classList.toggle("act", k === i); p.l.classList.toggle("act", k === i); });
+    const p = vids[i]; p.w.currentTime = 0; p.l.currentTime = 0;
+    p.w.play().catch(() => {}); p.l.play().catch(() => {});
+    const cap = $("#cap"); cap.style.opacity = 0;
+    setTimeout(() => { cap.textContent = FR[i].cap; cap.style.opacity = 1; }, first ? 600 : 200);
+    cur = i;
+  }
+
+  function onFrag(i) {
+    if (state === "lift" && i === 0) gather();
+    else if (state === "gather" || state === "pair") pair(i);
+  }
+
+  $("#again").addEventListener("click", () => {
+    vids.forEach((p) => { p.w.pause(); p.l.pause(); p.w.classList.remove("act"); p.l.classList.remove("act"); });
+    fe.forEach((el) => { el.classList.remove("ease", "on", "lift", "small"); el.style.opacity = 0; });
+    pw.style.opacity = 0; pl.style.opacity = 0; $("#cap").style.opacity = 0; $("#lens").style.opacity = 0; $("#again").classList.remove("show");
+    kobe.classList.remove("dim"); kobe.style.opacity = 1;
+    state = "play"; cur = -1; kv.currentTime = 0; kv.play().catch(() => {});
+  });
+
+  apply(true);
+  window.__lp = { get state() { return state; }, get cur() { return cur; }, vids, kv, fe, L };
+})();
+</script>
