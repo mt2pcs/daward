@@ -1058,3 +1058,10 @@ Setup scriptには (1) ユーザーレベルCLAUDE.md（恒常ルール）の生
   他は遠のく、押すたびに全体が組み替わる）を作らず、静止した球に光を足していた。**構造＝位置の意味を先に決める（中心＝押したもの、距離＝繋がりの近さ）。**
 - **ユーザー指摘（2026-10-16）「中途半端なものを見せられても何も判断できない。並べただけで何を判断しろと要求しているのか」**。→ 途中のもの（骨格・一部分）を出して判断を求めない。
   出すのは通しで触れる完成形だけ（入口→1本がかけらにほどける→押すと全体が組み替わる→渡っていく→言葉で組み替わる、映像が流れる、PC/SP）。自分で触って2つの問いを確かめてから。
+- **体験の試作 /lab/net（2026-10-16・本番 e-mooments-burst に同居）**: https://e-mooments-burst-vckorfe4qa-an.a.run.app/lab/net 。`components/lab/NetWorld.tsx`、`app/lab/net/page.tsx`、
+  言葉の API `app/api/lab/net/word/route.ts`（言葉＋映像の場面への言い換え4つを埋め込み→488かけらと照合→上位36を gemini-2.5-flash が6〜12に選び各一言と塊の名前、約4秒、メモリにキャッシュ）。
+  構造: 位置＝中心が押したもの/投げた言葉、周り＝直接繋がるかけら（枠と糸の色＝繋がりの種類、同時に頭から再生）、外側＝その先、奥＝残り全部。押すたびに全体が組み替わる。
+  データ: `scripts/net/build_world.mjs` → `data/net/world.json`＋`public/lab/net/world.json`、`names.mjs`（塊の名前 403）、`emb.mjs`（`public/lab/net/emb.bin`）、
+  `clips.mjs <out>`（かけらごとに 3.6 秒の webm/mp4 とその1秒の jpg）、`atlas.py <out>` → バケット `lab/net/`（`scripts/lab/upload_dir.js <dir> lab/net`）。
+  検証 `scripts/lab/net_world_test.mjs W H tag`（OUT・CLIPS=ローカルの映像・BASE。バケットの要求をローカルへ差し替え）。swiftshader で約10fps。
+  既知の弱さ: 繋がりの大半がよくある所作（押して渡る側は似た場面のおすすめに見える恐れ）、引きの画のかけら、SP の開いた画面で名前が重なる、映像の無い24本は未収録、実機未確認。
