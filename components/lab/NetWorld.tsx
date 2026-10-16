@@ -119,7 +119,7 @@ export default function NetWorld({ media }: { media: MediaMap }) {
         let center: Tile | null = null, firsts: { y: number; k: number; r: number; why: string; line?: string }[];
         if (m.kind === "focus") { center = tiles[m.i]; firsts = (nb.get(m.i) || []).slice().sort((a, b) => b.r - a.r).slice(0, pr ? 8 : 10); }
         else firsts = m.picks.slice(0, pr ? 8 : 12).map((p) => ({ y: p.i, k: -1, r: 3, why: "", line: p.line }));
-        const cy = pr ? 3 : 2;
+        const cy = m.kind === "word" ? 0 : pr ? 3 : 2;   // 言葉は画面の中心（文字と線の集まる点を合わせる）
         if (center) { center.g = [0, cy, 8, pr ? 15 : 17, 1]; center.fo = 0.9; center.fc.set("#ffffff"); play.push({ t: center, sound: true }); }
         const n = firsts.length, rx = pr ? 11.5 : 31, ry = pr ? 20 : 14.5, used = new Set<number>(center ? [m.kind === "focus" ? m.i : -1] : []);
         firsts.forEach((f, j) => { const a = -Math.PI / 2 + (j / n) * Math.PI * 2 + (n % 2 ? 0 : Math.PI / n), t = tiles[f.y]; used.add(f.y);
