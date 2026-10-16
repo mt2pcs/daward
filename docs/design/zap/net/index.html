@@ -157,7 +157,7 @@ const dend = new THREE.LineSegments(dg, dendMat); dend.frustumCulled = false; sc
 // 人（L2）は、その人が映る1秒のコマ
 const firstUnit = (i) => { if (LV[i] === 2) return UNIT[i]; for (const c of KIDS[i]) { const u = firstUnit(c); if (u >= 0) return u; } return -1; };
 const P2 = []; for (let i = 0; i < N; i++) if (LV[i] === 2 || LV[i] === 0) P2.push(i); const NP = P2.length;
-const ISZ = [6.5, 0, 5, 0];                          // 板の大きさ（瞬間 / 人）
+const ISZ = [9, 0, 5.5, 0]; const GROW = new Float32Array(N).fill(1);                          // 板の大きさ（瞬間 / 人）
 const LW = 192, LH = 108, sheets = [0, 1, 2], NL = 683, layers = new Uint8Array(LW * LH * 4 * NL);
 const arr = new THREE.DataArrayTexture(layers, LW, LH, NL); arr.generateMipmaps = true; arr.minFilter = THREE.LinearMipmapLinearFilter; arr.magFilter = THREE.LinearFilter;
 const pg = new THREE.PlaneGeometry(1, 0.5625); const aL = new THREE.InstancedBufferAttribute(new Float32Array(NP), 1), aV = new THREE.InstancedBufferAttribute(new Float32Array(NP), 1);
@@ -166,7 +166,7 @@ const imgMat = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, transparent:
   vertexShader: `in float aL, aV; out vec2 vUv; out float vL, vV; void main(){ vUv=uv; vL=aL; vV=aV; gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0); }`,
   fragmentShader: `precision highp sampler2DArray; uniform sampler2DArray uTex; in vec2 vUv; in float vL, vV; out vec4 o;
     void main(){ vec3 c=texture(uTex, vec3(vUv.x,1.0-vUv.y,vL)).rgb; o=vec4(c*(0.55+0.45*vV), vV); }` });
-const imgs = new THREE.InstancedMesh(pg, imgMat, NP); imgs.frustumCulled = false; imgs.renderOrder = 2; scene.add(imgs);
+const imgs = new THREE.InstancedMesh(pg, imgMat, NP); imgs.frustumCulled = false; imgs.renderOrder = 4; scene.add(imgs);
 (async () => { const cv = document.createElement("canvas"); cv.width = 16 * LW; cv.height = 16 * LH; const x = cv.getContext("2d", { willReadFrequently: true });
   for (const s of sheets) { const im = new Image(); im.src = `sheet${s}.jpg`; try { await im.decode(); } catch { continue; }
     x.drawImage(im, 0, 0); const px = x.getImageData(0, 0, cv.width, cv.height).data;
@@ -195,7 +195,15 @@ canvas.addEventListener("pointermove", (e) => { if (!ptrs.has(e.pointerId)) retu
   ptrs.set(e.pointerId, [e.clientX, e.clientY]); moved += Math.abs(dx) + Math.abs(dy);
   if (ptrs.size === 1) { CAMS.th -= dx * 0.005; CAMS.ph = Math.max(-1.3, Math.min(1.3, CAMS.ph + dy * 0.004)); }
   else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch0) zoomBy(pinch0 / d, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); pinch0 = d; } });
-const endPtr = (e) => { const wasTap = ptrs.size === 1 && moved < 8; ptrs.delete(e.pointerId); if (wasTap) select(-1); };
+const endPtr = (e) => { const wasTap = ptrs.size === 1 && moved < 8; ptrs.delete(e.pointerId); if (wasTap) select(pick(e.clientX, e.clientY)); };
+let hover = -1;
+canvas.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse" && !ptrs.size) hover = pick(e.clientX, e.clientY); });
+// 画面上でコマの矩形に入っているもののうち、手前のもの
+function pick(x, y) { let best = -1, bz = 1e9; const f = innerHeight / (2 * Math.tan(cam.fov * Math.PI / 360));
+  for (const i of P2) { if (VIS[i] < 0.05) continue; const s = scr(i); if (s[2] > 1) continue;
+    const dz = V3.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]).distanceTo(cam.position), hw = Math.max(16, GROW[i] * ISZ[LV[i]] * 0.5 * f / dz), hh = Math.max(12, hw * 0.5625);
+    if (Math.abs(s[0] - x) < hw && Math.abs(s[1] - y) < hh && dz < bz) { bz = dz; best = i; } }
+  return best; }
 canvas.addEventListener("pointerup", endPtr); canvas.addEventListener("pointercancel", (e) => ptrs.delete(e.pointerId));
 canvas.addEventListener("wheel", (e) => { e.preventDefault(); auto = false; touched = true; zoomBy(Math.exp(e.deltaY * 0.0014), e.clientX, e.clientY); }, { passive: false });
 // 寄るときは、カーソルの近くで見えているものへ中心を寄せる（ダイヤルを回すとそこへ潜っていく）
@@ -211,7 +219,7 @@ function nearestScreen(x, y, r) { let best = -1, bd = r * r;
   return best; }
 
 // ---- 選ぶ: その中から出る糸が温かくなり、届いた先の瞬間が開いて寄ってくる（塊になる） ----
-let sel = -1, fitT = 0, selT = 0; const LIT = new Uint8Array(N); const cap = document.getElementById("cap");
+let sel = -1, fitT = 0, selT = 0; window.__pick = (x, y) => pick(x, y); const LIT = new Uint8Array(N); const cap = document.getElementById("cap");
 const inSub = (n, root) => { while (n >= 0) { if (n === root) return true; n = PAR[n]; } return false; };
 function select(i) {
   sel = i; HF = []; LIT.fill(0); BOOST.fill(0); PULLT.fill(0); aHL.fill(0);
@@ -233,7 +241,7 @@ function select(i) {
   hlAttr.needsUpdate = true; fiberMat.uniforms.uSel.value = i >= 0 ? 1 : 0; dendMat.uniforms.uSel.value = i >= 0 ? 1 : 0; fitT = i >= 0 ? 3.5 : 0; selT = 0;
   // 選んだのが要素なら、届いた先の具体と一文を出す（理由が辿れる＝ブラックボックスにしない）
   whys.sort((a, b) => b[2] - a[2]);
-  if (i >= 0 && LV[i] === 3 && whys.length) {
+  if (false) {
     cap.innerHTML = whys.slice(0, portrait() ? 2 : 3).map(([w, o]) => `<div><span class="w">${esc(D.nodes[o][2])}</span>　${esc(D.nodes[MOM[o]][2])}<br>${esc(w)}</div>`).join("");
     cap.classList.add("on");
   } else cap.classList.remove("on");
@@ -244,29 +252,54 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const M4 = new THREE.Matrix4(), QI = new THREE.Quaternion(), S3 = new THREE.Vector3(), PV = new THREE.Vector3();
 let last = performance.now(); const DTMAX = +(Q.get("dtmax") || 0.1);
+// 大きく育ったコマどうしが画面上で重ならないよう、カメラの面に沿って押し離す（枝と糸もその位置へついていく）
+const OFF = new Float32Array(N * 3), OFFT = new Float32Array(N * 3), CR = new THREE.Vector3(), CU = new THREE.Vector3();
+function spread(dt) {
+  OFFT.fill(0); const big = P2.filter((i) => LV[i] === 2 && GROW[i] > 1.6);
+  if (big.length > 1) {
+    const fpx = innerHeight / (2 * Math.tan(cam.fov * Math.PI / 360)), R0 = big.map((i) => { V3.set(POS[i * 3] - OFF[i * 3], POS[i * 3 + 1] - OFF[i * 3 + 1], POS[i * 3 + 2] - OFF[i * 3 + 2]);
+      const dz = V3.distanceTo(cam.position); V3.project(cam); const hw = GROW[i] * ISZ[2] * 0.5 * fpx / dz + 6;
+      return { i, x: (V3.x + 1) / 2 * innerWidth, y: (1 - V3.y) / 2 * innerHeight, hw, hh: hw * 0.5625 + 6, dz, dx: 0, dy: 0 }; });
+    for (let it = 0; it < 24; it++) for (let a = 0; a < R0.length; a++) for (let b = a + 1; b < R0.length; b++) { const A = R0[a], B = R0[b];
+      const ox = A.hw + B.hw - Math.abs(A.x + A.dx - B.x - B.dx), oy = A.hh + B.hh - Math.abs(A.y + A.dy - B.y - B.dy); if (ox <= 0 || oy <= 0) continue;
+      if (ox / (A.hw + B.hw) < oy / (A.hh + B.hh)) { const sg = A.x + A.dx < B.x + B.dx ? -1 : 1; A.dx += sg * ox / 2; B.dx -= sg * ox / 2; }
+      else { const sg = A.y + A.dy < B.y + B.dy ? -1 : 1; A.dy += sg * oy / 2; B.dy -= sg * oy / 2; } }
+    CR.setFromMatrixColumn(cam.matrixWorld, 0); CU.setFromMatrixColumn(cam.matrixWorld, 1);
+    for (const r of R0) { const k = r.dz / fpx; for (let d = 0; d < 3; d++) OFFT[r.i * 3 + d] = (CR.getComponent(d) * r.dx - CU.getComponent(d) * r.dy) * k; }
+  }
+  for (let k = 0; k < N * 3; k++) OFF[k] += (OFFT[k] - OFF[k]) * (1 - Math.exp(-dt * 4));
+}
 function frame(now) {
   const dt = Math.min(DTMAX, (now - last) / 1000); last = now;
   // 選んだ直後は、選んだものと届いた先（同じ深さで光っているもの）が全部入るようにカメラを合わせる
   if (fitT > 0 && sel >= 0) { fitT -= dt; const c = new THREE.Vector3(), q = new THREE.Vector3(); let n = 0, r = 0; const pts = [];
     for (let k = 0; k < N; k++) if ((LIT[k] && LV[k] === LV[sel]) || k === sel) { pts.push(k); c.x += POS[k * 3]; c.y += POS[k * 3 + 1]; c.z += POS[k * 3 + 2]; n++; }
     if (n) { c.divideScalar(n); for (const k of pts) r = Math.max(r, q.set(POS[k * 3], POS[k * 3 + 1], POS[k * 3 + 2]).distanceTo(c));
-      GOAL.pivot.copy(c); GOAL.dist = Math.max([120, 40, 14, 9][LV[sel]], r * (portrait() ? 3.4 : 2.4)); } }
+      GOAL.pivot.copy(c); GOAL.dist = Math.max([120, 40, 18, 9][LV[sel]], r * (portrait() ? 3.4 : 2.4)); } }
   selT += dt; fiberMat.uniforms.uProg.value = Math.min(1.05, selT / 1.8);
   camUpdate(dt);
+  spread(dt);
   for (let k = 0; k < N * 3; k++) PULL[k] += (PULLT[k] - PULL[k]) * (1 - Math.exp(-dt * 1.8));
   const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
   for (let i = 0; i < N; i++) {
     const p = PAR[i];
     if (p < 0) { POS[i * 3] = BASE[i * 3] + PULL[i * 3]; POS[i * 3 + 1] = BASE[i * 3 + 1] + PULL[i * 3 + 1]; POS[i * 3 + 2] = BASE[i * 3 + 2] + PULL[i * 3 + 2]; VIS[i] = 1; }
     else { const e = OPN[p], r = R[LV[i]] * e;
-      POS[i * 3] = POS[p * 3] + DIR[i * 3] * r; POS[i * 3 + 1] = POS[p * 3 + 1] + DIR[i * 3 + 1] * r; POS[i * 3 + 2] = POS[p * 3 + 2] + DIR[i * 3 + 2] * r; VIS[i] = VIS[p] * e; }
+      POS[i * 3] = POS[p * 3] + DIR[i * 3] * r + OFF[i * 3]; POS[i * 3 + 1] = POS[p * 3 + 1] + DIR[i * 3 + 1] * r + OFF[i * 3 + 1]; POS[i * 3 + 2] = POS[p * 3 + 2] + DIR[i * 3 + 2] * r + OFF[i * 3 + 2]; VIS[i] = VIS[p] * e; }
     if (LV[i] < 3) { const d = Math.hypot(POS[i * 3] - cx, POS[i * 3 + 1] - cy, POS[i * 3 + 2] - cz), o = OPEN[LV[i]];
       const tgt = Math.max(MINOPEN[LV[i]] + (1 - MINOPEN[LV[i]]) * ss(o[1], o[0], d), BOOST[i] === 1 || (BOOST[i] === 2 && selT > 1.3) ? 0.85 : 0); OPN[i] += (tgt - OPN[i]) * (1 - Math.exp(-dt * 3)); } else OPN[i] = 0;
   }
   for (let i = 0; i < N; i++) posData.set([POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2], 1], i * 4); posTex.needsUpdate = true;
   // 人のコマ
-  P2.forEach((i, k) => { const v = VIS[i]; aV.array[k] = LIT[i] ? Math.max(v, 0.8) : v; PV.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]);
-    S3.setScalar(v > 0.02 ? ISZ[LV[i]] * (LV[i] ? 0.25 + 0.75 * v : 1 - 0.55 * OPN[i]) : 0); M4.compose(PV, cam.quaternion, S3); imgs.setMatrixAt(k, M4); });
+  P2.forEach((i, k) => { const arrived = LIT[i] === 3 ? selT > 1.6 : LIT[i] > 0;
+    // 選んだコマと届いた先のコマは、画面上で中身が読める大きさまで育つ（文字を読まずに、映っているものどうしで繋がりが分かる）
+    const dzi = Math.hypot(POS[i * 3] - cam.position.x, POS[i * 3 + 1] - cam.position.y, POS[i * 3 + 2] - cam.position.z), fpx = innerHeight / (2 * Math.tan(cam.fov * Math.PI / 360));
+    const want = (px) => Math.max(1, px * dzi / fpx / (ISZ[LV[i]] * (LV[i] ? 1 : 0.55)));
+    const W0 = Math.min(innerWidth, innerHeight * 1.8);
+    const g = sel < 0 ? (i === hover ? want(W0 * 0.16) : 1) : i === sel ? want(W0 * (portrait() ? 0.46 : 0.24)) : arrived ? (LV[i] === 2 ? want(W0 * (portrait() ? 0.4 : 0.2)) : 1.3) : 1; GROW[i] += (g - GROW[i]) * (1 - Math.exp(-dt * 3.2));
+    let v = VIS[i]; if (arrived || i === sel) v = Math.max(v, 0.9);
+    aV.array[k] = sel < 0 || arrived || i === sel ? v : v * 0.28; PV.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]);
+    S3.setScalar(v > 0.02 ? GROW[i] * ISZ[LV[i]] * (LV[i] ? 0.25 + 0.75 * v : 1 - 0.45 * OPN[i]) : 0); M4.compose(PV, cam.quaternion, S3); imgs.setMatrixAt(k, M4); });
   imgs.instanceMatrix.needsUpdate = true; aV.needsUpdate = true;
   hMat.uniforms.uProg.value = fiberMat.uniforms.uProg.value; updateHL();
   R3.render(scene, cam);
@@ -275,26 +308,16 @@ function frame(now) {
 }
 // 文字の候補: 開いていない（＝今その深さで見えている）もの、と光っているもの
 function drawLabels() {
-  const cand = [], capOn = cap.classList.contains("on");
-  for (let i = 0; i < N; i++) {
-    const dz = V3.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]).distanceTo(cam.position);
-    // 見えている深さ: その層の要素が「開いていない」ほど文字が出る。遠いものは寄るほど消える
-    const span = [Math.max(130, CAMS.dist * 1.5), 110, 40, 22][LV[i]];
-    let a = (VIS[i] < 0.12 && LV[i] > 0 ? 0 : 1) * (LV[i] === 3 ? 1 : 1 - (LV[i] ? 0.85 : 0.35) * ss(0.4, 0.9, OPN[i])) * ss(span * 1.6, span, dz);
-    if (LIT[i] && (LIT[i] !== 3 || selT > 1.6)) a = Math.max(a, VIS[i] > 0.2 ? 0.95 : 0); if (sel >= 0 && !LIT[i] && i !== sel) a *= 0.4; if (i === sel) a = 1;
-    if (a < 0.12) continue; const s = scr(i); if (capOn && s[1] > innerHeight - (portrait() ? 150 : 120) && i !== sel) continue; if (s[2] > 1 || s[0] < -40 || s[0] > innerWidth + 40 || s[1] < -20 || s[1] > innerHeight + 20) continue;
-    cand.push([i, s[0], s[1] + (LV[i] === 2 ? (ISZ[2] * (0.25 + 0.75 * VIS[i]) * 0.29 + 0.6) * innerHeight / (2 * Math.tan(cam.fov * Math.PI / 360) * dz) : 0), a, (i === sel ? -1e6 : 0) + (LIT[i] ? -1e5 : 0) + LV[i] * -50 + dz]);
-  }
-  cand.sort((x, y) => x[4] - y[4]); const boxes = []; let k = 0; const capN = CAP(), FS = portrait() ? [12.5, 11, 11, 11] : [14, 12.5, 11.5, 11.5];
-  for (const [i, x, y, a] of cand) { if (k >= capN) break;
-    const w = D.nodes[i][2].length * FS[LV[i]] / 2 + 6, h = 10, hit = boxes.some((b) => Math.abs(b[0] - x) < b[2] + w && Math.abs(b[1] - y) < b[3] + h);
-    if (hit && i !== sel) continue; boxes.push([x, y, w, h]);
-    const d = POOL[k++]; if (d._i !== i) { d._i = i; d.textContent = D.nodes[i][2]; }
-    d.className = `lb l${LV[i]}${i === sel ? " sel" : LIT[i] ? " lit" : ""}`;
-    d.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%)`; d.style.opacity = a.toFixed(2);
-  }
+  const show = [];
+  if (hover >= 0 && hover !== sel) show.push(hover); if (sel >= 0) show.push(sel);
+  let k = 0;
+  for (const i of show) { const s = scr(i); if (s[2] > 1) continue; const dz = V3.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]).distanceTo(cam.position);
+    const half = GROW[i] * ISZ[LV[i]] * 0.29 * innerHeight / (2 * Math.tan(cam.fov * Math.PI / 360) * dz);
+    const d = POOL[k++]; if (d._i !== i) { d._i = i; d.textContent = D.nodes[i][2].replace("｜", "　"); }
+    d.className = `lb l${LV[i]}${i === sel ? " sel" : ""}`;
+    d.style.transform = `translate(${s[0].toFixed(1)}px,${(s[1] + half + 12).toFixed(1)}px) translate(-50%,-50%)`; d.style.opacity = 1; }
   for (; k < POOL.length; k++) { POOL[k].style.opacity = 0; POOL[k]._i = -1; POOL[k].style.transform = "translate(-999px,-999px)"; }
 }
-window.__n = { select, zoomBy, get cams() { return CAMS; }, goal: GOAL, N, NF, find: (s) => D.nodes.findIndex((n) => n[2].includes(s)), pos: (i) => [POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]], setAuto: (v) => (auto = v) };
+window.__n = { V3: () => THREE.Vector3, proj: (i) => scr(i), sel: () => sel, litPeople: () => P2.filter((i) => LIT[i] === 3 && LV[i] === 2).map((i) => [i, D.nodes[i][2]]), select, zoomBy, get cams() { return CAMS; }, goal: GOAL, N, NF, find: (s) => D.nodes.findIndex((n) => n[2].includes(s)), pos: (i) => [POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]], setAuto: (v) => (auto = v) };
 requestAnimationFrame(frame);
 </script>
