@@ -17,7 +17,7 @@ canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
 #cap.on{opacity:1;transform:none}
 #cap .t{font-size:clamp(15px,1.25vw,18px);font-weight:600;letter-spacing:.04em;line-height:1.5}
 #cap .m{font-size:12px;letter-spacing:.12em;color:var(--dim);margin-top:4px;font-variant-numeric:tabular-nums}
-#snd{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);right:max(16px,env(safe-area-inset-right,0px));all:unset;position:fixed;cursor:pointer;
+#snd{all:unset;position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);right:max(16px,env(safe-area-inset-right,0px));cursor:pointer;
   font-size:12px;letter-spacing:.14em;color:var(--dim);padding:8px 4px;opacity:0;transition:opacity 1s}
 #snd.on{opacity:1}
 @media (max-aspect-ratio:1/1){#cap{left:0;right:0;margin:auto;text-align:center;bottom:calc(env(safe-area-inset-bottom,0px) + 96px)}}
@@ -216,7 +216,7 @@ function slot(j) {
   const c = camPose("proc"), f = c.look.clone().sub(c.pos).normalize(), r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize();
   const th = Math.tan(cam.fov * Math.PI / 360), A = cam.aspect;
   let nx, d, s, turn;
-  if (portrait) { const X = [0, 0.34, -0.3, 0.3, -0.26, 0.24, -0.2, 0.18]; s = j === 0 ? 2.2 : 1.6; d = j === 0 ? 7.2 : 8 + j * 4.2; nx = X[j] || 0; turn = -nx * 0.9; }
+  if (portrait) { const X = [0, 0.34, -0.3, 0.3, -0.26, 0.24, -0.2, 0.18]; s = j === 0 ? 2.5 : 1.5; d = j === 0 ? 9.4 : 10.5 + j * 4.2; nx = X[j] || 0; turn = -nx * 0.9; }
   else { s = j === 0 ? 2.4 : 1.9; d = j === 0 ? 8.2 : 9.5 + j * 3.4; nx = j === 0 ? -0.43 : 0.02 + (j - 1) * 0.16; turn = -0.3; }
   const pos = c.pos.clone().addScaledVector(f, d).addScaledVector(r, nx * d * th * A); pos.y = PH * s / 2 + 0.06;
   return { pos, s, yaw: Math.atan2(c.pos.x - pos.x, c.pos.z - pos.z) + turn };
@@ -258,8 +258,11 @@ function choose(w) {
     camTo("whole", 2.4, 0.1); focusProc = false;
     t = 2.2;
   }
-  word = w; proc = D.words[w].slice();
-  const set = new Set(proc);
+  word = w; const next = D.words[w].slice();
+  later(t, () => extract(next));
+}
+function extract(next) {
+  proc = next; const set = new Set(proc), t = 0;
   // 抜き出し: その言葉に答える1秒だけが列から浮き上がり手前へ。他は沈む
   units.forEach((u) => { if (!set.has(u.i)) { tw(P[u.i], "br", 0.07, 1.8, t + 0.2); tw(P[u.i], "bl", 1.8, 1.8, t + 0.2); } });
   proc.forEach((i, j) => {
@@ -374,7 +377,8 @@ function snap(name, w) {
     proc.forEach((i, j) => { const p = P[i]; if (name === "lift") { p.pos.copy(liftPos(i)); p.s = portrait ? 1.1 : 1.5; p.br = 1.1; } else { const sl = slot(j); p.pos.copy(sl.pos); p.s = sl.s; p.q.copy(yawQ(sl.yaw)); p.br = j ? 0.9 : 1.08; } }); }
   if (name === "proc") state = "proc";
 }
-window.__m = { tick, snap, get now() { return now; }, choose, setHead: (j) => setHead(j, false), get state() { return state; }, get fps() { return fpsA; }, units, P, proc: () => proc };
+window.__m = { tick, snap, video, head: () => head, usingVideo: () => head >= 0 && hi.get(head).U.uMap.value === vtex,
+  screenOf: (j) => { const v = P[proc[j]].pos.clone().project(cam); return [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight]; }, get now() { return now; }, choose, setHead: (j) => setHead(j, false), get state() { return state; }, get fps() { return fpsA; }, units, P, proc: () => proc };
 await loadSheets();
 if (Q.has("manual")) { intro(); window.__ready = true; }           // 検証: 1コマずつ __m.tick(1/30) で進めて撮る
 else requestAnimationFrame((ms) => { last = ms / 1000; intro(); requestAnimationFrame(frame); });
