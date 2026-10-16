@@ -37,22 +37,28 @@ const portrait = () => innerHeight > innerWidth;
 // ---- 入れ子の配置: 子は親のまわりの決まった方向に、親が「開いた」分だけ広がる ----
 let seed = 5; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const DIR = new Float32Array(N * 3), BASE = new Float32Array(N * 3);
-for (let p = 0; p < N; p++) {
-  const k = KIDS[p], n = k.length, rot = new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd() * 6.28, rnd() * 6.28, rnd() * 6.28));
-  k.forEach((c, j) => { const y = n === 1 ? 0 : 1 - (2 * (j + 0.5)) / n, r = Math.sqrt(1 - y * y), th = j * 2.399963 + rnd() * 0.3;
-    const v = new THREE.Vector3(Math.cos(th) * r, y * 0.8, Math.sin(th) * r).normalize().applyQuaternion(rot); DIR.set([v.x, v.y, v.z], c * 3); });
-}
 for (const [k, p] of Object.entries(D.pos)) BASE.set(p, +k * 3);
-const R = [0, 15, 4.4, 1.6];                         // 子の広がりの半径（層ごと）
-const OPEN = [[48, 120], [11, 26], [3.6, 8.5]];       // 子が開ききる距離・開き始める距離（カメラから）
-const MINOPEN = [0.42, 0.34, 0.4];                    // 遠くからでも枝分かれが見える最小の開き（＝神経細胞の形）
+// 枝は球の外へ向かって育つ（内側は繋がりの束が通る）。子は親の向きのまわりの円錐に等間隔
+const CONE = [0, 1.0, 0.85, 0.75];
+for (let p = 0; p < N; p++) {
+  const k = KIDS[p], n = k.length; if (!n) continue;
+  const ax = PAR[p] < 0 ? new THREE.Vector3(BASE[p * 3], BASE[p * 3 + 1], BASE[p * 3 + 2]).normalize() : new THREE.Vector3(DIR[p * 3], DIR[p * 3 + 1], DIR[p * 3 + 2]);
+  const t1 = new THREE.Vector3(0, 1, 0).cross(ax); if (t1.lengthSq() < 1e-4) t1.set(1, 0, 0).cross(ax); t1.normalize(); const t2 = ax.clone().cross(t1);
+  const off = rnd() * 6.28;
+  k.forEach((c, j) => { const pol = CONE[LV[c]] * Math.sqrt((j + 0.6) / n) * (n === 1 ? 0.3 : 1), az = off + j * 2.399963;
+    const v = ax.clone().multiplyScalar(Math.cos(pol)).addScaledVector(t1, Math.sin(pol) * Math.cos(az)).addScaledVector(t2, Math.sin(pol) * Math.sin(az)).normalize();
+    DIR.set([v.x, v.y, v.z], c * 3); });
+}
+const R = [0, 22, 8, 3.4];                         // 子の広がりの半径（層ごと）
+const OPEN = [[80, 190], [40, 95], [14, 34]];       // 子が開ききる距離・開き始める距離（カメラから）
+const MINOPEN = [0.5, 0.42, 0.4];                    // 遠くからでも枝分かれが見える最小の開き（＝神経細胞の形）
 const POS = new Float32Array(N * 3), OPN = new Float32Array(N), VIS = new Float32Array(N), BOOST = new Float32Array(N);
 const PULL = new Float32Array(N * 3), PULLT = new Float32Array(N * 3);   // 塊になるときの瞬間の移動
 
 // ---- 描画 ----
 const canvas = document.getElementById("c");
 const R3 = new THREE.WebGLRenderer({ canvas, antialias: true }); R3.setPixelRatio(Math.min(devicePixelRatio, 2));
-const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(55, 1, 0.05, 2000);
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(55, 1, 0.05, 3000);
 function resize() { R3.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.fov = portrait() ? 68 : 55; cam.updateProjectionMatrix(); }
 addEventListener("resize", resize); resize();
 const TW = 64, TH = Math.ceil(N / TW), posData = new Float32Array(TW * TH * 4);
@@ -73,7 +79,7 @@ g.setAttribute("aC0", new THREE.BufferAttribute(aC0, 4)); g.setAttribute("aC1", 
 g.setAttribute("aT", new THREE.BufferAttribute(aT, 1)); g.setAttribute("aR", new THREE.BufferAttribute(aR, 1)); g.setAttribute("aPD", new THREE.BufferAttribute(aPD, 2)); const hlAttr = new THREE.BufferAttribute(aHL, 1); g.setAttribute("aHL", hlAttr);
 const fiberMat = new THREE.ShaderMaterial({
   glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
-  uniforms: { uPos: { value: posTex }, uB: { value: bTex }, uW: { value: TW }, uBeta: { value: 0.92 }, uSel: { value: 0 }, uA: { value: 0.1 } },
+  uniforms: { uPos: { value: posTex }, uB: { value: bTex }, uW: { value: TW }, uBeta: { value: 0.9 }, uSel: { value: 0 }, uA: { value: 0.085 }, uProg: { value: 0 } },
   vertexShader: `
     uniform sampler2D uPos, uB; uniform float uW, uBeta; in vec4 aC0, aC1; in float aT, aHL, aR; in vec2 aPD; out float vHL, vT, vD, vR;
     vec3 P(float i){ return texelFetch(uPos, ivec2(int(mod(i,uW)), int(floor(i/uW))), 0).xyz; }
@@ -89,15 +95,52 @@ const fiberMat = new THREE.ShaderMaterial({
       vHL=aHL; vT=aT; vR=aR; vec4 mv=modelViewMatrix*vec4(p,1.0); vD=-mv.z; gl_Position=projectionMatrix*mv;
     }`,
   fragmentShader: `
-    uniform float uSel, uA; in float vHL, vT, vD, vR; out vec4 o;
+    uniform float uSel, uA, uProg; in float vHL, vT, vD, vR; out vec4 o;
     void main(){
-      vec3 cool=vec3(0.52,0.60,0.70), warm=vec3(0.98,0.84,0.58);
-      float near=smoothstep(0.4,3.0,vD)*mix(1.0,0.25,smoothstep(120.0,330.0,vD));   // カメラの直前は消す・遠いほど霞む
-      float a = vHL>0.5 ? 0.35+0.2*vR : uA*(vR<1.5 ? 0.9 : vR<2.5 ? 2.0 : 3.2)*(1.0-0.72*uSel);
-      o=vec4(mix(cool,warm,vHL), a*near);
+      vec3 cool=vec3(0.50,0.60,0.72), warm=vec3(1.0,0.80,0.50);
+      float near=smoothstep(0.4,3.0,vD)*mix(1.0,0.35,smoothstep(250.0,520.0,vD));   // カメラの直前は消す・遠いほど霞む
+      if(vHL>0.5){                                         // 選んだ側から相手側へ光が伝わる
+        float t = vHL<1.5 ? vT : 1.0-vT; float done=smoothstep(uProg, uProg-0.04, t); float head=exp(-pow((t-uProg)*18.0,2.0));
+        o=vec4(mix(warm, vec3(1.0), head), (0.10+0.5*done+0.9*head)*(0.6+0.2*vR)*near); return; }
+      float a = uA*(vR<1.5 ? 0.8 : vR<2.5 ? 2.0 : 3.4)*(1.0-0.75*uSel);
+      o=vec4(cool, a*near);
     }`,
 });
 const fibers = new THREE.LineSegments(g, fiberMat); fibers.frustumCulled = false; scene.add(fibers);
+// 選んだ糸だけは太い帯で描く（GPU の線は1px なので、CPU で同じ B スプラインを計算して画面に向いた帯にする）
+const HSEG = 90, HMAX = 24, hPos = new Float32Array(HMAX * (HSEG + 1) * 2 * 3), hT = new Float32Array(HMAX * (HSEG + 1) * 2), hIdx = [];
+for (let f = 0; f < HMAX; f++) for (let k = 0; k < HSEG; k++) { const b = f * (HSEG + 1) * 2 + k * 2; hIdx.push(b, b + 1, b + 2, b + 1, b + 3, b + 2); }
+const hg = new THREE.BufferGeometry(); hg.setAttribute("position", new THREE.BufferAttribute(hPos, 3)); hg.setAttribute("aT", new THREE.BufferAttribute(hT, 1)); hg.setIndex(hIdx);
+const hMat = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  uniforms: { uProg: { value: 0 } },
+  vertexShader: `in float aT; out float vT; void main(){ vT=aT; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader: `uniform float uProg; in float vT; out vec4 o; void main(){ float done=smoothstep(uProg, uProg-0.05, vT), head=exp(-pow((vT-uProg)*14.0,2.0));
+    o=vec4(mix(vec3(1.0,0.74,0.42), vec3(1.0,0.97,0.9), head), 0.55*done+0.9*head); }` });
+const hMesh = new THREE.Mesh(hg, hMat); hMesh.frustumCulled = false; hMesh.renderOrder = 3; scene.add(hMesh); hg.setDrawRange(0, 0);
+let HF = [];   // [fiber, 向き]
+const C14 = Array.from({ length: 14 }, () => new THREE.Vector3()), TP = new THREE.Vector3(), TQ = new THREE.Vector3(), TV = new THREE.Vector3();
+function fiberAt(f, t, out) {
+  const c = D.fibers[f], pd = D.fpair[f], b = D.bundles[pd[0]], beta = fiberMat.uniforms.uBeta.value;
+  const P = (i, v) => v.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]);
+  for (let k = 0; k < 4; k++) { P(c[k], C14[k]); P(c[4 + k], C14[10 + k]); }
+  for (let k = 0; k < 6; k++) { const o = b[pd[1] > 0 ? k : 5 - k]; C14[4 + k].lerpVectors(C14[3], C14[10], (k + 1) / 7).add(TV.set(o[0], o[1], o[2])); }
+  for (let k = 1; k < 13; k++) { TP.lerpVectors(C14[0], C14[13], k / 13); C14[k].lerpVectors(TP, C14[k], beta); }
+  const u = t * 15, sI = Math.min(Math.floor(u), 14), fr = u - sI, f2 = fr * fr, f3 = f2 * fr;
+  const q = (j) => { const i = sI + j; return i <= 2 ? C14[0] : i >= 15 ? C14[13] : C14[i - 2]; };
+  const w = [(1 - fr) ** 3 / 6, (3 * f3 - 6 * f2 + 4) / 6, (-3 * f3 + 3 * f2 + 3 * fr + 1) / 6, f3 / 6];
+  out.set(0, 0, 0); for (let j = 0; j < 4; j++) out.addScaledVector(q(j), w[j]); return out;
+}
+const PTS = Array.from({ length: HSEG + 1 }, () => new THREE.Vector3());
+function updateHL() {
+  const n = Math.min(HMAX, HF.length); hg.setDrawRange(0, n * HSEG * 6); if (!n) return;
+  const k = 2 * Math.tan(cam.fov * Math.PI / 360) / innerHeight * (portrait() ? 3.2 : 2.6);   // 画面上でおよそ 2.6px の太さ
+  for (let h = 0; h < n; h++) { const [f, dir] = HF[h];
+    for (let s = 0; s <= HSEG; s++) fiberAt(f, s / HSEG, PTS[s]);
+    for (let s = 0; s <= HSEG; s++) { const p = PTS[s]; TQ.subVectors(PTS[Math.min(HSEG, s + 1)], PTS[Math.max(0, s - 1)]); TV.subVectors(cam.position, p);
+      const wd = k * TV.length(); TP.crossVectors(TQ, TV).normalize().multiplyScalar(wd); const b = (h * (HSEG + 1) + s) * 2;
+      hPos.set([p.x + TP.x, p.y + TP.y, p.z + TP.z, p.x - TP.x, p.y - TP.y, p.z - TP.z], b * 3); const t = dir > 0 ? s / HSEG : 1 - s / HSEG; hT[b] = hT[b + 1] = t; } }
+  hg.attributes.position.needsUpdate = true; hg.attributes.aT.needsUpdate = true;
+}
 // 枝（瞬間→出来事→人→要素の所属）: 1本の瞬間がどれだけ細かく読まれているかが形で見える
 const dg = new THREE.BufferGeometry(), dI = [];
 for (let i = 0; i < N; i++) if (PAR[i] >= 0) dI.push(PAR[i], i);
@@ -108,15 +151,17 @@ const dendMat = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, transparent
   vertexShader: `uniform sampler2D uPos; uniform float uW; in float aI, aLv; out float vD, vLv;
     void main(){ vec3 p=texelFetch(uPos, ivec2(int(mod(aI,uW)), int(floor(aI/uW))), 0).xyz; vLv=aLv; vec4 mv=modelViewMatrix*vec4(p,1.0); vD=-mv.z; gl_Position=projectionMatrix*mv; }`,
   fragmentShader: `uniform float uSel; in float vD, vLv; out vec4 o;
-    void main(){ float near=smoothstep(0.3,2.0,vD)*mix(1.0,0.2,smoothstep(90.0,300.0,vD)); o=vec4(vec3(0.9,0.92,0.95), (0.55-0.08*vLv)*near*(1.0-0.5*uSel)); }` });
+    void main(){ float near=smoothstep(0.3,2.0,vD)*mix(1.0,0.3,smoothstep(250.0,520.0,vD)); o=vec4(vec3(0.86,0.9,0.96), (0.6-0.1*vLv)*near*(1.0-0.45*uSel)); }` });
 const dend = new THREE.LineSegments(dg, dendMat); dend.frustumCulled = false; scene.add(dend);
 
 // 人（L2）は、その人が映る1秒のコマ
-const NP = D.nodes.filter((n) => n[0] === 2).length, P2 = []; for (let i = 0; i < N; i++) if (LV[i] === 2) P2.push(i);
+const firstUnit = (i) => { if (LV[i] === 2) return UNIT[i]; for (const c of KIDS[i]) { const u = firstUnit(c); if (u >= 0) return u; } return -1; };
+const P2 = []; for (let i = 0; i < N; i++) if (LV[i] === 2 || LV[i] === 0) P2.push(i); const NP = P2.length;
+const ISZ = [6.5, 0, 5, 0];                          // 板の大きさ（瞬間 / 人）
 const LW = 192, LH = 108, sheets = [0, 1, 2], NL = 683, layers = new Uint8Array(LW * LH * 4 * NL);
 const arr = new THREE.DataArrayTexture(layers, LW, LH, NL); arr.generateMipmaps = true; arr.minFilter = THREE.LinearMipmapLinearFilter; arr.magFilter = THREE.LinearFilter;
-const pg = new THREE.PlaneGeometry(1.6, 0.9); const aL = new THREE.InstancedBufferAttribute(new Float32Array(NP), 1), aV = new THREE.InstancedBufferAttribute(new Float32Array(NP), 1);
-P2.forEach((i, k) => (aL.array[k] = Math.max(0, UNIT[i]))); pg.setAttribute("aL", aL); pg.setAttribute("aV", aV);
+const pg = new THREE.PlaneGeometry(1, 0.5625); const aL = new THREE.InstancedBufferAttribute(new Float32Array(NP), 1), aV = new THREE.InstancedBufferAttribute(new Float32Array(NP), 1);
+P2.forEach((i, k) => (aL.array[k] = Math.max(0, firstUnit(i)))); pg.setAttribute("aL", aL); pg.setAttribute("aV", aV);
 const imgMat = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, uniforms: { uTex: { value: arr } },
   vertexShader: `in float aL, aV; out vec2 vUv; out float vL, vV; void main(){ vUv=uv; vL=aL; vV=aV; gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position,1.0); }`,
   fragmentShader: `precision highp sampler2DArray; uniform sampler2DArray uTex; in vec2 vUv; in float vL, vV; out vec4 o;
@@ -131,11 +176,11 @@ const imgs = new THREE.InstancedMesh(pg, imgMat, NP); imgs.frustumCulled = false
 
 // ---- 文字（DOM）: 今いる深さで見えているものだけ、重ならないように ----
 const labelsEl = document.getElementById("labels"), POOL = [];
-const CAP = () => (portrait() ? 46 : 90);
+const CAP = () => (portrait() ? 40 : 80);
 for (let k = 0; k < 110; k++) { const d = document.createElement("div"); d.className = "lb"; d.style.opacity = 0; d.addEventListener("click", (e) => { e.stopPropagation(); if (d._i >= 0) select(d._i); }); labelsEl.appendChild(d); POOL.push(d); }
 
 // ---- カメラ（ダイヤル＝ズーム、ドラッグ＝回す） ----
-const CAMS = { pivot: new THREE.Vector3(), dist: 150, th: 0.6, ph: 0.18 }, GOAL = { pivot: new THREE.Vector3(), dist: 150 };
+const D0 = portrait() ? 620 : 300, CAMS = { pivot: new THREE.Vector3(), dist: D0, th: 0.6, ph: 0.18 }, GOAL = { pivot: new THREE.Vector3(), dist: D0 };
 let auto = true, touched = false;
 function camUpdate(dt) {
   CAMS.pivot.lerp(GOAL.pivot, 1 - Math.exp(-dt * 2.2)); CAMS.dist += (GOAL.dist - CAMS.dist) * (1 - Math.exp(-dt * 2.4));
@@ -155,7 +200,7 @@ canvas.addEventListener("pointerup", endPtr); canvas.addEventListener("pointerca
 canvas.addEventListener("wheel", (e) => { e.preventDefault(); auto = false; touched = true; zoomBy(Math.exp(e.deltaY * 0.0014), e.clientX, e.clientY); }, { passive: false });
 // 寄るときは、カーソルの近くで見えているものへ中心を寄せる（ダイヤルを回すとそこへ潜っていく）
 function zoomBy(f, x, y) {
-  GOAL.dist = Math.max(1.6, Math.min(420, GOAL.dist * f));
+  f = Math.max(0.8, Math.min(1.25, f)); GOAL.dist = Math.max(7, Math.min(700, GOAL.dist * f));
   if (f < 1) { const t = nearestScreen(x, y, 160); if (t >= 0) GOAL.pivot.lerp(new THREE.Vector3(POS[t * 3], POS[t * 3 + 1], POS[t * 3 + 2]), Math.min(0.5, (1 - f) * 2.2)); }
 }
 const V3 = new THREE.Vector3();
@@ -166,26 +211,26 @@ function nearestScreen(x, y, r) { let best = -1, bd = r * r;
   return best; }
 
 // ---- 選ぶ: その中から出る糸が温かくなり、届いた先の瞬間が開いて寄ってくる（塊になる） ----
-let sel = -1, fitT = 0; const LIT = new Uint8Array(N); const cap = document.getElementById("cap");
+let sel = -1, fitT = 0, selT = 0; const LIT = new Uint8Array(N); const cap = document.getElementById("cap");
 const inSub = (n, root) => { while (n >= 0) { if (n === root) return true; n = PAR[n]; } return false; };
 function select(i) {
-  sel = i; LIT.fill(0); BOOST.fill(0); PULLT.fill(0); aHL.fill(0);
+  sel = i; HF = []; LIT.fill(0); BOOST.fill(0); PULLT.fill(0); aHL.fill(0);
   const whys = [];
   if (i >= 0) {
     for (let f = 0; f < NF; f++) { const c = D.fibers[f]; const hit = c.slice(0, 4).includes(i) ? 0 : c.slice(4).includes(i) ? 1 : -1; if (hit < 0) continue;
-      for (let v = f * SEG * 2; v < (f + 1) * SEG * 2; v++) aHL[v] = 1;
+      for (let v = f * SEG * 2; v < (f + 1) * SEG * 2; v++) aHL[v] = hit === 0 ? 1 : 2; HF.push([f, hit === 0 ? 1 : -1]);
       const other = hit === 0 ? c.slice(4) : c.slice(0, 4);            // 相手側（要素…瞬間）
-      for (const n of other) { LIT[n] = 1; if (LV[i] > 0) BOOST[n] = 1; }
-      for (const n of (hit === 0 ? c.slice(0, 4) : c.slice(4))) LIT[n] = 1;
+      for (const n of other) { LIT[n] = 3; if (LV[i] > 0) BOOST[n] = 2; }
+      for (const n of (hit === 0 ? c.slice(0, 4) : c.slice(4))) if (!LIT[n]) LIT[n] = 1;
       whys.push([D.whys[f], hit === 0 ? c[7] : c[0], D.rates[f]]);
     }
     // 届いた先の瞬間を、選んだものの瞬間のほうへ寄せる（層の中の塊）
     const m0 = MOM[i], tgt = [BASE[m0 * 3], BASE[m0 * 3 + 1], BASE[m0 * 3 + 2]];
     const ms = new Set(); for (let n = 0; n < N; n++) if (LIT[n] && LV[n] === 0 && n !== m0) ms.add(n);
-    for (const m of ms) for (let k = 0; k < 3; k++) PULLT[m * 3 + k] = (tgt[k] - BASE[m * 3 + k]) * 0.55;
+    for (const m of ms) for (let k = 0; k < 3; k++) PULLT[m * 3 + k] = (tgt[k] - BASE[m * 3 + k]) * 0.35;
     LIT[i] = 2; for (let n = PAR[i]; n >= 0; n = PAR[n]) BOOST[n] = 1;
   }
-  hlAttr.needsUpdate = true; fiberMat.uniforms.uSel.value = i >= 0 ? 1 : 0; dendMat.uniforms.uSel.value = i >= 0 ? 1 : 0; fitT = i >= 0 ? 3.5 : 0;
+  hlAttr.needsUpdate = true; fiberMat.uniforms.uSel.value = i >= 0 ? 1 : 0; dendMat.uniforms.uSel.value = i >= 0 ? 1 : 0; fitT = i >= 0 ? 3.5 : 0; selT = 0;
   // 選んだのが要素なら、届いた先の具体と一文を出す（理由が辿れる＝ブラックボックスにしない）
   whys.sort((a, b) => b[2] - a[2]);
   if (i >= 0 && LV[i] === 3 && whys.length) {
@@ -205,7 +250,8 @@ function frame(now) {
   if (fitT > 0 && sel >= 0) { fitT -= dt; const c = new THREE.Vector3(), q = new THREE.Vector3(); let n = 0, r = 0; const pts = [];
     for (let k = 0; k < N; k++) if ((LIT[k] && LV[k] === LV[sel]) || k === sel) { pts.push(k); c.x += POS[k * 3]; c.y += POS[k * 3 + 1]; c.z += POS[k * 3 + 2]; n++; }
     if (n) { c.divideScalar(n); for (const k of pts) r = Math.max(r, q.set(POS[k * 3], POS[k * 3 + 1], POS[k * 3 + 2]).distanceTo(c));
-      GOAL.pivot.copy(c); GOAL.dist = Math.max([60, 16, 6, 4][LV[sel]], r * (portrait() ? 3.4 : 2.4)); } }
+      GOAL.pivot.copy(c); GOAL.dist = Math.max([120, 40, 14, 9][LV[sel]], r * (portrait() ? 3.4 : 2.4)); } }
+  selT += dt; fiberMat.uniforms.uProg.value = Math.min(1.05, selT / 1.8);
   camUpdate(dt);
   for (let k = 0; k < N * 3; k++) PULL[k] += (PULLT[k] - PULL[k]) * (1 - Math.exp(-dt * 1.8));
   const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
@@ -215,36 +261,37 @@ function frame(now) {
     else { const e = OPN[p], r = R[LV[i]] * e;
       POS[i * 3] = POS[p * 3] + DIR[i * 3] * r; POS[i * 3 + 1] = POS[p * 3 + 1] + DIR[i * 3 + 1] * r; POS[i * 3 + 2] = POS[p * 3 + 2] + DIR[i * 3 + 2] * r; VIS[i] = VIS[p] * e; }
     if (LV[i] < 3) { const d = Math.hypot(POS[i * 3] - cx, POS[i * 3 + 1] - cy, POS[i * 3 + 2] - cz), o = OPEN[LV[i]];
-      const tgt = Math.max(MINOPEN[LV[i]] + (1 - MINOPEN[LV[i]]) * ss(o[1], o[0], d), BOOST[i] ? 0.85 : 0); OPN[i] += (tgt - OPN[i]) * (1 - Math.exp(-dt * 3)); } else OPN[i] = 0;
+      const tgt = Math.max(MINOPEN[LV[i]] + (1 - MINOPEN[LV[i]]) * ss(o[1], o[0], d), BOOST[i] === 1 || (BOOST[i] === 2 && selT > 1.3) ? 0.85 : 0); OPN[i] += (tgt - OPN[i]) * (1 - Math.exp(-dt * 3)); } else OPN[i] = 0;
   }
   for (let i = 0; i < N; i++) posData.set([POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2], 1], i * 4); posTex.needsUpdate = true;
   // 人のコマ
   P2.forEach((i, k) => { const v = VIS[i]; aV.array[k] = LIT[i] ? Math.max(v, 0.8) : v; PV.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]);
-    S3.setScalar(v > 0.02 ? 0.25 + 0.75 * v : 0); M4.compose(PV, cam.quaternion, S3); imgs.setMatrixAt(k, M4); });
+    S3.setScalar(v > 0.02 ? ISZ[LV[i]] * (LV[i] ? 0.25 + 0.75 * v : 1 - 0.55 * OPN[i]) : 0); M4.compose(PV, cam.quaternion, S3); imgs.setMatrixAt(k, M4); });
   imgs.instanceMatrix.needsUpdate = true; aV.needsUpdate = true;
+  hMat.uniforms.uProg.value = fiberMat.uniforms.uProg.value; updateHL();
   R3.render(scene, cam);
   drawLabels();
   requestAnimationFrame(frame);
 }
 // 文字の候補: 開いていない（＝今その深さで見えている）もの、と光っているもの
-const occ = new Map();
 function drawLabels() {
-  const cand = [];
+  const cand = [], capOn = cap.classList.contains("on");
   for (let i = 0; i < N; i++) {
     const dz = V3.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]).distanceTo(cam.position);
     // 見えている深さ: その層の要素が「開いていない」ほど文字が出る。遠いものは寄るほど消える
-    const span = [Math.max(130, CAMS.dist * 1.5), 40, 12, 5][LV[i]];
-    let a = (VIS[i] < 0.35 && LV[i] > 0 ? 0 : 1) * (LV[i] === 3 ? 1 : 1 - 0.85 * ss(0.4, 0.9, OPN[i])) * ss(span * 1.6, span, dz);
-    if (LIT[i]) a = Math.max(a, VIS[i] > 0.2 ? 0.95 : 0); if (i === sel) a = 1;
-    if (a < 0.12) continue; const s = scr(i); if (s[2] > 1 || s[0] < -40 || s[0] > innerWidth + 40 || s[1] < -20 || s[1] > innerHeight + 20) continue;
-    cand.push([i, s[0], s[1], a, (i === sel ? -1e6 : 0) + (LIT[i] ? -1e5 : 0) + LV[i] * -50 + dz]);
+    const span = [Math.max(130, CAMS.dist * 1.5), 110, 40, 22][LV[i]];
+    let a = (VIS[i] < 0.12 && LV[i] > 0 ? 0 : 1) * (LV[i] === 3 ? 1 : 1 - (LV[i] ? 0.85 : 0.35) * ss(0.4, 0.9, OPN[i])) * ss(span * 1.6, span, dz);
+    if (LIT[i] && (LIT[i] !== 3 || selT > 1.6)) a = Math.max(a, VIS[i] > 0.2 ? 0.95 : 0); if (sel >= 0 && !LIT[i] && i !== sel) a *= 0.4; if (i === sel) a = 1;
+    if (a < 0.12) continue; const s = scr(i); if (capOn && s[1] > innerHeight - (portrait() ? 150 : 120) && i !== sel) continue; if (s[2] > 1 || s[0] < -40 || s[0] > innerWidth + 40 || s[1] < -20 || s[1] > innerHeight + 20) continue;
+    cand.push([i, s[0], s[1] + (LV[i] === 2 ? (ISZ[2] * (0.25 + 0.75 * VIS[i]) * 0.29 + 0.6) * innerHeight / (2 * Math.tan(cam.fov * Math.PI / 360) * dz) : 0), a, (i === sel ? -1e6 : 0) + (LIT[i] ? -1e5 : 0) + LV[i] * -50 + dz]);
   }
-  cand.sort((x, y) => x[4] - y[4]); occ.clear(); let k = 0; const cap = CAP();
-  for (const [i, x, y, a] of cand) { if (k >= cap) break;
-    const gx = Math.floor(x / 170), gy = Math.floor(y / 22), key = gx + "," + gy; if (occ.has(key) && !LIT[i] && i !== sel) continue; occ.set(key, 1);
+  cand.sort((x, y) => x[4] - y[4]); const boxes = []; let k = 0; const capN = CAP(), FS = portrait() ? [12.5, 11, 11, 11] : [14, 12.5, 11.5, 11.5];
+  for (const [i, x, y, a] of cand) { if (k >= capN) break;
+    const w = D.nodes[i][2].length * FS[LV[i]] / 2 + 6, h = 10, hit = boxes.some((b) => Math.abs(b[0] - x) < b[2] + w && Math.abs(b[1] - y) < b[3] + h);
+    if (hit && i !== sel) continue; boxes.push([x, y, w, h]);
     const d = POOL[k++]; if (d._i !== i) { d._i = i; d.textContent = D.nodes[i][2]; }
     d.className = `lb l${LV[i]}${i === sel ? " sel" : LIT[i] ? " lit" : ""}`;
-    d.style.transform = `translate(${x.toFixed(1)}px,${(y + (LV[i] === 2 ? 22 : 0)).toFixed(1)}px) translate(-50%,-50%)`; d.style.opacity = a.toFixed(2);
+    d.style.transform = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) translate(-50%,-50%)`; d.style.opacity = a.toFixed(2);
   }
   for (; k < POOL.length; k++) { POOL[k].style.opacity = 0; POOL[k]._i = -1; POOL[k].style.transform = "translate(-999px,-999px)"; }
 }

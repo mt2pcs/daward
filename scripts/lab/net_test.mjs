@@ -7,10 +7,10 @@ const logs = []; p.on("console", (m) => m.type() === "error" && logs.push(m.text
 await p.goto("http://127.0.0.1:3190/index.html?dtmax=0.6"); await p.waitForFunction(() => window.__n, null, { timeout: 60000 }); await p.waitForTimeout(5000);
 const shot = (n) => p.screenshot({ path: `${out}/${tag}_${n}.png` });
 await shot("0whole");
-const go = (s, d) => p.evaluate(([s, d]) => { __n.setAuto(false); const i = __n.find(s); const q = __n.pos(i); __n.goal.pivot.set(q[0], q[1], q[2]); __n.goal.dist = d; return i; }, [s, d]);
-await go("神戸スティーラーズ", 90); await p.waitForTimeout(7000); await shot("1near");
-await go("神戸スティーラーズ", 34); await p.waitForTimeout(7000); await shot("2open");
-await go("40歳", 12); await p.waitForTimeout(7000); await shot("3event");
-await go("40歳", 4.5); await p.waitForTimeout(7000); await shot("4person");
+const go = async (s, d) => { for (let k = 0; k < 6; k++) { await p.evaluate(([s, d]) => { __n.setAuto(false); const i = __n.find(s); const q = __n.pos(i); __n.goal.pivot.set(q[0], q[1], q[2]); __n.goal.dist = d; }, [s, d]); await p.waitForTimeout(1100); } };
+await go("神戸スティーラーズ", 170); await p.waitForTimeout(7000); await shot("1near");
+await go("神戸スティーラーズ", 60); await p.waitForTimeout(7000); await shot("2open");
+await go("40歳", 24); await p.waitForTimeout(7000); await shot("3event");
+await go("40歳", 12); await p.waitForTimeout(7000); await shot("4person");
 const i = await p.evaluate(() => { const i = __n.find("我が子を腕に抱く"); __n.select(i); return i; }); await p.waitForTimeout(9000); await shot("5select");
 console.log(tag, "sel", i, logs.join("\n") || "no errors"); await b.close();
