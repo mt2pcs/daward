@@ -948,3 +948,8 @@ Setup scriptには (1) ユーザーレベルCLAUDE.md（恒常ルール）の生
 - 行列と浮き上がりの位置は、カメラの基底から「画面上の位置（NDC）と奥行き」で決めてから床へ置く（画面比が変わっても崩れない）。
 - 検証: `scripts/lab/motion_snap.mjs W H tag "whole|lift:家族|proc:家族"`（状態を直接置いて撮る）、`motion_test.mjs`（空間の時計で止めて撮る）、
   `motion_rec.mjs W H tag [ts]`（CDP screencast で遅回しに描かせ、実時間の mp4 に戻す。swiftshader でも動きの連続性を確かめられる）。配信は python http.server 3180（charset を付けた外枠で包む）。
+- **動きの検証は `motion_frames.mjs`**（`?manual=1` で 1/30 秒ずつ進めて1コマずつ撮る→実時間の mp4。screencast は fps が場面で変わり時間がずれた）。通常再生の映像と押す操作は `motion_live.mjs`。
+- 先頭で流す5秒の映像は、選んだ1秒の後で勝者の歓喜などに切り替わるものがあった（アルジェリアのGK→メッシ）。22本を0.5秒ごとに見て、選んだ人が映る区間だけを使う（`motion_assets.mjs` の CLIP、
+  短いものは3秒にスロー、音は元の速さの場内音）。素材の秒の直後にカットがあることが多いので、区間の頭も実フレームで確かめる。
+- 公開: https://claude.ai/artifact/7FGXpKzT1j9UbsfT3Dqymx（root はスクラッチの out/、files で sheet・hi・v・data.js を載せる）。映像の無い24本はこの試作に入れていない。
+  実機（iPhone Safari の mp4 再生・音・速度）はこの環境では未確認。
