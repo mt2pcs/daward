@@ -1,0 +1,378 @@
+<title>100の瞬間 ほどけて組み直る</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root{color-scheme:dark;--bg:#060709;--fg:#f2f2f0;--dim:rgba(242,242,240,.42)}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);overflow:hidden;touch-action:none;
+  font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic",system-ui,sans-serif}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+#words{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 34px);display:flex;justify-content:center;gap:clamp(28px,6vw,64px);
+  opacity:0;transition:opacity 1.6s ease;pointer-events:none;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
+#words.on{opacity:1;pointer-events:auto}
+#words button{all:unset;cursor:pointer;font-size:clamp(17px,1.5vw,21px);letter-spacing:.14em;color:var(--dim);padding:10px 2px 9px;
+  border-bottom:1px solid transparent;transition:color .5s,border-color .5s}
+#words button:hover{color:var(--fg)}
+#words button.on{color:var(--fg);border-color:var(--fg)}
+#cap{position:fixed;left:max(24px,env(safe-area-inset-left,0px) + 16px);bottom:calc(env(safe-area-inset-bottom,0px) + 104px);max-width:min(560px,80vw);
+  opacity:0;transform:translateY(6px);transition:opacity .9s ease,transform .9s ease;pointer-events:none}
+#cap.on{opacity:1;transform:none}
+#cap .t{font-size:clamp(15px,1.25vw,18px);font-weight:600;letter-spacing:.04em;line-height:1.5}
+#cap .m{font-size:12px;letter-spacing:.12em;color:var(--dim);margin-top:4px;font-variant-numeric:tabular-nums}
+#snd{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);right:max(16px,env(safe-area-inset-right,0px));all:unset;position:fixed;cursor:pointer;
+  font-size:12px;letter-spacing:.14em;color:var(--dim);padding:8px 4px;opacity:0;transition:opacity 1s}
+#snd.on{opacity:1}
+@media (max-aspect-ratio:1/1){#cap{left:0;right:0;margin:auto;text-align:center;bottom:calc(env(safe-area-inset-bottom,0px) + 96px)}}
+</style>
+<canvas id="c"></canvas>
+<div id="cap"><div class="t"></div><div class="m"></div></div>
+<div id="words"></div>
+<button id="snd">音 あり</button>
+<script src="data.js" charset="utf-8"></script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from "three";
+const D = window.DATA, Q = new URLSearchParams(location.search);
+const TS = +(Q.get("ts") || 1);              // 検証用: 時間の倍率
+const canvas = document.getElementById("c");
+const R = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
+R.setPixelRatio(Math.min(devicePixelRatio, 2));
+R.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(50, 1, 0.1, 400);
+let portrait = false;
+function resize() {
+  const w = innerWidth, h = innerHeight; portrait = h > w;
+  R.setSize(w, h, false); cam.aspect = w / h; cam.fov = portrait ? 66 : 50; cam.updateProjectionMatrix();
+}
+addEventListener("resize", resize); resize();
+
+// ---- 乱数（毎回同じ配置） ----
+let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+// ---- 空間の配置: 76本の映像は消失点（DAZN フレームの位置）から放射する線の上にいる ----
+const H0 = 4.6, PW = 1.36, PH = 0.765, STEP = 2.3;
+const vids = D.videos.map((v) => ({ ...v }));
+const order = vids.map((_, i) => i).sort(() => rnd() - 0.5);
+order.forEach((vi, k) => {
+  const v = vids[vi];
+  v.th = (-30 + (k + 0.5) / vids.length * 240) * Math.PI / 180;
+  v.rho = 6.2 + (k % 4) * 2.8 + rnd() * 0.6;
+  v.z0 = 3 - rnd() * 9;
+  v.delay = Math.abs(v.th - Math.PI / 2) * 0.55 + rnd() * 0.35;   // 上の中心から外へ波が伝わる
+});
+const units = D.units.map((u, i) => ({ i, no: u.no, t: u.t }));
+vids.forEach((v) => v.units.forEach((x, k) => { const u = units[x.i]; u.v = v; u.k = k; }));
+function rowPos(u, spread) {
+  const v = u.v, x = Math.cos(v.th) * v.rho, y = Math.max(PH / 2 + 0.12, H0 + Math.sin(v.th) * v.rho);
+  return new THREE.Vector3(x, y, v.z0 - u.k * STEP * spread - u.k * 0.002);
+}
+
+// ---- 683の1秒を1枚の配列テクスチャに ----
+const LW = 192, LH = 108, N = units.length;
+const layers = new Uint8Array(LW * LH * 4 * N);
+const arrTex = new THREE.DataArrayTexture(layers, LW, LH, N);
+arrTex.generateMipmaps = true; arrTex.minFilter = THREE.LinearMipmapLinearFilter; arrTex.magFilter = THREE.LinearFilter;
+async function loadSheets() {
+  const cv = document.createElement("canvas"); cv.width = 16 * LW; cv.height = 16 * LH;
+  const g = cv.getContext("2d", { willReadFrequently: true });
+  for (let s = 0; s * 256 < N; s++) {
+    const img = new Image(); img.src = `sheet${s}.jpg`; await img.decode();
+    g.drawImage(img, 0, 0); const px = g.getImageData(0, 0, cv.width, cv.height).data;
+    for (let k = 0; k < 256 && s * 256 + k < N; k++) {
+      const L = s * 256 + k, cx = (k % 16) * LW, cy = Math.floor(k / 16) * LH;
+      for (let y = 0; y < LH; y++) layers.set(px.subarray(((cy + y) * cv.width + cx) * 4, ((cy + y) * cv.width + cx + LW) * 4), (L * LH + y) * LW * 4);
+    }
+  }
+  arrTex.needsUpdate = true;
+}
+
+// ---- 共通の絵づくり: 枠そのものが光源。遠いほど霞み、焦点から外れるほどぼける。床に映り込む ----
+const HAZE = new THREE.Color(0x0c0e13);
+const common = { uHaze: { value: HAZE }, uFog: { value: 0.012 }, uFocus: { value: 20 }, uDof: { value: 0.06 }, uGlobal: { value: 0 } };
+const VS = `
+  #ifdef ARR
+  in float aLayer; in float aBright; in float aBlur; out float vLayer;
+  #else
+  uniform float uBright, uBlur;
+  #endif
+  uniform float uMirror; out vec2 vUv; out float vBright, vBlur, vDepth, vY;
+  void main(){
+    vUv = uv;
+    #ifdef ARR
+    vLayer = aLayer; vBright = aBright; vBlur = aBlur;
+    vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
+    #else
+    vBright = uBright; vBlur = uBlur;
+    vec4 wp = modelMatrix * vec4(position, 1.0);
+    #endif
+    if (uMirror > 0.5) wp.y = -wp.y;
+    vY = wp.y; vec4 mv = viewMatrix * wp; vDepth = -mv.z; gl_Position = projectionMatrix * mv;
+  }`;
+const FS = `
+  precision highp float; precision highp sampler2DArray;
+  #ifdef ARR
+  uniform sampler2DArray uTex; in float vLayer;
+  #else
+  uniform sampler2D uMap; uniform float uFlip;
+  #endif
+  uniform vec3 uHaze; uniform float uFog, uFocus, uDof, uMirror, uGlobal;
+  in vec2 vUv; in float vBright, vBlur, vDepth, vY; out vec4 o;
+  void main(){
+    float b = vBlur + min(3.6, abs(vDepth - uFocus) * uDof) + uMirror * 2.2;
+    #ifdef ARR
+    vec3 c = texture(uTex, vec3(vUv.x, 1.0 - vUv.y, vLayer), b).rgb;
+    #else
+    vec3 c = texture(uMap, vUv, b).rgb;
+    #endif
+    c = pow(c, vec3(2.2)) * vBright * uGlobal;
+    c = mix(c, pow(uHaze, vec3(2.2)), 1.0 - exp(-vDepth * uFog));
+    o = uMirror > 0.5 ? vec4(c, 0.30 * exp(vY * 0.62) * uGlobal) : vec4(c, 1.0);
+    o.rgb = pow(o.rgb, vec3(1.0 / 2.2));
+  }`;
+function mat(arr, mirror, extra) {
+  return new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3, defines: arr ? { ARR: 1 } : {}, vertexShader: VS, fragmentShader: FS, side: THREE.DoubleSide,
+    uniforms: { ...common, uMirror: { value: mirror ? 1 : 0 }, ...extra },
+    transparent: mirror, depthWrite: !mirror,
+  });
+}
+const geo = new THREE.PlaneGeometry(PW, PH);
+const aLayer = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+const aBright = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+const aBlur = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+units.forEach((u) => (aLayer.array[u.i] = u.i));
+const igeo = geo.clone(); igeo.setAttribute("aLayer", aLayer); igeo.setAttribute("aBright", aBright); igeo.setAttribute("aBlur", aBlur);
+const arrU = { uTex: { value: arrTex } };
+const inst = new THREE.InstancedMesh(igeo, mat(true, false, arrU), N);
+const instM = new THREE.InstancedMesh(igeo, mat(true, true, arrU), N);
+inst.frustumCulled = instM.frustumCulled = false; instM.renderOrder = 2;
+scene.add(inst, instM);
+
+// 背景: 上は黒、地平線にかすかな霞、床は黒
+const bg = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+  depthTest: false, depthWrite: false, uniforms: { uHz: { value: 0.5 }, uRes: { value: new THREE.Vector2(1, 1) } },
+  vertexShader: `void main(){ gl_Position = vec4(position.xy, 0.999, 1.0); }`,
+  fragmentShader: `uniform float uHz; uniform vec2 uRes;
+    void main(){ vec2 p = gl_FragCoord.xy / uRes; float d = p.y - uHz;
+      vec3 sky = mix(vec3(0.043,0.050,0.066), vec3(0.016,0.018,0.024), smoothstep(0.0, 0.55, d));
+      vec3 flo = mix(vec3(0.030,0.034,0.044), vec3(0.008,0.009,0.012), smoothstep(0.0, 0.35, -d));
+      vec3 c = d > 0.0 ? sky : flo; c *= 1.0 - 0.45 * pow(length((p - 0.5) * vec2(1.0, 0.8)), 2.0);
+      gl_FragColor = vec4(c, 1.0); }`,
+}));
+bg.frustumCulled = false; bg.renderOrder = -10; scene.add(bg);
+
+// ---- 言葉に答える1秒は高解像の板（あとで映像になる） ----
+const picked = [...new Set(Object.values(D.words).flat())];
+const loader = new THREE.TextureLoader();
+const hi = new Map();
+for (const i of picked) {
+  const tex = loader.load(`hi/${i}.jpg`); tex.anisotropy = 4;
+  const U = { uMap: { value: tex }, uBright: { value: 1 }, uBlur: { value: 0 } };
+  const m = new THREE.Mesh(geo, mat(false, false, U)), mm = new THREE.Mesh(geo, mat(false, true, U));
+  mm.renderOrder = 2; scene.add(m, mm); m.userData.i = i;
+  hi.set(i, { m, mm, U, tex });
+}
+
+// ---- 1枚ずつの状態とトゥイーン ----
+const ease = { io: (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2), out: (x) => 1 - Math.pow(1 - x, 3), in: (x) => x * x * x,
+  so: (x) => 1 - Math.pow(1 - x, 4) };
+let now = 0;
+const P = units.map((u) => ({ pos: rowPos(u, 0), q: new THREE.Quaternion(), s: 1, br: 1, bl: 0, tw: {} }));
+function tw(p, key, to, dur, delay = 0, e = ease.io, ctrl = null) {
+  const cur = p[key];
+  p.tw[key] = { a: cur.clone ? cur.clone() : cur, b: to, c: ctrl, t0: now + delay, d: dur, e };
+}
+function step(p) {
+  for (const k in p.tw) {
+    const T = p.tw[k]; let x = (now - T.t0) / T.d; if (x < 0) continue; if (x >= 1) x = 1; const y = T.e(x);
+    if (k === "pos") {
+      if (T.c) { const a = T.a, b = T.b, c = T.c, m = 1 - y; p.pos.set(m * m * a.x + 2 * m * y * c.x + y * y * b.x, m * m * a.y + 2 * m * y * c.y + y * y * b.y, m * m * a.z + 2 * m * y * c.z + y * y * b.z); }
+      else p.pos.lerpVectors(T.a, T.b, y);
+    } else if (T.a.isVector3) p[k].lerpVectors(T.a, T.b, y);
+    else if (k === "q") p.q.slerpQuaternions(T.a, T.b, y);
+    else p[k] = T.a + (T.b - T.a) * y;
+    if (x === 1) delete p.tw[k];
+  }
+}
+const jobs = [];
+function later(sec, fn) { jobs.push({ t: now + sec, fn }); }
+function runJobs() { for (let k = jobs.length - 1; k >= 0; k--) if (now >= jobs[k].t) { const j = jobs.splice(k, 1)[0]; j.fn(); } }
+let focusProc = false;
+
+// ---- カメラ ----
+const CP = JSON.parse(Q.get("cp") || "null") || {
+  pc: { whole: [[0.3, 2.2, 14], [0, 9.5, -80]], proc: [[-1.0, 1.6, 15], [0.6, 1.0, -10]] },
+  sp: { whole: [[0.2, 2.4, 17], [0, 9.5, -80]], proc: [[0, 5.0, 15], [0, 0.4, -8]] } };
+const CAM = { pos: new THREE.Vector3(0.6, 2.2, 30), look: new THREE.Vector3(0, 5.0, -60), tw: {} };
+function camPose(name) {
+  const c = CP[portrait ? "sp" : "pc"][name]; return { pos: new THREE.Vector3(...c[0]), look: new THREE.Vector3(...c[1]) };
+}
+function camTo(name, dur, delay = 0) { const c = camPose(name); tw(CAM, "pos", c.pos, dur, delay); tw(CAM, "look", c.look, dur, delay); }
+let mx = 0, my = 0, smx = 0, smy = 0;
+addEventListener("pointermove", (e) => { mx = e.clientX / innerWidth - 0.5; my = e.clientY / innerHeight - 0.5; });
+
+// ---- 並び（再構築の形）: 床に立つ1本の行列が奥へ曲がっていく ----
+function slot(j) {
+  // 画面のどこに、どの奥行きで立つかを決めてから、床の上へ置く（画面比が変わっても行列が崩れない）
+  const c = camPose("proc"), f = c.look.clone().sub(c.pos).normalize(), r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize();
+  const th = Math.tan(cam.fov * Math.PI / 360), A = cam.aspect;
+  let nx, d, s, turn;
+  if (portrait) { const X = [0, 0.34, -0.3, 0.3, -0.26, 0.24, -0.2, 0.18]; s = j === 0 ? 2.2 : 1.6; d = j === 0 ? 7.2 : 8 + j * 4.2; nx = X[j] || 0; turn = -nx * 0.9; }
+  else { s = j === 0 ? 2.4 : 1.9; d = j === 0 ? 8.2 : 9.5 + j * 3.4; nx = j === 0 ? -0.43 : 0.02 + (j - 1) * 0.16; turn = -0.3; }
+  const pos = c.pos.clone().addScaledVector(f, d).addScaledVector(r, nx * d * th * A); pos.y = PH * s / 2 + 0.06;
+  return { pos, s, yaw: Math.atan2(c.pos.x - pos.x, c.pos.z - pos.z) + turn };
+}
+const yawQ = (y) => new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), y);
+const Q0 = new THREE.Quaternion();
+
+// ---- 流れ ----
+let state = "intro", word = null, proc = [], pending = null, head = -1;
+const wordsEl = document.getElementById("words"), cap = document.getElementById("cap"), snd = document.getElementById("snd");
+for (const w of Object.keys(D.words)) {
+  const b = document.createElement("button"); b.textContent = w; b.onclick = () => choose(w); wordsEl.appendChild(b);
+}
+function intro() {
+  common.uGlobal.value = 0;
+  camTo("whole", 4.2, 0);
+  // 2.6秒後、映像が奥へほどけて1秒の列になる（上の中心から外へ）
+  units.forEach((u) => {
+    const p = P[u.i];
+    tw(p, "pos", rowPos(u, 1), 2.1, 2.6 + u.v.delay + u.k * 0.045, ease.io);
+    tw(p, "br", 0.92, 2.0, 2.6 + u.v.delay, ease.io);
+  });
+  later(7.6, () => { state = "whole"; wordsEl.classList.add("on"); if (pending) { const w = pending; pending = null; choose(w); } });
+}
+function choose(w) {
+  if (state === "intro" || state === "moving") { pending = w; markWord(w); return; }
+  if (w === word && state === "proc") return;
+  markWord(w); sound(true);
+  const back = state === "proc";
+  state = "moving"; stopHead();
+  let t = 0;
+  if (back) {
+    // 今の行列は元の列のその位置へ帰る
+    proc.forEach((i, j) => {
+      const p = P[i], to = rowPos(units[i], 1), c = p.pos.clone().lerp(to, 0.5).add(new THREE.Vector3(0, 3.5, 0));
+      tw(p, "pos", to, 1.9, j * 0.06, ease.io, c); tw(p, "s", 1, 1.9, j * 0.06); tw(p, "q", Q0, 1.6, j * 0.06); tw(p, "br", 0.92, 1.6, j * 0.06);
+    });
+    units.forEach((u) => { if (!proc.includes(u.i)) tw(P[u.i], "br", 0.92, 1.6, 0.2); tw(P[u.i], "bl", 0, 1.6, 0.2); });
+    camTo("whole", 2.4, 0.1); focusProc = false;
+    t = 2.2;
+  }
+  word = w; proc = D.words[w].slice();
+  const set = new Set(proc);
+  // 抜き出し: その言葉に答える1秒だけが列から浮き上がり手前へ。他は沈む
+  units.forEach((u) => { if (!set.has(u.i)) { tw(P[u.i], "br", 0.07, 1.8, t + 0.2); tw(P[u.i], "bl", 1.8, 1.8, t + 0.2); } });
+  proc.forEach((i, j) => {
+    const p = P[i], r = rowPos(units[i], 1);
+    tw(p, "pos", liftPos(i), 1.8, t + j * 0.16, ease.io); tw(p, "s", portrait ? 1.1 : 1.5, 1.8, t + j * 0.16); tw(p, "br", 1.1, 1.0, t + j * 0.16);
+  });
+  // 再構築: 1本の行列へ。カメラは床の高さへ降りる
+  const t2 = t + 2.6;
+  proc.forEach((i, j) => {
+    const p = P[i], sl = slot(j), d = t2 + j * 0.13;
+    later(d, () => {
+      const c = p.pos.clone().lerp(sl.pos, 0.5); c.y += 2.2 + j * 0.15;
+      tw(p, "pos", sl.pos, 2.3, 0, ease.io, c); tw(p, "s", sl.s, 2.3); tw(p, "q", yawQ(sl.yaw), 2.3); tw(p, "br", j === 0 ? 1.08 : 0.9, 2.3);
+    });
+  });
+  later(t2 - 0.2, () => { camTo("proc", 3.2); focusProc = true; });
+  later(t2 + 2.3 + proc.length * 0.13, () => { state = "proc"; setHead(0, true); if (pending) { const w2 = pending; pending = null; choose(w2); } });
+}
+// 浮き上がる位置: 画面上の方向はそのまま、カメラへ寄って中心へ半分詰める
+// 浮き上がる位置: 元の列の方向（放射の角度の順）を保ったまま、カメラの前の輪に並ぶ
+function liftPos(i) {
+  const L = proc.slice().sort((a, b) => units[a].v.th - units[b].v.th), k = L.indexOf(i), n = L.length;
+  const c = camPose("whole"), f = c.look.clone().sub(c.pos).normalize(), r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0, 1, 0)).normalize(), up = new THREE.Vector3().crossVectors(r, f);
+  const th = Math.tan(cam.fov * Math.PI / 360), A = cam.aspect, d = portrait ? 10 : 8.5;
+  const a = -0.35 + 2 * Math.PI * (k + 0.5) / n;                // 右から上を回って一周
+  const nx = Math.cos(a) * (portrait ? 0.5 : 0.62), ny = Math.sin(a) * (portrait ? 0.56 : 0.55) + 0.04;
+  const q = c.pos.clone().addScaledVector(f, d).addScaledVector(r, nx * d * th * A).addScaledVector(up, ny * d * th);
+  q.y = Math.max(q.y, PH * (portrait ? 1.1 : 1.5) / 2 + 0.15); return q;
+}
+function markWord(w) { [...wordsEl.children].forEach((b) => b.classList.toggle("on", b.textContent === w)); }
+
+// ---- 先頭の1秒から映像が流れる。押すと行列が回って、その1秒が先頭に来る ----
+const video = document.createElement("video");
+video.playsInline = true; video.loop = true; video.crossOrigin = "anonymous"; video.preload = "auto";
+const vtex = new THREE.VideoTexture(video);
+const useMp4 = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+let soundOn = true;
+function sound(on) { snd.classList.add("on"); }
+snd.onclick = () => { soundOn = !soundOn; video.muted = !soundOn; snd.textContent = soundOn ? "音 あり" : "音 なし"; };
+function stopHead() {
+  video.pause(); if (head >= 0) hi.get(head).U.uMap.value = hi.get(head).tex; head = -1; cap.classList.remove("on");
+}
+function setHead(j0, first) {
+  stopHead();
+  if (!first) {
+    proc = proc.slice(j0).concat(proc.slice(0, j0));
+    proc.forEach((i, j) => {
+      const p = P[i], sl = slot(j), c = p.pos.clone().lerp(sl.pos, 0.5); c.y += j === 0 ? 0.6 : 1.2;
+      tw(p, "pos", sl.pos, 1.5, 0, ease.io, c); tw(p, "s", sl.s, 1.5); tw(p, "q", yawQ(sl.yaw), 1.5); tw(p, "br", j === 0 ? 1.08 : 0.9, 1.2);
+    });
+  }
+  head = proc[0];
+  const u = units[head], v = u.v, h = head;
+  video.src = `v/${head}.${useMp4 ? "mp4" : "webm"}`; video.muted = !soundOn; video.volume = 0.85;
+  video.onplaying = () => { if (head === h) hi.get(h).U.uMap.value = vtex; };
+  later(first ? 0 : 0.9, () => { if (head === h) video.play().catch(() => { video.muted = true; video.play().catch(() => {}); }); });
+  cap.querySelector(".t").textContent = v.title;
+  cap.querySelector(".m").textContent = `${v.sport}　${u.t.replace(/^0(\d)/, "$1")}`;
+  later(first ? 0.2 : 1.1, () => { if (head === h) cap.classList.add("on"); });
+}
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let down = null;
+canvas.addEventListener("pointerdown", (e) => (down = [e.clientX, e.clientY]));
+canvas.addEventListener("pointerup", (e) => {
+  if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 10 || state !== "proc") return;
+  ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam);
+  const hit = ray.intersectObjects(proc.map((i) => hi.get(i).m))[0];
+  if (hit) { const j = proc.indexOf(hit.object.userData.i); if (j > 0) setHead(j, false); }
+});
+
+// ---- 描画 ----
+const M4 = new THREE.Matrix4(), S3 = new THREE.Vector3(), hz = new THREE.Vector3();
+const DTMAX = +(Q.get("dtmax") || 0.1);
+let last = performance.now() / 1000, fpsA = 60;
+function frame(ms) {
+  const tt = ms / 1000; const dt = window.__hold ? 0 : Math.min(DTMAX, Math.max(0, tt - last)); last = tt; fpsA = fpsA * 0.95 + (1 / Math.max(dt, 1e-3)) * 0.05;
+  now += dt * TS; runJobs();
+  common.uGlobal.value = Math.min(1, common.uGlobal.value + dt * TS / 2.2);
+  step(CAM);
+  smx += (mx - smx) * Math.min(1, dt * 2); smy += (my - smy) * Math.min(1, dt * 2);
+  const drift = Math.sin(now * 0.11) * 0.35;
+  cam.position.copy(CAM.pos).add(new THREE.Vector3(smx * 0.9 + drift, -smy * 0.35, 0));
+  cam.lookAt(CAM.look); cam.updateMatrixWorld();
+  for (const u of units) {
+    const p = P[u.i]; step(p);
+    if (hi.has(u.i)) {
+      const H = hi.get(u.i); H.m.position.copy(p.pos); H.m.quaternion.copy(p.q); H.m.scale.setScalar(p.s);
+      H.mm.position.copy(p.pos); H.mm.quaternion.copy(p.q); H.mm.scale.setScalar(p.s);
+      H.U.uBright.value = p.br; H.U.uBlur.value = p.bl;
+      S3.set(0, 0, 0); M4.compose(p.pos, p.q, S3);
+    } else { S3.setScalar(p.s); M4.compose(p.pos, p.q, S3); }
+    inst.setMatrixAt(u.i, M4); instM.setMatrixAt(u.i, M4);
+    aBright.array[u.i] = p.br; aBlur.array[u.i] = p.bl;
+  }
+  inst.instanceMatrix.needsUpdate = instM.instanceMatrix.needsUpdate = aBright.needsUpdate = aBlur.needsUpdate = true;
+  // 焦点: 全体では中ほど、行列では先頭
+  const fTarget = focusProc && proc.length ? cam.position.distanceTo(P[proc[0]].pos) : 19;
+  common.uFocus.value += (fTarget - common.uFocus.value) * Math.min(1, dt * 1.5);
+  hz.set(0, 0, -300).project(cam);
+  bg.material.uniforms.uHz.value = hz.y * 0.5 + 0.5; R.getDrawingBufferSize(bg.material.uniforms.uRes.value);
+  R.render(scene, cam);
+  requestAnimationFrame(frame);
+}
+function snap(name, w) {
+  for (const k in CAM.tw) delete CAM.tw[k]; P.forEach((p) => (p.tw = {})); jobs.length = 0; common.uGlobal.value = 1;
+  units.forEach((u) => { const p = P[u.i]; p.pos.copy(rowPos(u, 1)); p.s = 1; p.q.identity(); p.br = 0.92; p.bl = 0; });
+  const c = camPose(name === "whole" ? "whole" : name === "lift" ? "whole" : "proc"); CAM.pos.copy(c.pos); CAM.look.copy(c.look);
+  state = "whole"; focusProc = name === "proc";
+  if (w) { proc = D.words[w].slice(); const set = new Set(proc); units.forEach((u) => { if (!set.has(u.i)) { P[u.i].br = 0.07; P[u.i].bl = 1.8; } });
+    proc.forEach((i, j) => { const p = P[i]; if (name === "lift") { p.pos.copy(liftPos(i)); p.s = portrait ? 1.1 : 1.5; p.br = 1.1; } else { const sl = slot(j); p.pos.copy(sl.pos); p.s = sl.s; p.q.copy(yawQ(sl.yaw)); p.br = j ? 0.9 : 1.08; } }); }
+  if (name === "proc") state = "proc";
+}
+window.__m = { snap, get now() { return now; }, choose, setHead: (j) => setHead(j, false), get state() { return state; }, get fps() { return fpsA; }, units, P, proc: () => proc };
+await loadSheets();
+requestAnimationFrame((ms) => { last = ms / 1000; intro(); requestAnimationFrame(frame); });
+</script>
