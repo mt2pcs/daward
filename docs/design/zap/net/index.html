@@ -43,8 +43,9 @@ for (let p = 0; p < N; p++) {
     const v = new THREE.Vector3(Math.cos(th) * r, y * 0.8, Math.sin(th) * r).normalize().applyQuaternion(rot); DIR.set([v.x, v.y, v.z], c * 3); });
 }
 for (const [k, p] of Object.entries(D.pos)) BASE.set(p, +k * 3);
-const R = [0, 9, 2.6, 0.95];                         // 子の広がりの半径（層ごと）
-const OPEN = [[34, 80], [7, 18], [2.6, 6.5]];        // その層の要素の子が開き始める距離・開ききる距離（カメラから）
+const R = [0, 15, 4.4, 1.6];                         // 子の広がりの半径（層ごと）
+const OPEN = [[48, 120], [11, 26], [3.6, 8.5]];       // 子が開ききる距離・開き始める距離（カメラから）
+const MINOPEN = [0.42, 0.34, 0.4];                    // 遠くからでも枝分かれが見える最小の開き（＝神経細胞の形）
 const POS = new Float32Array(N * 3), OPN = new Float32Array(N), VIS = new Float32Array(N), BOOST = new Float32Array(N);
 const PULL = new Float32Array(N * 3), PULLT = new Float32Array(N * 3);   // 塊になるときの瞬間の移動
 
@@ -58,39 +59,57 @@ const TW = 64, TH = Math.ceil(N / TW), posData = new Float32Array(TW * TH * 4);
 const posTex = new THREE.DataTexture(posData, TW, TH, THREE.RGBAFormat, THREE.FloatType); posTex.needsUpdate = true;
 
 // 糸: 要素→人→出来事→瞬間→瞬間→出来事→人→要素 の8点を通る B スプライン（束ねる強さ uBeta）。位置はテクスチャから毎フレーム読む
-const SEG = portrait() ? 20 : 30, NF = D.fibers.length;
+const SEG = portrait() ? 28 : 40, NF = D.fibers.length;
 const g = new THREE.BufferGeometry(), nv = NF * SEG * 2;
-const aC0 = new Float32Array(nv * 4), aC1 = new Float32Array(nv * 4), aT = new Float32Array(nv), aHL = new Float32Array(nv);
+// 束の形（瞬間どうしの直線からのずれ、6点）
+const NB = D.bundles.length, bData = new Float32Array(6 * Math.max(1, NB) * 4);
+D.bundles.forEach((b, i) => b.forEach((o, k) => bData.set([o[0], o[1], o[2], 0], (i * 6 + k) * 4)));
+const bTex = new THREE.DataTexture(bData, 6, Math.max(1, NB), THREE.RGBAFormat, THREE.FloatType); bTex.needsUpdate = true;
+const aC0 = new Float32Array(nv * 4), aC1 = new Float32Array(nv * 4), aT = new Float32Array(nv), aHL = new Float32Array(nv), aR = new Float32Array(nv), aPD = new Float32Array(nv * 2);
 for (let f = 0, v = 0; f < NF; f++) { const c = D.fibers[f];
-  for (let s = 0; s < SEG; s++) for (const tt of [s / SEG, (s + 1) / SEG]) { aC0.set(c.slice(0, 4), v * 4); aC1.set(c.slice(4, 8), v * 4); aT[v] = tt; v++; } }
+  for (let s = 0; s < SEG; s++) for (const tt of [s / SEG, (s + 1) / SEG]) { aC0.set(c.slice(0, 4), v * 4); aC1.set(c.slice(4, 8), v * 4); aT[v] = tt; aR[v] = D.rates[f]; aPD[v * 2] = D.fpair[f][0]; aPD[v * 2 + 1] = D.fpair[f][1]; v++; } }
 g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
 g.setAttribute("aC0", new THREE.BufferAttribute(aC0, 4)); g.setAttribute("aC1", new THREE.BufferAttribute(aC1, 4));
-g.setAttribute("aT", new THREE.BufferAttribute(aT, 1)); const hlAttr = new THREE.BufferAttribute(aHL, 1); g.setAttribute("aHL", hlAttr);
+g.setAttribute("aT", new THREE.BufferAttribute(aT, 1)); g.setAttribute("aR", new THREE.BufferAttribute(aR, 1)); g.setAttribute("aPD", new THREE.BufferAttribute(aPD, 2)); const hlAttr = new THREE.BufferAttribute(aHL, 1); g.setAttribute("aHL", hlAttr);
 const fiberMat = new THREE.ShaderMaterial({
-  glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, depthTest: false,
-  uniforms: { uPos: { value: posTex }, uW: { value: TW }, uBeta: { value: 0.82 }, uSel: { value: 0 }, uA: { value: 0.07 } },
+  glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+  uniforms: { uPos: { value: posTex }, uB: { value: bTex }, uW: { value: TW }, uBeta: { value: 0.92 }, uSel: { value: 0 }, uA: { value: 0.1 } },
   vertexShader: `
-    uniform sampler2D uPos; uniform float uW, uBeta; in vec4 aC0, aC1; in float aT, aHL; out float vHL, vT, vD;
+    uniform sampler2D uPos, uB; uniform float uW, uBeta; in vec4 aC0, aC1; in float aT, aHL, aR; in vec2 aPD; out float vHL, vT, vD, vR;
     vec3 P(float i){ return texelFetch(uPos, ivec2(int(mod(i,uW)), int(floor(i/uW))), 0).xyz; }
     void main(){
-      vec3 C[8]; C[0]=P(aC0.x);C[1]=P(aC0.y);C[2]=P(aC0.z);C[3]=P(aC0.w);C[4]=P(aC1.x);C[5]=P(aC1.y);C[6]=P(aC1.z);C[7]=P(aC1.w);
-      vec3 a=C[0], b=C[7]; for(int k=1;k<7;k++) C[k]=mix(a+(b-a)*float(k)/7.0, C[k], uBeta);
-      float u=aT*9.0; int s=int(min(floor(u),8.0)); float f=u-float(s);
-      vec3 q[4]; for(int j=0;j<4;j++){ int i=s+j; q[j]= i<=2 ? C[0] : (i>=9 ? C[7] : C[i-2]); }
+      vec3 C[14]; C[0]=P(aC0.x);C[1]=P(aC0.y);C[2]=P(aC0.z);C[3]=P(aC0.w);C[10]=P(aC1.x);C[11]=P(aC1.y);C[12]=P(aC1.z);C[13]=P(aC1.w);
+      for(int k=0;k<6;k++){ int kk = aPD.y>0.0 ? k : 5-k; vec3 off=texelFetch(uB, ivec2(kk, int(aPD.x)), 0).xyz;
+        C[4+k]=mix(C[3],C[10],float(k+1)/7.0)+off; }                       // 瞬間どうしの間は束の形をたどる
+      vec3 a=C[0], b=C[13]; for(int k=1;k<13;k++) C[k]=mix(a+(b-a)*float(k)/13.0, C[k], uBeta);
+      float u=aT*15.0; int s=int(min(floor(u),14.0)); float f=u-float(s);
+      vec3 q[4]; for(int j=0;j<4;j++){ int i=s+j; q[j]= i<=2 ? C[0] : (i>=15 ? C[13] : C[i-2]); }
       float f2=f*f, f3=f2*f;
       vec3 p=q[0]*((1.0-f)*(1.0-f)*(1.0-f)/6.0)+q[1]*((3.0*f3-6.0*f2+4.0)/6.0)+q[2]*((-3.0*f3+3.0*f2+3.0*f+1.0)/6.0)+q[3]*(f3/6.0);
-      vHL=aHL; vT=aT; vec4 mv=modelViewMatrix*vec4(p,1.0); vD=-mv.z; gl_Position=projectionMatrix*mv;
+      vHL=aHL; vT=aT; vR=aR; vec4 mv=modelViewMatrix*vec4(p,1.0); vD=-mv.z; gl_Position=projectionMatrix*mv;
     }`,
   fragmentShader: `
-    uniform float uSel, uA; in float vHL, vT, vD; out vec4 o;
+    uniform float uSel, uA; in float vHL, vT, vD, vR; out vec4 o;
     void main(){
       vec3 cool=vec3(0.52,0.60,0.70), warm=vec3(0.98,0.84,0.58);
-      float near=smoothstep(0.4,3.0,vD);                    // カメラの直前は消す
-      float a = vHL>0.5 ? 0.75 : uA*(1.0-0.72*uSel);
+      float near=smoothstep(0.4,3.0,vD)*mix(1.0,0.25,smoothstep(120.0,330.0,vD));   // カメラの直前は消す・遠いほど霞む
+      float a = vHL>0.5 ? 0.35+0.2*vR : uA*(vR<1.5 ? 0.9 : vR<2.5 ? 2.0 : 3.2)*(1.0-0.72*uSel);
       o=vec4(mix(cool,warm,vHL), a*near);
     }`,
 });
 const fibers = new THREE.LineSegments(g, fiberMat); fibers.frustumCulled = false; scene.add(fibers);
+// 枝（瞬間→出来事→人→要素の所属）: 1本の瞬間がどれだけ細かく読まれているかが形で見える
+const dg = new THREE.BufferGeometry(), dI = [];
+for (let i = 0; i < N; i++) if (PAR[i] >= 0) dI.push(PAR[i], i);
+dg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(dI.length * 3), 3)); dg.setAttribute("aI", new THREE.BufferAttribute(new Float32Array(dI), 1));
+dg.setAttribute("aLv", new THREE.BufferAttribute(new Float32Array(dI.map((n) => LV[n])), 1));
+const dendMat = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, transparent: true, depthWrite: false, depthTest: false,
+  uniforms: { uPos: { value: posTex }, uW: { value: TW }, uSel: { value: 0 } },
+  vertexShader: `uniform sampler2D uPos; uniform float uW; in float aI, aLv; out float vD, vLv;
+    void main(){ vec3 p=texelFetch(uPos, ivec2(int(mod(aI,uW)), int(floor(aI/uW))), 0).xyz; vLv=aLv; vec4 mv=modelViewMatrix*vec4(p,1.0); vD=-mv.z; gl_Position=projectionMatrix*mv; }`,
+  fragmentShader: `uniform float uSel; in float vD, vLv; out vec4 o;
+    void main(){ float near=smoothstep(0.3,2.0,vD)*mix(1.0,0.2,smoothstep(90.0,300.0,vD)); o=vec4(vec3(0.9,0.92,0.95), (0.55-0.08*vLv)*near*(1.0-0.5*uSel)); }` });
+const dend = new THREE.LineSegments(dg, dendMat); dend.frustumCulled = false; scene.add(dend);
 
 // 人（L2）は、その人が映る1秒のコマ
 const NP = D.nodes.filter((n) => n[0] === 2).length, P2 = []; for (let i = 0; i < N; i++) if (LV[i] === 2) P2.push(i);
@@ -116,7 +135,7 @@ const CAP = () => (portrait() ? 46 : 90);
 for (let k = 0; k < 110; k++) { const d = document.createElement("div"); d.className = "lb"; d.style.opacity = 0; d.addEventListener("click", (e) => { e.stopPropagation(); if (d._i >= 0) select(d._i); }); labelsEl.appendChild(d); POOL.push(d); }
 
 // ---- カメラ（ダイヤル＝ズーム、ドラッグ＝回す） ----
-const CAMS = { pivot: new THREE.Vector3(), dist: 330, th: 0.6, ph: 0.25 }, GOAL = { pivot: new THREE.Vector3(), dist: 330 };
+const CAMS = { pivot: new THREE.Vector3(), dist: 150, th: 0.6, ph: 0.18 }, GOAL = { pivot: new THREE.Vector3(), dist: 150 };
 let auto = true, touched = false;
 function camUpdate(dt) {
   CAMS.pivot.lerp(GOAL.pivot, 1 - Math.exp(-dt * 2.2)); CAMS.dist += (GOAL.dist - CAMS.dist) * (1 - Math.exp(-dt * 2.4));
@@ -147,7 +166,7 @@ function nearestScreen(x, y, r) { let best = -1, bd = r * r;
   return best; }
 
 // ---- 選ぶ: その中から出る糸が温かくなり、届いた先の瞬間が開いて寄ってくる（塊になる） ----
-let sel = -1; const LIT = new Uint8Array(N); const cap = document.getElementById("cap");
+let sel = -1, fitT = 0; const LIT = new Uint8Array(N); const cap = document.getElementById("cap");
 const inSub = (n, root) => { while (n >= 0) { if (n === root) return true; n = PAR[n]; } return false; };
 function select(i) {
   sel = i; LIT.fill(0); BOOST.fill(0); PULLT.fill(0); aHL.fill(0);
@@ -156,19 +175,19 @@ function select(i) {
     for (let f = 0; f < NF; f++) { const c = D.fibers[f]; const hit = c.slice(0, 4).includes(i) ? 0 : c.slice(4).includes(i) ? 1 : -1; if (hit < 0) continue;
       for (let v = f * SEG * 2; v < (f + 1) * SEG * 2; v++) aHL[v] = 1;
       const other = hit === 0 ? c.slice(4) : c.slice(0, 4);            // 相手側（要素…瞬間）
-      for (const n of other) { LIT[n] = 1; BOOST[n] = 1; }
-      for (const n of (hit === 0 ? c.slice(0, 4) : c.slice(4))) { LIT[n] = 1; if (LV[n] <= LV[i]) {} }
-      whys.push([D.whys[f], hit === 0 ? c[7] : c[0]]);
+      for (const n of other) { LIT[n] = 1; if (LV[i] > 0) BOOST[n] = 1; }
+      for (const n of (hit === 0 ? c.slice(0, 4) : c.slice(4))) LIT[n] = 1;
+      whys.push([D.whys[f], hit === 0 ? c[7] : c[0], D.rates[f]]);
     }
     // 届いた先の瞬間を、選んだものの瞬間のほうへ寄せる（層の中の塊）
     const m0 = MOM[i], tgt = [BASE[m0 * 3], BASE[m0 * 3 + 1], BASE[m0 * 3 + 2]];
     const ms = new Set(); for (let n = 0; n < N; n++) if (LIT[n] && LV[n] === 0 && n !== m0) ms.add(n);
     for (const m of ms) for (let k = 0; k < 3; k++) PULLT[m * 3 + k] = (tgt[k] - BASE[m * 3 + k]) * 0.55;
     LIT[i] = 2; for (let n = PAR[i]; n >= 0; n = PAR[n]) BOOST[n] = 1;
-    GOAL.pivot.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]); GOAL.dist = [70, 20, 8, 5.5][LV[i]] * (portrait() ? 1.35 : 1);
   }
-  hlAttr.needsUpdate = true; fiberMat.uniforms.uSel.value = i >= 0 ? 1 : 0;
+  hlAttr.needsUpdate = true; fiberMat.uniforms.uSel.value = i >= 0 ? 1 : 0; dendMat.uniforms.uSel.value = i >= 0 ? 1 : 0; fitT = i >= 0 ? 3.5 : 0;
   // 選んだのが要素なら、届いた先の具体と一文を出す（理由が辿れる＝ブラックボックスにしない）
+  whys.sort((a, b) => b[2] - a[2]);
   if (i >= 0 && LV[i] === 3 && whys.length) {
     cap.innerHTML = whys.slice(0, portrait() ? 2 : 3).map(([w, o]) => `<div><span class="w">${esc(D.nodes[o][2])}</span>　${esc(D.nodes[MOM[o]][2])}<br>${esc(w)}</div>`).join("");
     cap.classList.add("on");
@@ -179,9 +198,14 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 // ---- 毎フレーム ----
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const M4 = new THREE.Matrix4(), QI = new THREE.Quaternion(), S3 = new THREE.Vector3(), PV = new THREE.Vector3();
-let last = performance.now();
+let last = performance.now(); const DTMAX = +(Q.get("dtmax") || 0.1);
 function frame(now) {
-  const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const dt = Math.min(DTMAX, (now - last) / 1000); last = now;
+  // 選んだ直後は、選んだものと届いた先（同じ深さで光っているもの）が全部入るようにカメラを合わせる
+  if (fitT > 0 && sel >= 0) { fitT -= dt; const c = new THREE.Vector3(), q = new THREE.Vector3(); let n = 0, r = 0; const pts = [];
+    for (let k = 0; k < N; k++) if ((LIT[k] && LV[k] === LV[sel]) || k === sel) { pts.push(k); c.x += POS[k * 3]; c.y += POS[k * 3 + 1]; c.z += POS[k * 3 + 2]; n++; }
+    if (n) { c.divideScalar(n); for (const k of pts) r = Math.max(r, q.set(POS[k * 3], POS[k * 3 + 1], POS[k * 3 + 2]).distanceTo(c));
+      GOAL.pivot.copy(c); GOAL.dist = Math.max([60, 16, 6, 4][LV[sel]], r * (portrait() ? 3.4 : 2.4)); } }
   camUpdate(dt);
   for (let k = 0; k < N * 3; k++) PULL[k] += (PULLT[k] - PULL[k]) * (1 - Math.exp(-dt * 1.8));
   const cx = cam.position.x, cy = cam.position.y, cz = cam.position.z;
@@ -191,7 +215,7 @@ function frame(now) {
     else { const e = OPN[p], r = R[LV[i]] * e;
       POS[i * 3] = POS[p * 3] + DIR[i * 3] * r; POS[i * 3 + 1] = POS[p * 3 + 1] + DIR[i * 3 + 1] * r; POS[i * 3 + 2] = POS[p * 3 + 2] + DIR[i * 3 + 2] * r; VIS[i] = VIS[p] * e; }
     if (LV[i] < 3) { const d = Math.hypot(POS[i * 3] - cx, POS[i * 3 + 1] - cy, POS[i * 3 + 2] - cz), o = OPEN[LV[i]];
-      const tgt = Math.max(ss(o[1], o[0], d), BOOST[i] ? 0.85 : 0); OPN[i] += (tgt - OPN[i]) * (1 - Math.exp(-dt * 3)); } else OPN[i] = 0;
+      const tgt = Math.max(MINOPEN[LV[i]] + (1 - MINOPEN[LV[i]]) * ss(o[1], o[0], d), BOOST[i] ? 0.85 : 0); OPN[i] += (tgt - OPN[i]) * (1 - Math.exp(-dt * 3)); } else OPN[i] = 0;
   }
   for (let i = 0; i < N; i++) posData.set([POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2], 1], i * 4); posTex.needsUpdate = true;
   // 人のコマ
@@ -207,14 +231,17 @@ const occ = new Map();
 function drawLabels() {
   const cand = [];
   for (let i = 0; i < N; i++) {
-    let a = VIS[i] * (LV[i] === 3 ? 1 : 1 - 0.85 * OPN[i]); if (LIT[i]) a = Math.max(a, VIS[i] > 0.2 ? 0.95 : 0); if (i === sel) a = 1;
-    if (a < 0.12) continue; const s = scr(i); if (s[2] > 1 || s[0] < -40 || s[0] > innerWidth + 40 || s[1] < -20 || s[1] > innerHeight + 20) continue;
     const dz = V3.set(POS[i * 3], POS[i * 3 + 1], POS[i * 3 + 2]).distanceTo(cam.position);
+    // 見えている深さ: その層の要素が「開いていない」ほど文字が出る。遠いものは寄るほど消える
+    const span = [Math.max(130, CAMS.dist * 1.5), 40, 12, 5][LV[i]];
+    let a = (VIS[i] < 0.35 && LV[i] > 0 ? 0 : 1) * (LV[i] === 3 ? 1 : 1 - 0.85 * ss(0.4, 0.9, OPN[i])) * ss(span * 1.6, span, dz);
+    if (LIT[i]) a = Math.max(a, VIS[i] > 0.2 ? 0.95 : 0); if (i === sel) a = 1;
+    if (a < 0.12) continue; const s = scr(i); if (s[2] > 1 || s[0] < -40 || s[0] > innerWidth + 40 || s[1] < -20 || s[1] > innerHeight + 20) continue;
     cand.push([i, s[0], s[1], a, (i === sel ? -1e6 : 0) + (LIT[i] ? -1e5 : 0) + LV[i] * -50 + dz]);
   }
   cand.sort((x, y) => x[4] - y[4]); occ.clear(); let k = 0; const cap = CAP();
   for (const [i, x, y, a] of cand) { if (k >= cap) break;
-    const gx = Math.floor(x / 150), gy = Math.floor(y / 20), key = gx + "," + gy; if (occ.has(key) && !LIT[i] && i !== sel) continue; occ.set(key, 1);
+    const gx = Math.floor(x / 170), gy = Math.floor(y / 22), key = gx + "," + gy; if (occ.has(key) && !LIT[i] && i !== sel) continue; occ.set(key, 1);
     const d = POOL[k++]; if (d._i !== i) { d._i = i; d.textContent = D.nodes[i][2]; }
     d.className = `lb l${LV[i]}${i === sel ? " sel" : LIT[i] ? " lit" : ""}`;
     d.style.transform = `translate(${x.toFixed(1)}px,${(y + (LV[i] === 2 ? 22 : 0)).toFixed(1)}px) translate(-50%,-50%)`; d.style.opacity = a.toFixed(2);
