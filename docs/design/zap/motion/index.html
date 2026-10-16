@@ -336,6 +336,9 @@ const DTMAX = +(Q.get("dtmax") || 0.1);
 let last = performance.now() / 1000, fpsA = 60;
 function frame(ms) {
   const tt = ms / 1000; const dt = window.__hold ? 0 : Math.min(DTMAX, Math.max(0, tt - last)); last = tt; fpsA = fpsA * 0.95 + (1 / Math.max(dt, 1e-3)) * 0.05;
+  tick(dt); requestAnimationFrame(frame);
+}
+function tick(dt) {
   now += dt * TS; runJobs();
   common.uGlobal.value = Math.min(1, common.uGlobal.value + dt * TS / 2.2);
   step(CAM);
@@ -361,7 +364,6 @@ function frame(ms) {
   hz.set(0, 0, -300).project(cam);
   bg.material.uniforms.uHz.value = hz.y * 0.5 + 0.5; R.getDrawingBufferSize(bg.material.uniforms.uRes.value);
   R.render(scene, cam);
-  requestAnimationFrame(frame);
 }
 function snap(name, w) {
   for (const k in CAM.tw) delete CAM.tw[k]; P.forEach((p) => (p.tw = {})); jobs.length = 0; common.uGlobal.value = 1;
@@ -372,7 +374,8 @@ function snap(name, w) {
     proc.forEach((i, j) => { const p = P[i]; if (name === "lift") { p.pos.copy(liftPos(i)); p.s = portrait ? 1.1 : 1.5; p.br = 1.1; } else { const sl = slot(j); p.pos.copy(sl.pos); p.s = sl.s; p.q.copy(yawQ(sl.yaw)); p.br = j ? 0.9 : 1.08; } }); }
   if (name === "proc") state = "proc";
 }
-window.__m = { snap, get now() { return now; }, choose, setHead: (j) => setHead(j, false), get state() { return state; }, get fps() { return fpsA; }, units, P, proc: () => proc };
+window.__m = { tick, snap, get now() { return now; }, choose, setHead: (j) => setHead(j, false), get state() { return state; }, get fps() { return fpsA; }, units, P, proc: () => proc };
 await loadSheets();
-requestAnimationFrame((ms) => { last = ms / 1000; intro(); requestAnimationFrame(frame); });
+if (Q.has("manual")) { intro(); window.__ready = true; }           // 検証: 1コマずつ __m.tick(1/30) で進めて撮る
+else requestAnimationFrame((ms) => { last = ms / 1000; intro(); requestAnimationFrame(frame); });
 </script>
