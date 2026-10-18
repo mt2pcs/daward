@@ -304,7 +304,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     // コマは seek が終わったところで1枚ずつ取る。最後（選んだ熱の時刻）のコマが取れたら着地する
     // seeked の時点ではまだコマが用意できていないことがある（readyState 1）。用意できたのを毎フレーム確かめてから取る
     let seekN = 0, seekedN = 0, spawnFail = "", wantGhost = false; mainV.addEventListener("seeked", () => { seekedN++; if (scrub && now >= scrub.t0) wantGhost = true; });
-    function land() { if (!scrub) return; const c = scrub.c; scrub = null; glitch = 0; mainV.muted = false; mainV.playbackRate = reduce ? 1 : 0.5; mainV.play().catch(() => {}); afterScrub(c); }
+    function land() { if (!scrub) return; const c = scrub.c; scrub = null; glitch = 0; mainV.muted = false; mainV.playbackRate = reduce ? 1 : 0.6; mainV.play().catch(() => {}); afterScrub(c); }
 
     // ===== 段取り: 状態が変わるたびに番号を進め、古い予定は捨てる（戻った後に前の予定が走って崩れないように）=====
     let tok = 0; const queue: { at: number; fn: () => void; t: number }[] = [];
@@ -460,7 +460,10 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       finishExtract(); go({ k: "scrub", m, c }); pMat.uniforms.uSel.value = ext ? ext.ids.indexOf(c) : -1; pMat.uniforms.uSelT.value = now;
       tiles.forEach((t) => { t.dimG = t.m === m ? 0.35 : 0.12; t.goal = t.m === m ? 30 : 16; }); frameTile(m, portrait() ? 1 : 0.6);
       mainV.pause(); clearStrip(); wantGhost = false; scrub = { from: mainV.currentTime, to: Math.max(0, N.ctx[c].t - 0.7), t0: now + (reduce ? 0.1 : 0.55), c, lastSeek: 0, dur: reduce ? 0.4 : 1.9, wait: -1 }; }
-    function afterScrub(c: number) { if (mainTile >= 0) { tiles[mainTile].dimG = 1; tiles[mainTile].dim = 1; } flash = 1.25; shake = 1.5; ringT = now; landT = now; hooks.current.slam?.(c); later(1.3, () => { mainV.playbackRate = 1; }); later(reduce ? 0.6 : 3.8, () => connect(c)); }
+    // 間（実機の秒）。文字は読める時間だけ出す: 選んだ熱の場面 5.5 秒（名前と一文を出したまま最後まで流す）、熱狂接続中 3.2 秒、「熱狂、接続」2.6 秒、
+    //   旅の1本ごとに 飛ぶ 5〜6.6 秒 → 繋がり 4.5 秒 → 流れる 4.2 秒（繋がりの組は流れている間も残す）
+    const PACE = { scene: 5.5, scan: 3.2, linked: 2.6, link: 4.5, play: 4.2 };
+    function afterScrub(c: number) { if (mainTile >= 0) { tiles[mainTile].dimG = 1; tiles[mainTile].dim = 1; } flash = 1.25; shake = 1.5; ringT = now; landT = now; hooks.current.slam?.(c); later(1.0, () => { mainV.playbackRate = 1; }); later(reduce ? 0.6 : PACE.scene, () => connect(c)); }
     // 熱狂接続中: カメラが引いて全体が映り、心臓のように鼓動する。選んだ熱から照合の波が全体へ広がる
     let beatAmp = 0, beatG = 0, waveA = 0, waveR = 0, waveC = V();
     function connect(seed: number, q?: string, given?: Item[], nm?: string) {
@@ -474,12 +477,12 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       paintFibers(() => 1); beatG = 1; waveC.copy(seed >= 0 ? EP[seed] : WORDP); waveR = 0; waveA = 1;
       grp++; if (nm) setName(nm); else { setName(""); setLines({}); } if (seed >= 0 && (!nm || !Object.keys(lines).length)) nameGroup({ seed, ids: [seed, ...items.map((x) => x.id)] }, !!nm);
       // 繋がる: 照合の波が一周したところで、行き先の線だけが選んだ熱から伸びる
-      later(reduce ? 0.6 : 2.6, () => { const pj = new Set(items.map((x) => x.id)), pn = new Set(items.map((x) => (seed >= 0 ? linkOf(seed, x.id) : -1)));
+      later(reduce ? 0.6 : PACE.scan, () => { const pj = new Set(items.map((x) => x.id)), pn = new Set(items.map((x) => (seed >= 0 ? linkOf(seed, x.id) : -1)));
         paintFibers((n) => (pn.has(n) ? 2 : 0), (n) => N.links[n][1] === seed); setFat(items.map((it) => ({ pts: pathTo(seed, it), d: it.d })), 1.2);
         setNodes((i) => (i === seed ? [1.6, 3.2] : pj.has(i) ? [1.4, 2.6] : [0.08, 0.7])); setRoots((i) => (i === seed || pj.has(i) ? 1 : 0.03));
         tiles.forEach((t) => { const it = items.find((x) => momOf[x.id] === t.m); t.dimG = it || (seed >= 0 && t.m === momOf[seed]) ? 1.1 : 0.22; (t.mat.uniforms.uRim.value as THREE.Color).set(it ? DIMC[it.d] : "#f4f2ec"); t.mat.uniforms.uHi.value = it ? 0.9 : 0; });
         if (st.k === "trip") setV({ ...st, i: -1 }); waveA = 0;
-        later(reduce ? 0.6 : 1.9, () => hop(0)); }); }
+        later(reduce ? 0.6 : PACE.linked, () => hop(0)); }); }
     // 旅（＝ダイジェスト）。前の旅（cfca682: 外から入口へ降り、線を端から端まで通り、出口から出る。5.2秒）を土台に:
     //   出発の熱（選んだ熱、言葉なら中心の光）の入口へ外から降りる → その熱から相手の熱まで線の中を端から端まで通る（通る線と同じ見方の線が光り、出発側から光が走る。飛んでいる間は両端の言い方）
     //   → 相手の熱の出口から表へ抜け、横から回り込んで映像の正面へ → 繋がりを見せる（両端の熱・言い方・理由の一文。映像はまだ止まったまま）→ その熱の4秒が音つきで流れる → 次へ
@@ -505,9 +508,9 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       camG.yaw = Math.atan2(MP[m].n.x, MP[m].n.z); camG.pitch = Math.max(-1, Math.min(1, Math.asin(MP[m].n.y))); camG.dist = dist; tgtG.copy(MP[m].tile); syncCam();
       // 繋がりを見せる間、映像はその熱の最初のコマで止めておく（先に読み込んでおく）
       if (n >= 0) paintFibers((x) => (x === n ? 2 : N.links[x][3] === it.d ? 1 : 0)); else paintFibers((x) => (N.links[x][3] === it.d ? 1 : 0)); holdOn(m, clipOf(it.id));
-      setV({ ...s, i, ph: "link" }); later(reduce ? 0.8 : 2.6, () => play(s, i)); }
+      setV({ ...s, i, ph: "link" }); later(reduce ? 0.8 : PACE.link, () => play(s, i)); }
     function play(s: Extract<View, { k: "trip" }>, i: number) { const it = s.items[i], m = momOf[it.id];
-      setPlaying([{ tile: m, src: clipOf(it.id), sound: true }]); setV({ ...s, i, ph: "play" }); later(reduce ? 2 : 4.2, () => hop(i + 1)); }
+      setPlaying([{ tile: m, src: clipOf(it.id), sound: true }]); setV({ ...s, i, ph: "play" }); later(reduce ? 2 : PACE.play, () => hop(i + 1)); }
     // 飛んだ後・途中で止めた後に、今のカメラの位置と向きから回る動きへ戻す（跳ばないように）
     function syncCam() { const fwd = cam.getWorldDirection(V()), d = Math.max(40, cam.position.distanceTo(tgtG)); tgtC.copy(cam.position).addScaledVector(fwd, d); const o = cam.position.clone().sub(tgtC);
       cam0.dist = d; cam0.yaw = Math.atan2(o.x, o.z); cam0.pitch = Math.asin(Math.max(-1, Math.min(1, o.y / d))); }
@@ -714,11 +717,11 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
   // ===== 画面の文字と操作 =====
   useEffect(() => { hooks.current.view = (v) => setView(v); hooks.current.slam = (c) => setSlam({ c, key: Date.now() }); hooks.current.name = (n) => setGname(n); hooks.current.lines = (l) => setLines(l); });
   useEffect(() => { if (view.k !== "scrub") setSlam(null); }, [view.k]);
-  useEffect(() => { if (!slam) return; const t = setTimeout(() => setSlam(null), 3700); return () => clearTimeout(t); }, [slam]);
+  // 名前の打ち込みは、場面が終わって引くとき（状態が変わるとき）に消す。実時間のタイマーで消すと、重い端末では場面の途中で消える
   // 接続中の数（照らし合わせた熱が数え上がる）
   const [scan, setScan] = useState(0);
   const scanning = view.k === "search" || (view.k === "trip" && view.i === -2);
-  useEffect(() => { if (!scanning) { if (view.k !== "trip") setScan(0); return; } let n = 0; const id = setInterval(() => { n = Math.min(402, n + 11 + Math.floor(Math.random() * 9)); setScan(n); if (n >= 402) clearInterval(id); }, 55); return () => clearInterval(id); }, [scanning]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!scanning) { if (view.k !== "trip") setScan(0); return; } let n = 0; const id = setInterval(() => { n = Math.min(402, n + 6 + Math.floor(Math.random() * 5)); /* 約2.8秒かけて数え上がる */ setScan(n); if (n >= 402) clearInterval(id); }, 55); return () => clearInterval(id); }, [scanning]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (view.k !== "map") setShare(false); }, [view.k]);
 
   const N = net;
@@ -759,19 +762,16 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
           <div className="n">{view.k === "trip" && view.i === -1 ? <><b>{view.items.length}</b>つの熱が、<b>{sports(view.items)}</b>つの競技から</> : <><b>{scan}</b> / {N.ctx.length} の熱と照らし合わせています</>}</div>
         </div>)}
       {N && view.k === "trip" && view.i >= 0 && stop && (() => { const c = N.ctx[stop.id], m = momOfC(stop.id)!, d = stop.d, sd = view.seed >= 0 ? N.ctx[view.seed] : null, sm = view.seed >= 0 ? momOfC(view.seed) : null;
-        const from = sd ? sd.v[d] || sd.title : `「${view.q}」`, to = c.v[d] || c.title, why = lines[stop.id] && lines[stop.id] !== c.title ? lines[stop.id] : c.line; // AI の一文が名前と同じなら、その熱の一文
+        const from = sd ? sd.v[d] || "" : "", to = c.v[d] || "", why = lines[stop.id] && lines[stop.id] !== c.title ? lines[stop.id] : c.line; // AI の一文が名前と同じなら、その熱の一文
         return (
         <div className="bw-stop" style={{ ["--c" as string]: DIMC[d] }} onClick={() => api.current?.next()}>
           <div className="bar">{view.items.map((_, i) => <i key={i} className={i < view.i ? "done" : i === view.i ? "now" : ""} />)}</div>
-          {view.ph === "fly" && <div className="bw-fly" key={`f${view.i}`}><span className="a">{from}</span><i /><span className="b"><b>{m.sport}</b>{to}</span></div>}
-          {view.ph === "link" && (
-            <div className="bw-link" key={`l${view.i}`}>
-              <div className="e a">{sd && <Thumb id={view.seed} src={api.current?.thumb(view.seed)} />}<div>{sd && <small>{sm!.sport}</small>}<b>{sd ? sd.title : `「${view.q}」`}</b>{sd && sd.v[d] && <em>{sd.v[d]}</em>}</div></div>
-              <div className="w"><span /></div>
-              <div className="e b"><Thumb id={stop.id} src={api.current?.thumb(stop.id)} /><div><small>{m.sport}</small><b>{c.title}</b>{c.v[d] && <em>{c.v[d]}</em>}</div></div>
-              <p className="why">{why}</p>
-            </div>)}
-          {view.ph === "play" && <div className="cap" key={`p${view.i}`}><div className="fr"><i />{sd ? sd.title : `「${view.q}」`}</div><div className="k">{m.sport}</div><h3>{c.title}</h3><p>{why}</p></div>}
+          <div className={`bw-pair ph-${view.ph || "fly"}`} key={`p${view.i}`}>
+            <div className="e a">{sd && <Thumb id={view.seed} src={api.current?.thumb(view.seed)} />}<div>{sd ? <><small>{sm!.sport}</small><b>{sd.title}</b>{from && <em>{from}</em>}</> : <b className="q">{`「${view.q}」`}</b>}</div></div>
+            <div className="w"><span /></div>
+            <div className="e b"><Thumb id={stop.id} src={api.current?.thumb(stop.id)} /><div><small>{m.sport}</small><b>{c.title}</b>{to && <em>{to}</em>}</div></div>
+            <p className="why">{why}</p>
+          </div>
           <button className="skip" onClick={(e) => { e.stopPropagation(); api.current?.skip(); }}>全体を見る</button>
         </div>); })()}
       {N && view.k === "map" && !share && (
@@ -833,14 +833,13 @@ const CSS = `
 .pill{flex:none;font-family:inherit;font-size:14px;font-weight:900;color:#0a0a0a;background:#f7ff3c;border:0;border-radius:999px;padding:13px 20px;cursor:pointer;box-shadow:0 8px 30px rgba(247,255,60,.18)}
 .ghost{flex:none;font-family:inherit;font-size:13px;font-weight:700;color:#f4f2ec;background:rgba(2,3,6,.85);border:1px solid rgba(244,242,236,.25);border-radius:999px;padding:12px 16px;cursor:pointer}
 /* 熱の名前が打ち込まれる（衝撃のあと） */
-.bw-slam{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 8vh);z-index:7;display:flex;flex-direction:column;align-items:center;pointer-events:none;text-shadow:0 4px 30px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.9);animation:bwout 3.7s linear both;padding:0 20px}
+.bw-slam{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 8vh);z-index:7;display:flex;flex-direction:column;align-items:center;pointer-events:none;text-shadow:0 4px 30px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.9);padding:0 20px}
 .bw-slam h2{margin:0;font-size:clamp(34px,5.6vw,80px);font-weight:900;letter-spacing:.02em;line-height:1.1;text-align:center}
 .bw-slam h2 i{font-style:normal;display:inline-block;animation:bwslamch .55s cubic-bezier(.2,1.4,.3,1) both}
 .bw-slam .bar{display:block;height:4px;width:min(440px,60vw);background:var(--c);margin-top:12px;transform-origin:center;animation:bwbar .7s .35s cubic-bezier(.2,.8,.2,1) both;box-shadow:0 0 24px var(--c)}
 .bw-slam p{margin:12px 0 0;max-width:640px;text-align:center;font-size:clamp(13px,1.3vw,17px);font-weight:700;line-height:1.6;color:rgba(244,242,236,.92);animation:bwf .6s .75s ease both}
 @keyframes bwslamch{0%{opacity:0;transform:scale(2.8) translateY(-.15em);filter:blur(12px)}55%{opacity:1;filter:none}100%{opacity:1;transform:none}}
 @keyframes bwbar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-@keyframes bwout{0%,86%{opacity:1}100%{opacity:0}}
 @keyframes bwslam{0%{opacity:0;transform:scale(1.9);filter:blur(14px)}9%{opacity:1;transform:scale(.97);filter:none}14%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1)}}
 /* 熱狂接続中 */
 .bw-conn{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 9vh);z-index:7;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;animation:bwf .6s ease both;text-shadow:0 2px 20px rgba(0,0,0,.9)}
@@ -856,29 +855,24 @@ const CSS = `
 .bw-stop{position:absolute;inset:0;z-index:7;cursor:pointer}
 .bw-stop .bar{position:absolute;left:max(20px,4vw);right:max(20px,4vw);top:calc(env(safe-area-inset-top,0px) + 66px);display:flex;gap:5px}
 .bw-stop .bar i{flex:1;height:3px;background:rgba(244,242,236,.2);border-radius:3px}.bw-stop .bar i.done{background:#f4f2ec}.bw-stop .bar i.now{background:#f7ff3c}
-.bw-stop .cap{position:absolute;left:max(24px,5vw);right:24px;bottom:calc(env(safe-area-inset-bottom,0px) + 7vh);text-shadow:0 2px 20px rgba(0,0,0,.85);pointer-events:none}
-.bw-stop .cap .fr{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:rgba(244,242,236,.75);margin-bottom:10px;animation:bwf .4s ease both}.bw-stop .cap .fr i{width:26px;height:2px;background:var(--c)}
-/* 飛んでいる間: 両端の言い方 */
-.bw-fly{position:absolute;left:0;right:0;margin:0 auto;bottom:calc(env(safe-area-inset-bottom,0px) + 9vh);width:min(760px,calc(100% - 32px));display:flex;align-items:center;justify-content:center;gap:16px;pointer-events:none;text-shadow:0 2px 18px rgba(0,0,0,.95);animation:bwf .5s .2s ease both}
-.bw-fly span{font-size:clamp(16px,1.9vw,24px);font-weight:900}.bw-fly .a{text-align:right;flex:1}.bw-fly .b{flex:1}.bw-fly b{display:block;font-size:10.5px;letter-spacing:.2em;color:#f7ff3c;margin-bottom:3px}
-.bw-fly i{flex:none;width:90px;height:2px;background:linear-gradient(90deg,transparent,var(--c),transparent);position:relative;overflow:hidden}
-.bw-fly i::after{content:"";position:absolute;top:-2px;left:-30%;width:30%;height:6px;background:#fff;filter:blur(2px);animation:bwrun 1.1s linear infinite}
+/* 旅の1本ごとの組（飛ぶ→繋がり→流れる で同じ組のまま中身が出揃う） */
+.bw-pair{position:absolute;left:0;right:0;margin:0 auto;bottom:calc(env(safe-area-inset-bottom,0px) + 6vh);width:min(940px,calc(100% - 28px));display:grid;grid-template-columns:1fr 110px 1fr;align-items:center;pointer-events:none;text-shadow:0 2px 16px rgba(0,0,0,.95);animation:bwf .7s .3s ease both}
+.bw-pair .e{display:flex;align-items:center;gap:12px;min-width:0;transition:gap .6s}.bw-pair .a{flex-direction:row-reverse;text-align:right}
+.bw-pair .th{flex:none;width:112px;height:63px;border-radius:7px;background-size:1600% 1600%;box-shadow:0 0 0 2px var(--c),0 8px 24px rgba(0,0,0,.6);transition:width .7s cubic-bezier(.2,.8,.2,1),opacity .7s}
+.bw-pair small{display:block;font-size:10.5px;font-weight:900;letter-spacing:.2em;color:#f7ff3c}
+.bw-pair b{display:block;font-weight:900;line-height:1.3;margin-top:2px;max-height:3em;overflow:hidden;transition:opacity .7s .3s,max-height .7s}
+.bw-pair .a b{font-size:clamp(14px,1.35vw,17px);color:rgba(244,242,236,.88)}.bw-pair .a b.q{font-size:clamp(18px,2vw,24px);color:#f4f2ec;max-height:none;opacity:1}
+.bw-pair .b b{font-size:clamp(20px,2.3vw,30px)}
+.bw-pair em{display:inline-block;font-style:normal;font-size:clamp(13px,1.3vw,16px);font-weight:800;color:#0a0a0a;background:var(--c);border-radius:4px;padding:3px 9px;margin-top:6px;text-shadow:none}
+.bw-pair .w{height:3px;position:relative;margin:0 10px;overflow:hidden;background:color-mix(in srgb,var(--c) 30%,transparent)}
+.bw-pair .w span{position:absolute;top:0;bottom:0;left:-35%;width:35%;background:#fff;filter:blur(1px);animation:bwrun 1.4s linear infinite}
+.bw-pair:not(.ph-fly) .w{background:var(--c);box-shadow:0 0 16px var(--c)}.bw-pair:not(.ph-fly) .w span{display:none}
+.bw-pair .why{grid-column:1/-1;margin:16px auto 0;max-width:680px;text-align:center;font-size:clamp(14px,1.45vw,18px);font-weight:700;line-height:1.6;color:#f4f2ec;opacity:0;transform:translateY(6px);transition:opacity .7s .8s,transform .7s .8s}
+.bw-pair:not(.ph-fly) .why{opacity:1;transform:none}
+/* 飛んでいる間は両端の言い方だけ（止め絵と名前は着いてから） */
+.bw-pair.ph-fly .e{gap:0}.bw-pair.ph-fly .th{width:0;opacity:0}.bw-pair.ph-fly b:not(.q){opacity:0;max-height:0}
 @keyframes bwrun{to{left:100%}}
-/* 着いたら: 繋がり（両端と理由）*/
-.bw-link{position:absolute;left:0;right:0;margin:0 auto;bottom:calc(env(safe-area-inset-bottom,0px) + 6vh);width:min(900px,calc(100% - 28px));display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;gap:0;pointer-events:none;text-shadow:0 2px 16px rgba(0,0,0,.95)}
-.bw-link .e{display:flex;align-items:center;gap:12px;min-width:0}.bw-link .a{flex-direction:row-reverse;text-align:right;animation:bwinl .6s cubic-bezier(.2,.9,.2,1) both}.bw-link .b{animation:bwinr .6s .55s cubic-bezier(.2,.9,.2,1) both}
-.bw-link .th{flex:none;width:112px;height:63px;border-radius:7px;background-size:1600% 1600%;box-shadow:0 0 0 2px var(--c),0 8px 24px rgba(0,0,0,.6)}
-.bw-link .th.q{display:flex;align-items:center;justify-content:center;background:rgba(255,250,220,.08);font-size:14px;font-weight:900;padding:0 8px;text-align:center}
-.bw-link small{display:block;font-size:10px;font-weight:900;letter-spacing:.2em;color:#f7ff3c}.bw-link b{display:block;font-size:clamp(15px,1.6vw,21px);font-weight:900;line-height:1.3;margin-top:2px}
-.bw-link em{display:inline-block;font-style:normal;font-size:12.5px;font-weight:700;color:#0a0a0a;background:var(--c);border-radius:4px;padding:2px 7px;margin-top:6px;text-shadow:none}
-.bw-link .w{height:3px;position:relative;margin:0 10px}.bw-link .w span{position:absolute;inset:0;background:var(--c);box-shadow:0 0 16px var(--c);transform-origin:left;animation:bwbar .5s .3s cubic-bezier(.2,.8,.2,1) both}
-.bw-link .why{grid-column:1/-1;margin:16px auto 0;max-width:640px;text-align:center;font-size:clamp(14px,1.4vw,18px);font-weight:700;line-height:1.6;color:#f4f2ec;animation:bwf .6s 1.05s ease both}
-@keyframes bwinl{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
-@keyframes bwinr{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
-.bw-stop .k{font-size:12px;font-weight:900;letter-spacing:.24em;color:#f7ff3c;animation:bwf .4s .15s ease both}
-.bw-stop h3{margin:8px 0 0;font-size:clamp(30px,4.6vw,64px);font-weight:900;line-height:1.12;border-left:5px solid var(--c);padding-left:16px;animation:bwslam2 .7s cubic-bezier(.2,.9,.2,1) both}
-@keyframes bwslam2{0%{opacity:0;transform:translateX(-30px) scale(1.15);filter:blur(10px)}100%{opacity:1;transform:none;filter:none}}
-.bw-stop p{margin:10px 0 0 21px;font-size:14px;color:rgba(244,242,236,.85);animation:bwf .5s .35s ease both}
+@keyframes bwrunv{to{top:100%}}
 .bw-stop .skip{position:absolute;right:max(16px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 82px);font-family:inherit;font-size:12px;font-weight:700;color:#f4f2ec;background:rgba(2,3,6,.85);border:1px solid rgba(244,242,236,.25);border-radius:999px;padding:9px 14px;cursor:pointer}
 /* 全体図 */
 .bw-map{position:absolute;left:0;right:0;margin:0 auto;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);z-index:7;width:min(760px,calc(100% - 32px));display:flex;align-items:center;justify-content:space-between;gap:16px;background:linear-gradient(180deg,rgba(9,11,17,.94),rgba(5,6,10,.96));border:1px solid rgba(244,242,236,.1);border-radius:18px;padding:16px 18px;animation:bwf .5s ease both}
@@ -896,10 +890,10 @@ const CSS = `
   .bw-who{left:16px;top:calc(env(safe-area-inset-top,0px) + 52px)}.bw-who span{font-size:14px}
   .bw-t.hw span{font-size:13px;padding:7px 11px}.bw-t.ht span{font-size:11.5px}.bw-t.lobe{font-size:10px}
   .bw-slam{bottom:calc(env(safe-area-inset-bottom,0px) + 14vh)}.bw-slam h2{font-size:30px}.bw-slam p{font-size:13px}
-  .bw-stop .bar{top:calc(env(safe-area-inset-top,0px) + 56px)}.bw-stop .skip{top:calc(env(safe-area-inset-top,0px) + 70px)}.bw-stop h3{font-size:26px}
-  .bw-fly{flex-direction:column;gap:8px}.bw-fly .a,.bw-fly .b{text-align:center}.bw-fly i{width:2px;height:28px;background:linear-gradient(180deg,transparent,var(--c),transparent)}.bw-fly i::after{display:none}.bw-fly span{font-size:16px}
-  .bw-link{grid-template-columns:1fr;gap:6px;bottom:calc(env(safe-area-inset-bottom,0px) + 3vh)}.bw-link .a{flex-direction:row;text-align:left}.bw-link .w{height:22px;width:3px;margin:0 0 0 54px}.bw-link .w span{transform-origin:top}
-  .bw-link .th{width:96px;height:54px}.bw-link b{font-size:15px}.bw-link .why{font-size:13px;margin-top:10px}
+  .bw-stop .bar{top:calc(env(safe-area-inset-top,0px) + 56px)}.bw-stop .skip{top:calc(env(safe-area-inset-top,0px) + 70px)}
+  .bw-pair{grid-template-columns:1fr;gap:6px;bottom:calc(env(safe-area-inset-bottom,0px) + 3vh);width:calc(100% - 24px)}.bw-pair .a{flex-direction:row;text-align:left}
+  .bw-pair .w{height:22px;width:3px;margin:0 0 0 47px}.bw-pair .w span{top:-35%;left:0;right:0;width:auto;height:35%;animation:bwrunv 1.4s linear infinite}
+  .bw-pair .th{width:96px;height:54px}.bw-pair .b b{font-size:19px}.bw-pair .why{font-size:13.5px;margin-top:10px}
   .bw-map{flex-direction:column;align-items:stretch;gap:12px;width:calc(100% - 20px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px)}.bw-map .row{justify-content:stretch}.bw-map .row .pill{flex:1}
 }
 `;
