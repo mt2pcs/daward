@@ -1,0 +1,262 @@
+<title>熱狂ザッピング UIモック</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* 映像を使わない操作のモック。映像の位置は色の板と「映像」の表示で代わりにする。暗い一色の世界に固定 */
+:root{
+  --bg:#05060a; --fg:#f4f5f8; --mute:#9aa1b2; --line:#2a3044; --accent:#ffe600; --panel:rgba(12,14,22,.86);
+  --display:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif; --body:"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);overflow:hidden;margin:0;-webkit-user-select:none;user-select:none;touch-action:none}
+#gl{position:fixed;inset:0}
+.top{position:fixed;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 12px) max(16px,env(safe-area-inset-right,0px)) 0 max(16px,env(safe-area-inset-left,0px));z-index:20;pointer-events:none}
+.top>*{pointer-events:auto}
+.brand{font-weight:900;font-size:12px;letter-spacing:.12em}.brand em{font-style:normal;color:var(--accent)}
+.mocktag{font-size:10px;color:var(--mute);border:1px solid var(--line);padding:3px 8px;border-radius:999px}
+.back{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--fg);font-size:18px;cursor:pointer}
+.hint{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 52px);text-align:center;font-size:13px;color:var(--mute);z-index:5;pointer-events:none;padding:0 16px;transition:opacity .4s}
+.hint b{color:var(--fg)}
+.zoom{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;z-index:6;font-size:10px;color:var(--mute)}
+.zoom i{width:3px;height:120px;background:var(--line);border-radius:3px;position:relative;display:block}
+.zoom i::after{content:"";position:absolute;left:-4px;width:11px;height:11px;border-radius:50%;background:var(--accent);top:var(--z,50%);transform:translateY(-50%)}
+/* 下の欄 */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:15;padding:0 max(12px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 12px) max(12px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none}
+.dock>*{pointer-events:auto}
+.dest{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.dest button{background:var(--panel);border:1px solid var(--line);color:var(--fg);font-size:12px;font-weight:700;padding:7px 11px;border-radius:999px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.dest button i{font-style:normal;color:var(--accent);display:inline-block}
+.word{display:flex;gap:8px;width:min(520px,100%)}
+.word input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--line);color:var(--fg);font-size:16px;padding:11px 14px;border-radius:999px;outline:none}
+.word input:focus{border-color:var(--accent)}
+.word button,.btn.go{background:var(--accent);color:#000;border:0;font-weight:900;border-radius:999px;padding:0 18px;cursor:pointer;font-size:14px}
+.sheet{width:min(640px,100%);background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:14px 16px;backdrop-filter:blur(10px);position:relative;animation:up .3s ease both}
+.sheet .x{position:absolute;right:8px;top:6px;background:none;border:0;color:var(--mute);font-size:20px;cursor:pointer;padding:4px 8px}
+.sheet .k{font-size:10px;letter-spacing:.14em;color:var(--mute)}
+.sheet h2{font-family:var(--display);font-size:20px;line-height:1.3;margin:4px 28px 2px 0;text-wrap:balance}
+.sheet p{font-size:12px;color:var(--mute);margin:2px 0 0;line-height:1.6}
+.row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn{background:transparent;border:1px solid var(--line);color:var(--fg);font-size:13px;font-weight:700;padding:10px 14px;border-radius:999px;cursor:pointer}
+.btn.go{padding:10px 18px;margin-left:auto}
+.chips{display:flex;gap:6px;margin-top:10px;overflow-x:auto;scrollbar-width:none}
+.chips button{flex:0 0 auto;background:transparent;border:1.5px solid var(--c);color:var(--fg);font-size:12px;font-weight:700;padding:6px 11px;border-radius:999px;cursor:pointer}
+.chips button.on{background:var(--c);color:#000}
+.chips small{flex:0 0 auto;font-size:10px;color:var(--mute);align-self:center}
+/* 観る（モック）*/
+.player{position:fixed;inset:0;z-index:30;background:#000;display:flex;align-items:center;justify-content:center;animation:in .35s ease both}
+.player .frame{position:absolute;inset:0;background:var(--grad);display:flex;align-items:center;justify-content:center}
+.player .frame span{font-size:12px;letter-spacing:.2em;color:rgba(255,255,255,.55);border:1px dashed rgba(255,255,255,.35);padding:8px 14px;border-radius:8px}
+.player .shade{position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.5),transparent 25%,transparent 55%,rgba(0,0,0,.85))}
+.player .cap{position:absolute;left:max(18px,5vw);right:18px;bottom:calc(env(safe-area-inset-bottom,0px) + 120px)}
+.player .cap small{font-size:12px;color:var(--mute)}.player .cap h1{font-family:var(--display);font-size:clamp(28px,5vw,60px);margin:6px 0 0;line-height:1.1;text-wrap:balance}.player .cap p{font-size:14px;margin:8px 0 0;max-width:640px;line-height:1.6}
+.player .bar{position:absolute;left:0;right:0;bottom:0;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;flex-direction:column;align-items:center;gap:10px}
+.player .prog{position:absolute;left:0;top:0;height:3px;background:var(--accent);animation:prog linear both}
+.player .top2{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 56px);text-align:center}.player .top2 b{color:var(--accent);font-size:16px}.player .top2 span{display:block;font-size:11px;color:var(--mute)}
+.strip{display:flex;gap:6px;overflow-x:auto;max-width:100%;scrollbar-width:none}.strip button{flex:0 0 auto;width:58px;height:33px;border-radius:5px;border:2px solid transparent;background:var(--grad);opacity:.5;cursor:pointer}.strip button.on{opacity:1;border-color:var(--accent)}
+.navl,.navr{position:absolute;top:15%;bottom:35%;width:30%;background:none;border:0;cursor:pointer}.navl{left:0}.navr{right:0}
+/* 探索の数 */
+.count{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 30px);display:flex;justify-content:center;gap:clamp(14px,4vw,40px);z-index:8;pointer-events:none}
+.count div{display:flex;flex-direction:column;align-items:center}.count b{font-size:clamp(24px,4vw,44px);font-weight:900;font-variant-numeric:tabular-nums;line-height:1}.count span{font-size:10px;color:var(--mute);margin-top:4px}
+.title{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 56px);text-align:center;z-index:8;pointer-events:none;padding:0 16px}
+.title small{display:block;font-size:11px;color:var(--mute)}.title b{font-family:var(--display);font-size:clamp(20px,3vw,32px)}
+.found{position:fixed;left:0;right:0;top:36%;text-align:center;z-index:9;animation:in .6s ease both;padding:0 16px}
+.found small{display:block;font-size:12px;color:var(--mute)}.found b{display:block;font-family:var(--display);font-size:clamp(32px,6vw,68px);margin:6px 0 14px;text-wrap:balance}
+.end{position:fixed;inset:0;z-index:35;background:rgba(5,6,10,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;padding:0 20px;animation:in .5s ease both}
+.end b{font-family:var(--display);font-size:clamp(30px,6vw,60px)}.end p{color:var(--mute);font-size:13px;margin:0}
+.toast{position:fixed;left:0;right:0;top:38%;text-align:center;z-index:9;pointer-events:none;font-family:var(--display);font-size:clamp(28px,5vw,52px);font-weight:900;animation:toast 2.6s ease both}
+.toast small{display:block;font-family:var(--body);font-size:12px;color:var(--mute);font-weight:400}
+@keyframes up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}@keyframes in{from{opacity:0}to{opacity:1}}
+@keyframes prog{from{width:0}to{width:100%}}@keyframes toast{0%{opacity:0;letter-spacing:.3em}15%{opacity:1;letter-spacing:.02em}75%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.01s!important}}
+</style>
+<canvas id="gl"></canvas>
+<div class="top"><div class="brand">DAZN <em>100</em> MOMENTS</div><span class="mocktag">UIモック・映像なし</span><button class="back" id="back" hidden aria-label="空間へ戻る">×</button></div>
+<div class="hint" id="hint"></div>
+<div class="zoom" id="zoom"><span>瞬間</span><i></i><span>熱</span></div>
+<div id="ui"></div>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+const D = __DATA__;
+// ---- データ（実際の文言）: m=[題, 競技, 熱ids, 位置] c=[題, 一文, 瞬間, 位置, 見方の言い方8, 見方ごとの繋がり先] l=[a,b,強さ,次元] g=[領域名, 位置]
+const DIMC = ["#ff3366","#ffee55","#4de6ff","#ff8866","#ff4040","#dff257","#66ccff","#dd8820"];
+const SPORTC = {}; const pal = ["#2b4c9a","#9a2b4c","#2b9a6e","#9a7a2b","#5b2b9a","#2b8a9a","#9a4a2b","#6a9a2b"];
+D.m.forEach((m) => { if (!SPORTC[m[1]]) SPORTC[m[1]] = pal[Object.keys(SPORTC).length % pal.length]; });
+const grad = (c) => `linear-gradient(135deg, ${c}, #0b0d14 70%)`;
+const S = 1.0;
+const P = (a) => new THREE.Vector3(a[0] * S, a[1] * S, a[2] * S);
+// ---- three ----
+const cv = document.getElementById("gl"), R = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.setClearColor(0x05060a, 1);
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(52, 1, 0.1, 3000);
+const portrait = () => innerHeight > innerWidth;
+const resize = () => { R.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.fov = portrait() ? 68 : 52; cam.updateProjectionMatrix(); }; addEventListener("resize", resize); resize();
+// 文字入りの板（映像の代わり）
+function cardTex(title, sub, color, small) {
+  const c = document.createElement("canvas"); c.width = 512; c.height = 288; const g = c.getContext("2d");
+  const gr = g.createLinearGradient(0, 0, 512, 288); gr.addColorStop(0, color); gr.addColorStop(1, "#0b0d14"); g.fillStyle = gr; g.fillRect(0, 0, 512, 288);
+  g.strokeStyle = "rgba(255,255,255,.18)"; g.setLineDash([8, 8]); g.strokeRect(10, 10, 492, 268); g.setLineDash([]);
+  g.fillStyle = "rgba(255,255,255,.45)"; g.font = "600 20px sans-serif"; g.fillText(small ? "熱の場面（映像）" : "映像", 24, 44);
+  g.fillStyle = "#fff"; g.font = `900 ${small ? 34 : 38}px sans-serif`; const words = [...title]; let line = "", y = 190 - (small ? 0 : 0), lines = [];
+  for (const ch of words) { if (g.measureText(line + ch).width > 464) { lines.push(line); line = ch; } else line += ch; } lines.push(line); lines = lines.slice(0, 2);
+  lines.forEach((ln, i) => g.fillText(ln, 24, 200 - (lines.length - 1 - i) * 42));
+  g.fillStyle = "rgba(255,255,255,.65)"; g.font = "600 20px sans-serif"; g.fillText(sub, 24, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }
+const geo = new THREE.PlaneGeometry(1.7778, 1);
+const moments = D.m.map((m, i) => { const mat = new THREE.MeshBasicMaterial({ map: cardTex(m[0], m[1], SPORTC[m[1]]), transparent: true, depthWrite: false }); const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.copy(P(m[3])); mesh.scale.setScalar(10); mesh.userData = { kind: "m", i }; scene.add(mesh); return { mesh, mat, i, s: 10, gs: 10, op: 1, gop: 1, play: 0 }; });
+const ctxs = D.c.map((c, i) => { const mat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, opacity: 0 }); const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(P(c[3])); mesh.visible = false; mesh.userData = { kind: "c", i }; scene.add(mesh);
+  return { mesh, mat, i, s: 0, gs: 0, op: 0, gop: 0, tex: null }; });
+const ctxTex = (i) => { const x = ctxs[i]; if (!x.tex) { const c = D.c[i]; x.tex = cardTex(c[0], D.m[c[2]][1] + "　" + D.m[c[2]][0], SPORTC[D.m[c[2]][1]], true); x.mat.map = x.tex; x.mat.needsUpdate = true; } };
+// 星（全部の熱）と神経（全部の繋がり）
+const sp = new Float32Array(D.c.length * 3); D.c.forEach((c, i) => sp.set(c[3], i * 3));
+const starG = new THREE.BufferGeometry(); starG.setAttribute("position", new THREE.BufferAttribute(sp, 3)); const starCol = new Float32Array(D.c.length * 3).fill(0.55); starG.setAttribute("color", new THREE.BufferAttribute(starCol, 3));
+const dot = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const g = c.getContext("2d"), r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(0.35, "rgba(255,255,255,.6)"); r.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+const stars = new THREE.Points(starG, new THREE.PointsMaterial({ size: 3, map: dot, vertexColors: true, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending })); scene.add(stars);
+const lp = new Float32Array(D.l.length * 6), lc = new Float32Array(D.l.length * 6); D.l.forEach(([a, b], k) => { lp.set(D.c[a][3], k * 6); lp.set(D.c[b][3], k * 6 + 3); });
+const nerveG = new THREE.BufferGeometry(); nerveG.setAttribute("position", new THREE.BufferAttribute(lp, 3)); nerveG.setAttribute("color", new THREE.BufferAttribute(lc, 3));
+const nerves = new THREE.LineSegments(nerveG, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending })); scene.add(nerves);
+const litT = new Float32Array(D.l.length).fill(1e9), litCol = D.l.map(() => [0.2, 0.25, 0.4]);
+// 選んだ熱から相手へ走る道（見方ごと）
+const roadG = new THREE.BufferGeometry(); const road = new THREE.LineSegments(roadG, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); scene.add(road);
+let roads = []; // {a:Vector3,b:Vector3,col,t0}
+// カメラ
+const C = { t: new THREE.Vector3(), d: 330, yaw: 0.4, pitch: 0.2 }, G = { t: new THREE.Vector3(), d: 330, yaw: 0.4, pitch: 0.2 }; let tau = 1, auto = 0.03, kick = 0;
+const camPos = () => new THREE.Vector3(C.t.x + C.d * Math.cos(C.pitch) * Math.sin(C.yaw), C.t.y + C.d * Math.sin(C.pitch), C.t.z + C.d * Math.cos(C.pitch) * Math.cos(C.yaw));
+const fly = (p, d, t = 0.9) => { G.t.copy(p); G.d = d; tau = t; };
+const facing = (p) => { const cp = camPos(); return Math.atan2(cp.x - p.x, cp.z - p.z); };
+// ---- 状態 ----
+let st = { k: "free" }, now = 0, timers = [];
+const later = (ms, f) => timers.push(setTimeout(f, ms)); const clear = () => { timers.forEach(clearTimeout); timers = []; };
+const ui = document.getElementById("ui"), hint = document.getElementById("hint"), back = document.getElementById("back");
+back.onclick = () => go({ k: "free" });
+function go(s) { clear(); st = s; render(); scene3(); }
+// 空間の見え方
+function scene3() {
+  roads = []; litT.fill(1e9);
+  for (const c of ctxs) c.gop = 0;
+  if (st.k === "free") { for (const m of moments) { m.gop = 1; m.gs = 10; } auto = 0.03; if (C.d < 60) fly(C.t, 160); }
+  if (st.k === "lockm") { const m = moments[st.i]; for (const x of moments) { x.gop = x === m ? 1 : 0; x.gs = 10; } m.gs = 14; fly(m.mesh.position, portrait() ? 70 : 52); G.yaw = facing(m.mesh.position); auto = 0.006;
+    if (st.mode === "open") { const ids = D.m[st.i][2]; m.gop = 0.2; ids.forEach((id, k) => { ctxTex(id); const x = ctxs[id]; x.mesh.position.copy(m.mesh.position); x.dest = P(D.c[id][3]); x.gop = 1; x.gs = 6.5; x.t0 = now + k * 0.08; }); }
+    if (st.mode === "links") { const ids = new Set(D.m[st.i][2]); const tg = new Map(); D.l.forEach(([a, b, s, d], k) => { if (ids.has(a) !== ids.has(b)) { const from = ids.has(a) ? a : b, to = ids.has(a) ? b : a; litT[k] = now + Math.random() * 0.6; litCol[k] = hex(DIMC[Math.max(0, d)]); tg.set(to, Math.max(tg.get(to) || 0, s)); } });
+      ids.forEach((id) => { ctxTex(id); ctxs[id].gop = 1; ctxs[id].gs = 5; ctxs[id].dest = null; ctxs[id].mesh.position.copy(P(D.c[id][3])); });
+      [...tg.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).forEach(([id], k) => { ctxTex(id); const x = ctxs[id]; x.mesh.position.copy(P(D.c[id][3])); x.dest = null; x.gop = 1; x.gs = 6; x.t0 = now + 0.6 + k * 0.1; });
+      fly(m.mesh.position, portrait() ? 260 : 200, 1.2); } }
+  if (st.k === "lockc") { const c = D.c[st.i], x = ctxs[st.i]; ctxTex(st.i); for (const m of moments) { m.gop = 0; } x.gop = 1; x.gs = 9; x.dest = null; x.mesh.position.copy(P(c[3])); fly(x.mesh.position, portrait() ? 64 : 48); G.yaw = facing(x.mesh.position); auto = 0.006;
+    const d = st.dim ?? +Object.keys(c[5])[0]; if (!isNaN(d)) { const tg = c[5][d] || []; tg.forEach((id, k) => { ctxTex(id); const y = ctxs[id]; y.mesh.position.copy(P(D.c[id][3])); y.dest = null; y.gop = 1; y.gs = 7; y.t0 = now + 0.5 + k * 0.15; roads.push({ a: P(c[3]), b: P(D.c[id][3]), col: hex(DIMC[d]), t0: now + k * 0.15 }); });
+      const pts = [P(c[3]), ...tg.map((id) => P(D.c[id][3]))], cen = pts.reduce((a, p) => a.add(p), new THREE.Vector3()).multiplyScalar(1 / pts.length); let r = 0; pts.forEach((p) => (r = Math.max(r, p.distanceTo(cen)))); later(250, () => fly(cen, Math.max(70, r * (portrait() ? 2.9 : 2.3)), 1.1)); } }
+  if (st.k === "explore") { for (const m of moments) m.gop = 0; fly(st.from || new THREE.Vector3(), portrait() ? 430 : 340, 1.2); auto = 0.05; spread(st.seed); }
+}
+const hex = (h) => { const c = new THREE.Color(h); return [c.r, c.g, c.b]; };
+// 探索: 幅優先で信号が広がる（照らし合わせている量）→ 結果への道だけが残り、結果がその場で開く
+const adj = new Map(); D.l.forEach(([a, b], k) => { for (const [x, y] of [[a, b], [b, a]]) { if (!adj.has(x)) adj.set(x, []); adj.get(x).push([y, k]); } });
+function spread(seed) { const t0 = now + 0.3, seen = new Set(); let fr = seed !== undefined ? [[seed, t0]] : Array.from({ length: 16 }, (_, j) => [Math.floor(Math.random() * D.c.length), t0 + j * 0.06]); let n = 0;
+  for (let h = 0; h < 4; h++) { const nx = []; for (const [x, tx] of fr) for (const [y, k] of (adj.get(x) || []).slice(0, h ? 7 : 24)) { if (litT[k] < 1e8) continue; litT[k] = tx + Math.random() * 0.3; litCol[k] = hex(DIMC[Math.max(0, D.l[k][3])]); n++; if (!seen.has(y)) { seen.add(y); nx.push([y, litT[k] + 0.7]); } } fr = nx; }
+  return n; }
+function results(seed, word) { // モック: 種の見方の繋がり先と強い繋がりから6本（本番は /api/ctx/digest）
+  let ids = []; if (seed !== undefined) { const c = D.c[seed]; for (const d of Object.keys(c[5])) ids.push(...c[5][d]); D.l.filter((l) => l[0] === seed || l[1] === seed).sort((a, b) => b[2] - a[2]).forEach((l) => ids.push(l[0] === seed ? l[1] : l[0])); }
+  else { const w = [...word]; ids = D.c.map((c, i) => [i, w.filter((ch) => (c[0] + c[1]).includes(ch)).length]).sort((a, b) => b[1] - a[1]).map((x) => x[0]); }
+  const seenM = new Set(seed !== undefined ? [D.c[seed][2]] : []), out = []; for (const id of ids) { if (seenM.has(D.c[id][2])) continue; seenM.add(D.c[id][2]); out.push(id); if (out.length >= 6) break; } return out; }
+// ---- 画面の部品 ----
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const EX = ["最後の花道", "誰かのために", "負けた側の涙", "親父"]; let ex = 0; setInterval(() => { ex = (ex + 1) % EX.length; const i = document.querySelector("#w"); if (i) i.placeholder = `熱の言葉で探す　例「${EX[ex]}」`; }, 3000);
+function render() {
+  back.hidden = st.k === "free";
+  let h = "";
+  if (st.k === "free") { hint.innerHTML = "ドラッグで回る・ピンチ/ホイールで寄る。<b>寄るほど、瞬間が熱にほどける</b>"; hint.style.opacity = 1;
+    const near = D.g.map((g, k) => [k, P(g[1]).distanceTo(C.t)]).sort((a, b) => a[1] - b[1]).slice(1, 4);
+    h = `<div class="dock"><div class="dest">${near.map(([k]) => `<button data-jump="${k}"><i data-arrow="${k}">➤</i>${esc(D.g[k][0])}</button>`).join("")}</div>
+      <form class="word" id="wf"><input id="w" placeholder="熱の言葉で探す　例「${EX[ex]}」" maxlength="40" enterkeyhint="send"><button>探す</button></form></div>`; }
+  else hint.style.opacity = 0;
+  if (st.k === "lockm") { const m = D.m[st.i];
+    h = `<div class="dock"><div class="sheet"><button class="x" data-go="free">×</button><div class="k">${esc(m[1])}　瞬間</div><h2>${esc(m[0])}</h2>
+      <p>${st.mode === "open" ? `この瞬間を作っていた ${m[2].length} つの熱。押すと、その熱を中心に繋がりが見える` : st.mode === "links" ? "この瞬間の熱から、別の瞬間の熱へ伸びている繋がり" : `${m[2].length} つの熱でできている瞬間`}</p>
+      <div class="row"><button class="btn" data-watch="m:${st.i}">▶ 観る</button><button class="btn ${st.mode === "open" ? "go" : ""}" data-mode="open">熱に分解する</button><button class="btn ${st.mode === "links" ? "go" : ""}" data-mode="links">繋がりを見る</button></div></div></div>`; }
+  if (st.k === "lockc") { const c = D.c[st.i], m = D.m[c[2]], ds = Object.keys(c[5]).map(Number); const d = st.dim ?? ds[0];
+    h = `<div class="dock"><div class="sheet"><button class="x" data-go="free">×</button><div class="k">${esc(m[1])}　${esc(m[0])}　の熱</div><h2>${esc(c[0])}</h2><p>${esc(c[1])}</p>
+      ${ds.length ? `<div class="chips"><small>見方</small>${ds.map((x) => `<button style="--c:${DIMC[x]}" class="${x === d ? "on" : ""}" data-dim="${x}">${esc(c[4][x])}</button>`).join("")}</div>` : ""}
+      <div class="row"><button class="btn" data-watch="c:${st.i}">▶ この熱の場面</button><button class="btn" data-lockm="${c[2]}">この瞬間へ</button><button class="btn go" data-explore="${st.i}">この熱で100本を探す</button></div></div></div>`; }
+  if (st.k === "explore") { const t = st.seed !== undefined ? D.c[st.seed][0] : `「${st.q}」`;
+    h = `<div class="title"><small>${st.seed !== undefined ? "この熱で探す" : "この言葉で探す"}</small><b>${esc(t)}</b></div>`;
+    if (st.ph === "scan") h += `<div class="count"><div><b id="n1">0</b><span>の熱と照らし合わせ</span></div><div><b id="n2">0</b><span>本の繋がりを信号が通り</span></div><div><b id="n3">0</b><span>本に同じ熱</span></div></div>`;
+    if (st.ph === "found") h += `<div class="found"><small>${st.ids.length}本の瞬間に、同じ熱が見つかった</small><b>${esc(st.name)}</b><button class="btn go" data-digest>▶ ダイジェストで観る</button></div>`; }
+  if (st.k === "watch") { const [kk, i] = st.id; const t = kk === "m" ? D.m[i][0] : D.c[i][0], s = kk === "m" ? D.m[i][1] : D.m[D.c[i][2]][1] + "　" + D.m[D.c[i][2]][0];
+    h = `<div class="player" style="--grad:${grad(SPORTC[kk === "m" ? D.m[i][1] : D.m[D.c[i][2]][1]])}"><div class="frame"><span>ここに映像（音つき・全画面）</span></div><div class="shade"></div>
+      <div class="cap"><small>${esc(s)}</small><h1>${esc(t)}</h1>${kk === "c" ? `<p>${esc(D.c[i][1])}</p>` : ""}</div><div class="bar"><button class="btn" data-unwatch>← 空間に戻る</button></div></div>`; }
+  if (st.k === "digest") { const id = st.ids[st.i], c = D.c[id], m = D.m[c[2]];
+    h = `<div class="player" style="--grad:${grad(SPORTC[m[1]])}"><div class="frame" key="${st.i}"><span>ここに映像（その熱の4秒）</span></div><div class="shade"></div><div class="prog" style="animation-duration:4s" id="prog"></div>
+      <div class="top2"><b>${esc(st.name)}</b><span>${st.i + 1} / ${st.ids.length}</span></div>
+      <div class="cap"><small>${esc(m[1])}　${esc(m[0])}</small><h1>${esc(c[0])}</h1><p>${esc(c[1])}</p></div>
+      <button class="navl" data-dg="-1" aria-label="前へ"></button><button class="navr" data-dg="1" aria-label="次へ"></button>
+      <div class="bar"><div class="strip">${st.ids.map((x, j) => `<button style="--grad:${grad(SPORTC[D.m[D.c[x][2]][1]])}" class="${j === st.i ? "on" : ""}" data-dgi="${j}"></button>`).join("")}</div>
+      <div class="row" style="margin:0"><button class="btn" data-explore="${id}">この熱から分岐</button><button class="btn go" data-share>シェア</button></div></div></div>`; }
+  if (st.k === "end") h = `<div class="end"><small style="color:var(--mute);font-size:12px">あなたの熱狂ダイジェスト</small><b>${esc(st.name)}</b><p>${st.ids.length}本の瞬間が「${esc(st.seedT)}」で繋がった</p>
+    <div class="row" style="justify-content:center"><button class="btn go" style="margin:0">X でシェア</button><button class="btn">LINE</button><button class="btn">リンクをコピー</button></div>
+    <div class="row" style="justify-content:center"><button class="btn" data-dgi="0">もう一度観る</button><button class="btn" data-go="free">空間へ</button></div></div>`;
+  ui.innerHTML = h;
+  const wf = document.getElementById("wf"); if (wf) wf.onsubmit = (e) => { e.preventDefault(); const q = document.getElementById("w").value.trim() || EX[ex]; explore(undefined, q); };
+}
+ui.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; const ds = b.dataset;
+  if (ds.go) go({ k: ds.go }); if (ds.jump) jump(+ds.jump);
+  if (ds.mode) go({ ...st, mode: st.mode === ds.mode ? undefined : ds.mode });
+  if (ds.dim) go({ ...st, dim: +ds.dim }); if (ds.lockm) go({ k: "lockm", i: +ds.lockm });
+  if (ds.watch) { const [kk, i] = ds.watch.split(":"); prevSt = st; go({ k: "watch", id: [kk, +i] }); }
+  if (ds.unwatch !== undefined) go(prevSt || { k: "free" });
+  if (ds.explore) explore(+ds.explore); if (ds.digest !== undefined) digest(0);
+  if (ds.dg) step(+ds.dg); if (ds.dgi !== undefined) digest(+ds.dgi); if (ds.share !== undefined) go({ k: "end", ids: st.ids, name: st.name, seedT: st.seedT }); });
+let prevSt = null;
+function jump(k) { const g = D.g[k]; go({ k: "free" }); fly(P(g[1]), portrait() ? 120 : 90, 0.5); kick = 1; later(900, () => { const t = document.createElement("div"); t.className = "toast"; t.innerHTML = `${esc(g[0])}<small>この辺りに集まっている熱</small>`; document.body.appendChild(t); setTimeout(() => t.remove(), 2700); }); }
+function explore(seed, q) { const from = seed !== undefined ? P(D.c[seed][3]) : new THREE.Vector3(); go({ k: "explore", seed, q, ph: "scan", from });
+  const n = spread(seed); const ids = results(seed, q); const name = seed !== undefined ? `${D.c[seed][0].slice(0, 8)}…の熱` : `${q}の熱`;
+  countUp([D.c.length, n, ids.length], 1800);
+  later(2600, () => { litT.fill(1e9); ids.forEach((id, k) => { ctxTex(id); const x = ctxs[id]; x.mesh.position.copy(P(D.c[id][3])); x.dest = null; x.gop = 1; x.gs = 9; x.t0 = now + 0.4 + k * 0.3;
+      roads.push({ a: from, b: P(D.c[id][3]), col: hex("#ffe600"), t0: now + k * 0.3 }); });
+    const pts = [from, ...ids.map((id) => P(D.c[id][3]))], cen = pts.reduce((a, p) => a.add(p), new THREE.Vector3()).multiplyScalar(1 / pts.length); let r = 0; pts.forEach((p) => (r = Math.max(r, p.distanceTo(cen)))); fly(cen, Math.max(90, r * (portrait() ? 3 : 2.3)), 1.1);
+    later(2600, () => { st = { ...st, ph: "found", ids, name, seedT: seed !== undefined ? D.c[seed][0] : q }; render(); }); }); }
+function countUp(to, ms) { const t0 = performance.now(); const f = () => { const k = Math.min(1, (performance.now() - t0) / ms), e = 1 - Math.pow(1 - k, 3); ["n1", "n2", "n3"].forEach((id, j) => { const el = document.getElementById(id); if (el) el.textContent = Math.round(to[j] * e).toLocaleString(); }); if (k < 1) requestAnimationFrame(f); }; requestAnimationFrame(f); }
+function digest(i) { const s = st.k === "explore" || st.k === "digest" || st.k === "end" ? st : null; if (!s) return; go({ k: "digest", ids: s.ids, name: s.name, seedT: s.seedT, i }); later(4000, () => step(1)); }
+function step(dir) { if (st.k !== "digest") return; const i = st.i + dir; if (i >= st.ids.length) go({ k: "end", ids: st.ids, name: st.name, seedT: st.seedT }); else digest(Math.max(0, i)); }
+// ---- 操作（空間） ----
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), ptr = new Map(); let pinch = 0, moved = 0;
+cv.addEventListener("pointerdown", (e) => { ptr.set(e.pointerId, [e.clientX, e.clientY]); cv.setPointerCapture(e.pointerId); moved = 0; if (ptr.size === 2) { const [a, b] = [...ptr.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
+cv.addEventListener("pointermove", (e) => { const p = ptr.get(e.pointerId); if (!p) return; const dx = e.clientX - p[0], dy = e.clientY - p[1]; ptr.set(e.pointerId, [e.clientX, e.clientY]); moved += Math.abs(dx) + Math.abs(dy);
+  if (ptr.size === 1 && moved > 6) { G.yaw -= dx * 0.005; G.pitch = Math.max(-1.2, Math.min(1.2, G.pitch + dy * 0.004)); tau = 0.25; }
+  else if (ptr.size === 2) { const [a, b] = [...ptr.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) G.d = Math.max(14, Math.min(700, G.d * (pinch / d))); pinch = d; tau = 0.25; } });
+cv.addEventListener("pointerup", (e) => { ptr.delete(e.pointerId); if (ptr.size < 2) pinch = 0; if (moved > 10) return; if (st.k === "watch" || st.k === "digest" || st.k === "end") return;
+  ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam);
+  const objs = [...ctxs.filter((x) => x.mesh.visible && x.op > 0.4).map((x) => x.mesh), ...moments.filter((m) => m.op > 0.4).map((m) => m.mesh)];
+  const h = ray.intersectObjects(objs, false)[0]; if (!h) return; const u = h.object.userData;
+  if (u.kind === "m") go({ k: "lockm", i: u.i }); else go({ k: "lockc", i: u.i }); });
+cv.addEventListener("wheel", (e) => { e.preventDefault(); G.d = Math.max(14, Math.min(700, G.d * Math.exp(e.deltaY * 0.0012))); tau = 0.3;
+  if (e.deltaY < 0) { ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); G.t.lerp(ray.ray.at(C.d, new THREE.Vector3()), 0.12); } }, { passive: false });
+// ---- 毎フレーム ----
+let last = 0, lodT = 0; const V = new THREE.Vector3();
+function frame(t) { requestAnimationFrame(frame); const dt = Math.min(0.1, Math.max(0, (t - (last || t)) / 1000)); last = t; now += dt;
+  if (!ptr.size) G.yaw += dt * auto; const k = 1 - Math.exp(-dt / tau); C.t.lerp(G.t, k); C.d += (G.d - C.d) * k; C.yaw += (G.yaw - C.yaw) * k; C.pitch += (G.pitch - C.pitch) * k;
+  kick = Math.max(0, kick - dt * 1.2); const fb = portrait() ? 68 : 52; cam.fov = fb + Math.sin(Math.min(1, kick) * Math.PI) * 24; cam.updateProjectionMatrix();
+  cam.position.copy(camPos()); cam.lookAt(C.t);
+  // 寄るほど熱に: 自由に旅しているとき、注視点の近くの瞬間は熱にほどけ、少し離れた中央の瞬間は「再生中」になる
+  const zoomK = Math.max(0, Math.min(1, (C.d - 40) / 260)); document.getElementById("zoom").style.setProperty("--z", `${(1 - zoomK) * 100}%`);
+  lodT -= dt; if (st.k === "free" && lodT <= 0) { lodT = 0.4; for (const c of ctxs) c.gop = 0;
+    const cand = moments.map((m) => { V.copy(m.mesh.position).project(cam); return { m, c: V.x * V.x + V.y * V.y, z: V.z, d: cam.position.distanceTo(m.mesh.position) }; }).filter((o) => o.z < 1).sort((a, b) => a.c - b.c);
+    cand.forEach((o, j) => { o.m.play = j < 3 && o.d < 260 ? 1 : 0; const unravel = o.d < 75 && j < 4; o.m.gop = unravel ? 0.12 : 1; o.m.gs = o.m.play ? 12 : 10;
+      if (unravel) D.m[o.m.i][2].forEach((id) => { ctxTex(id); const x = ctxs[id]; if (x.gop === 0 && !x.mesh.visible) { x.mesh.position.copy(o.m.mesh.position); x.dest = P(D.c[id][3]); x.t0 = now; } x.gop = 1; x.gs = 5.5; }); }); }
+  const ko = 1 - Math.exp(-dt / 0.35);
+  for (const m of moments) { m.op += (m.gop - m.op) * ko; m.s += (m.gs - m.s) * ko; m.mat.opacity = m.op; m.mesh.visible = m.op > 0.02; m.mesh.scale.setScalar(m.s * (m.play ? 1 + Math.sin(now * 6) * 0.01 : 1)); m.mesh.quaternion.copy(cam.quaternion);
+    m.mat.color.setScalar(m.play && st.k === "free" ? 1 : 0.8); }
+  for (const x of ctxs) { if (x.t0 && now < x.t0) { x.mesh.visible = false; continue; } x.op += (x.gop - x.op) * ko; x.s += (x.gs - x.s) * ko; x.mat.opacity = x.op; x.mesh.visible = x.op > 0.02; if (!x.mesh.visible) continue;
+    if (x.dest) x.mesh.position.lerp(x.dest, 1 - Math.exp(-dt / 0.4)); x.mesh.scale.setScalar(Math.max(0.01, x.s)); x.mesh.quaternion.copy(cam.quaternion); x.mesh.renderOrder = 10; }
+  // 神経: 普段は淡く、信号が通ると次元の色に
+  const ca = nerveG.getAttribute("color"); const b0 = (st.k === "explore" ? 0.12 : st.k === "free" ? 0.07 : 0.035) * Math.min(1, C.d / 160);
+  for (let i = 0; i < D.l.length; i++) { const lt = Math.max(0, Math.min(1, (now - litT[i]) / 0.5)), c = litCol[i];
+    const r = 0.25 * b0 * (1 - lt) + c[0] * lt * 0.85, g = 0.32 * b0 * (1 - lt) + c[1] * lt * 0.85, bl = 0.55 * b0 * (1 - lt) + c[2] * lt * 0.85;
+    ca.array.set([r, g, bl, r, g, bl], i * 6); } ca.needsUpdate = true;
+  // 道（中心から相手へ伸びていく）
+  const rp = [], rc = []; for (const r of roads) { const u = Math.max(0, Math.min(1, (now - r.t0) / 0.6)); if (u <= 0) continue; const b = r.a.clone().lerp(r.b, u); rp.push(r.a.x, r.a.y, r.a.z, b.x, b.y, b.z); rc.push(...r.col.map((v) => v * 0.5), ...r.col); }
+  roadG.setAttribute("position", new THREE.Float32BufferAttribute(rp, 3)); roadG.setAttribute("color", new THREE.Float32BufferAttribute(rc, 3));
+  stars.material.opacity = st.k === "explore" ? 0.9 : 0.5;
+  // 行き先の矢印（その方角を指す）
+  document.querySelectorAll("[data-arrow]").forEach((el) => { const g = D.g[+el.dataset.arrow]; V.copy(P(g[1])).project(cam); let x = V.x, y = V.y; if (V.z > 1) { x = -x; y = -y; } el.style.transform = `rotate(${-Math.atan2(y, x)}rad)`; });
+  R.render(scene, cam); }
+requestAnimationFrame(frame); render();
+window.__m = { D, st: () => st, hit: (x, y) => { ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); const objs = [...ctxs.filter((q) => q.mesh.visible && q.op > 0.4).map((q) => q.mesh)]; return [objs.length, ray.intersectObjects(objs, false).map((h) => h.object.userData.i)]; }, at: (kind, i) => { const o = kind === "m" ? moments[i].mesh : ctxs[i].mesh; V.copy(o.position).project(cam); return [((V.x + 1) / 2) * innerWidth, ((1 - V.y) / 2) * innerHeight, V.z]; },
+  center: () => moments.map((m) => { V.copy(m.mesh.position).project(cam); return [m.i, V.x * V.x + V.y * V.y, V.z]; }).filter((o) => o[2] < 1).sort((a, b) => a[1] - b[1])[0][0] };
+</script>
