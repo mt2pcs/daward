@@ -220,6 +220,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       for (const s of somas) { s.gop = !ids ? 1 : dimOthers ? 0.45 : 1; s.gs = s.size; s.grim = 0; } };
     function go(s: Stage) {
       clearLater(); st = s; stageRef.current = s; setStage(s); setHover(null); wedges.forEach((w) => scene.remove(w.mesh)); wedges = [];
+      scrSlot.v.onended = null;
       if (s.k !== "digest" && s.k !== "end") { pausedNow = false; setPaused(false); }
       if (s.k === "overview") {
         resetFibers(); lightDend([], 0); if (path) path.visible = false; wordPoint = null; scr.gop = 0; stopScreen(); playCells([]); focusTips(null);
