@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import HeatViewer from "@/components/HeatViewer";
+import BrainWorld from "@/components/BrainWorld";
 import moments from "@/data/moments2026.json";
 import net from "@/data/ctx/net.json";
 import { decodeShare } from "@/lib/ctx/share";
@@ -17,8 +18,10 @@ export function generateMetadata({ params }: { params: { code: string } }): Meta
   const desc = d ? `${d.i.length}本の瞬間が「${d.s !== undefined && d.s >= 0 ? N.ctx[d.s]?.title : d.q}」で繋がった。100の瞬間の熱狂の神経系を旅する。` : "100の瞬間の熱狂の神経系を旅する。";
   return { metadataBase, title, description: desc, openGraph: { title, description: desc, images: [`/d/${params.code}/og`] }, twitter: { card: "summary_large_image", title, description: desc, images: [`/d/${params.code}/og`] } };
 }
-export default function SharedDigest({ params }: { params: { code: string } }) {
+export default function SharedDigest({ params, searchParams }: { params: { code: string }; searchParams: { v?: string } }) {
   const list = (Array.isArray(moments) ? moments : Object.values(moments)) as { no: string; clips?: { webm?: string; loop?: string }[] }[];
   const media = Object.fromEntries(list.map((m) => [m.no, { webm: m.clips?.[0]?.webm, loop: m.clips?.[0]?.loop }]));
+  // ?v=brain は熱狂の脳から編んだダイジェスト
+  if (searchParams.v === "brain") return <BrainWorld media={media} shared={decode(params.code) || undefined} />;
   return <HeatViewer media={media} shared={decode(params.code) || undefined} />;
 }
