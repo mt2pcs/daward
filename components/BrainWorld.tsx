@@ -224,7 +224,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     function select(s: Sel) { st = s; idle = false;
       const L = N.links;
       if (s.k !== "moment" && s.k !== "heat") setFat([]); if (s.k !== "heat") tiles.forEach((t) => (t.mat.uniforms.uRim.value as THREE.Color).set("#f4f2ec"));
-      if (s.k === "none") { paintFibers(() => 1); tiles.forEach((t) => { t.dimG = 1; t.goal = 16; }); setNodes(() => [0.7, 1]); setRoots(() => 0.35); setPlaying([]); }
+      if (s.k === "none") { camG.dist = portrait() ? 560 : 290; tgtG.set(0, 0, 0); paintFibers(() => 1); tiles.forEach((t) => { t.dimG = 1; t.goal = 16; }); setNodes(() => [0.7, 1]); setRoots(() => 0.35); setPlaying([]); }
       if (s.k === "tract") { paintFibers((n) => (L[n][3] === s.d ? 2 : 0)); const ms = new Set<number>(); L.forEach((l) => { if (l[3] === s.d) { ms.add(momOfCtx(l[0])); ms.add(momOfCtx(l[1])); } });
         tiles.forEach((t) => { t.dimG = ms.has(t.m) ? 1 : 0.3; t.goal = 16; }); const inT = new Set<number>(); L.forEach((l) => { if (l[3] === s.d) { inT.add(l[0]); inT.add(l[1]); } });
         setNodes((i) => (inT.has(i) ? [1, 1.3] : [0.15, 0.8])); setRoots((i) => (inT.has(i) ? 0.5 : 0.08)); setPlaying([]); }
@@ -368,7 +368,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       if (!alive) return; buildCortex(atl);
       const mats = scene.children.filter((o) => o instanceof THREE.LineSegments || o instanceof THREE.Points).map((o) => (o as unknown as { material: THREE.ShaderMaterial }).material);
       rootIntro = mats.find((m) => m.uniforms?.uIntro && m !== fiberMat && !m.uniforms.uPx)?.uniforms.uIntro ?? null; nodeIntro = mats.find((m) => m.uniforms?.uPx)?.uniforms.uIntro ?? null;
-      setNet(N); ready = true; cam0.dist = portrait() ? 620 : 520; camG.dist = portrait() ? 440 : 290;
+      setNet(N); ready = true; cam0.dist = portrait() ? 760 : 520; camG.dist = portrait() ? 560 : 290;
       if (shared?.i?.length) setTimeout(() => api.current?.digest(), 2600);
     })();
 
