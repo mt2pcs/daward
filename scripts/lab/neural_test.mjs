@@ -1,11 +1,12 @@
 // 体験 /experience（熱狂の神経系）を通しで操作して撮る: node scripts/lab/neural_test.mjs W H tag
-//   OUT=出力先、CLIPS=映像のローカルフォルダ（ctx/c/<id>.webm|jpg, ctx/atlas*.jpg, m/<key>.webm）、BASE=http://localhost:3142、WORD=投げる言葉、NO=入る瞬間
+//   OUT=出力先、CLIPS=映像のローカルフォルダ（ctx/c/<id>.webm|jpg, ctx/atlas*.jpg, m/<key>.webm）、BASE=http://localhost:3142、WORD=投げる言葉、PATH_=/d/<code>（シェアを開く）
+// 流れ: 全体 → 航路で跳ぶ → ホイールで寄る（動き出す・文脈の世界） → 瞬間をロックオン → 分解 → 文脈をロックオン → 視点 → 視点の先へ渡る → この熱で探す → ダイジェスト → 終わり → 言葉
 import { chromium } from "/home/user/daward/node_modules/playwright-core/index.mjs";
 import { readFileSync, existsSync } from "fs";
 const [W, H, tag] = [+process.argv[2], +process.argv[3], process.argv[4]], out = process.env.OUT, CL = process.env.CLIPS, BASE = process.env.BASE || "http://localhost:3142", WORD = process.env.WORD || "最後の花道";
 const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell", args: ["--use-gl=swiftshader", "--enable-webgl", "--ignore-gpu-blocklist", "--autoplay-policy=no-user-gesture-required"] });
-const p = await b.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1, hasTouch: W < 600, isMobile: W < 600 });
-const logs = []; p.on("console", (m) => m.type() === "error" && logs.push(m.text().slice(0, 200))); p.on("pageerror", (e) => logs.push("ERR " + e.message));
+const sp = W < 600, p = await b.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1, hasTouch: sp, isMobile: sp });
+const logs = []; p.on("console", (m) => m.type() === "error" && !/404/.test(m.text()) && logs.push(m.text().slice(0, 200))); p.on("pageerror", (e) => logs.push("ERR " + e.message));
 const CT = { webm: "video/webm", mp4: "video/mp4", jpg: "image/jpeg" };
 await p.route("https://storage.googleapis.com/e-mooments-assets/**", async (r) => {
   const u = new URL(r.request().url()); let f = null, m;
@@ -15,29 +16,28 @@ await p.route("https://storage.googleapis.com/e-mooments-assets/**", async (r) =
   return r.fulfill({ status: 404, body: "" });
 });
 const shot = (n) => p.screenshot({ path: `${out}/${tag}_${n}.png` });
-const st = () => p.evaluate(() => { const s = __nw.stage(); return { k: s.k, i: s.i, m: s.m, playing: __nw.playing(), sound: __nw.screenSound() }; });
-const tap = async (x, y) => { if (W < 600) await p.touchscreen.tap(x, y); else { await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.up(); } };
+const st = () => p.evaluate(() => { const s = __nw.stage(); return { k: s.k, kind: s.kind, id: s.id, mode: s.mode, i: s.i, playing: __nw.playing(), sound: __nw.screenSound(), found: __nw.found() }; });
+const tap = async (x, y) => { if (sp) await p.touchscreen.tap(x, y); else { await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.up(); } };
 const click = async (kind, id) => { const [x, y] = await p.evaluate(([k, i]) => __nw.screenOf(k, i), [kind, id]); await tap(x, y); return [Math.round(x), Math.round(y)]; };
 const N = JSON.parse(readFileSync("data/ctx/net.json", "utf8"));
-await p.goto(`${BASE}${process.env.PATH_ || "/experience"}${process.env.NO ? `?no=${process.env.NO}` : ""}`); await p.waitForFunction(() => window.__nw && __nw.ready(), null, { timeout: 120000 });
-await p.waitForTimeout(4500); await shot("0over");
-if (process.env.PATH_) { for (let k = 1; k < 8; k++) { await p.waitForTimeout(2500); await shot(`share${k}`); console.log("share", JSON.stringify(await st())); } console.log(logs.join("\n") || "no errors"); await b.close(); process.exit(0); }
-let mk = process.env.NO ? N.moments.findIndex((m) => m.no === process.env.NO) : await p.evaluate(() => __nw.nearSoma());
-if (!process.env.NO) console.log("soma", mk, N.moments[mk].title, await click("m", mk));
-for (const [t, n] of [[1200, "1fly"], [1800, "1play"], [1500, "1wedge"], [600, "1wedge2"], [2500, "1open"]]) { await p.waitForTimeout(t); await shot(n); }
-console.log("moment", JSON.stringify(await st()), logs.join("|"));
-const md = await p.evaluate(() => __nw.stage()); if (md.k === "moment") mk = md.m;
-const seed = N.moments[mk].ctx[0]; console.log("seed", seed, N.ctx[seed].title, await click("c", seed));
-for (const [t, n] of [[1000, "2ex1"], [1500, "2ex2"], [1500, "2ex3"]]) { await p.waitForTimeout(t); await shot(n); }
-await p.waitForFunction(() => __nw.stage().k === "digest", null, { timeout: 60000 }).catch(() => {}); await shot("3gather");
-console.log("digest", JSON.stringify(await st()), await p.evaluate(() => document.querySelector(".nw-big")?.textContent));
-await p.waitForTimeout(3000); await shot("3item0"); await p.waitForTimeout(4000); await shot("3item0b");
-await p.waitForFunction(() => __nw.stage().i >= 1, null, { timeout: 20000 }).catch(() => {}); await p.waitForTimeout(2500); await shot("3item1"); console.log("item", JSON.stringify(await st()));
-const n = await p.evaluate(() => __nw.stage().d.items.length); await p.click(`.nw-chain button:nth-child(${n})`); await p.waitForTimeout(3000);
-await p.waitForFunction(() => __nw.stage().k === "end", null, { timeout: 20000 }).catch(() => {}); await p.waitForTimeout(3000); await shot("4end"); console.log("end", JSON.stringify(await st()));
-const share = await p.evaluate(() => document.querySelector(".nw-end a.x")?.getAttribute("href")); console.log("share", decodeURIComponent(share || "").slice(0, 260));
-await p.click(".nw-end .b2 button:nth-child(2)"); await p.waitForTimeout(2500);
-await p.fill(".nw-in input", WORD); await p.click(".nw-in button"); await p.waitForTimeout(1500); await shot("5word1"); await p.waitForTimeout(2000); await shot("5word2");
-await p.waitForFunction(() => __nw.stage().k === "digest", null, { timeout: 60000 }).catch(() => {}); await shot("5gather"); await p.waitForTimeout(3500); await shot("5item0");
-console.log("word", JSON.stringify(await st()), await p.evaluate(() => document.querySelector(".nw-big")?.textContent));
+await p.goto(`${BASE}${process.env.PATH_ || "/experience"}`); await p.waitForFunction(() => window.__nw && __nw.ready(), null, { timeout: 120000 });
+await p.waitForTimeout(5000); await shot("0free");
+if (process.env.PATH_) { for (let k = 1; k < 6; k++) { await p.waitForTimeout(2500); await shot(`share${k}`); console.log("share", JSON.stringify(await st())); } console.log(logs.join("\n") || "no errors"); await b.close(); process.exit(0); }
+console.log("chips", await p.locator(".nw-chip").count());
+await p.locator(".nw-chip").first().click(); await p.waitForTimeout(500); await shot("1jump_a"); await p.waitForTimeout(1500); await shot("1jump_b"); await p.waitForTimeout(2500); await shot("1jump_c");
+console.log("jump", JSON.stringify(await st()), await p.locator(".nw-here").textContent().catch(() => ""));
+if (!sp) { for (let k = 0; k < 6; k++) { await p.mouse.move(W / 2, H / 2); await p.mouse.wheel(0, -260); await p.waitForTimeout(300); } await p.waitForTimeout(3000); await shot("2zoom"); console.log("zoom", JSON.stringify(await st())); }
+const mk = await p.evaluate(() => __nw.nearSoma()); console.log("lock m", mk, N.moments[mk]?.title, await click("m", mk)); await p.waitForTimeout(3500); await shot("3lockm"); console.log(JSON.stringify(await st()));
+await p.click(".nw-bar .a button:nth-child(2)"); await p.waitForTimeout(1500); await shot("4open_a"); await p.waitForTimeout(2200); await shot("4open_b"); await p.waitForTimeout(2500); await shot("4open_c");
+const c0 = N.moments[mk].ctx.slice().sort((a, c) => Object.keys(N.ctx[c].dn || {}).length - Object.keys(N.ctx[a].dn || {}).length)[0];
+console.log("lock c", c0, N.ctx[c0].title, await click("c", c0)); await p.waitForTimeout(3000); await shot("5lockc"); console.log(JSON.stringify(await st()));
+const nd = await p.locator(".nw-bar .v button").count(); console.log("dims", nd);
+if (nd) { await p.locator(".nw-bar .v button").first().click(); await p.waitForTimeout(3500); await shot("6dim"); console.log("dim", JSON.stringify(await st()));
+  const s0 = await p.evaluate(() => __nw.stage()); const tg = N.ctx[c0].dn[s0.dim][0][0]; console.log("zap", tg, N.ctx[tg].title, await click("c", tg)); await p.waitForTimeout(3000); await shot("7zap"); console.log(JSON.stringify(await st())); }
+await p.click(".nw-bar .a .go"); await p.waitForTimeout(2500); await shot("8ex");
+await p.waitForFunction(() => __nw.stage().k === "digest", null, { timeout: 60000 }).catch(() => {}); await p.waitForTimeout(3500); await shot("9dg"); console.log("digest", JSON.stringify(await st()));
+const n = await p.evaluate(() => __nw.stage().d?.items.length || 0); if (n) { await p.click(`.nw-chain button:nth-child(${n})`); await p.waitForFunction(() => __nw.stage().k === "end", null, { timeout: 20000 }).catch(() => {}); await p.waitForTimeout(3000); await shot("10end"); }
+const share = await p.evaluate(() => document.querySelector(".nw-end a.x")?.getAttribute("href")); console.log("share", (share || "").slice(-120));
+await p.click(".nw-end .b2 button:nth-child(2)").catch(() => {}); await p.waitForTimeout(2000);
+await p.fill(".nw-in input", WORD); await p.click(".nw-in button"); await p.waitForFunction(() => __nw.stage().k === "digest", null, { timeout: 60000 }).catch(() => {}); await p.waitForTimeout(3000); await shot("11word"); console.log("word", JSON.stringify(await st()));
 console.log(tag, logs.join("\n") || "no errors"); await b.close();
