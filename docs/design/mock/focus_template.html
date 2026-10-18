@@ -1,0 +1,262 @@
+<meta charset="utf-8">
+<title>熱狂ピント送り</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
+<style>
+/* 映画のカメラで観る 100 MOMENTS（UIモック・映像なし）。瞬間は奥行きの中に1本ずつ浮かび、ピントの合った1本だけがはっきり見える。
+   映像の代わりに、照明・観客・選手の影が動く板を描く（本番はここに各瞬間の映像が入る） */
+:root{
+  --ink:#050608; --paper:#f4f2ec; --dim:rgba(244,242,236,.62); --faint:rgba(244,242,236,.34); --hot:#f7ff3c;
+  --display:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--display);overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none;-webkit-font-smoothing:antialiased}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+.vig{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(130% 95% at 50% 40%,transparent 58%,rgba(0,0,0,.5)),linear-gradient(180deg,rgba(0,0,0,.42),transparent 18%,transparent 50%,rgba(0,0,0,.82))}
+.bar{position:fixed;left:0;right:0;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(env(safe-area-inset-top,0px) + 16px) max(18px,env(safe-area-inset-right,0px)) 0 max(18px,env(safe-area-inset-left,0px));pointer-events:none}
+.bar>*{pointer-events:auto}
+.mark{font-weight:900;font-size:11px;letter-spacing:.32em;white-space:nowrap}.mark em{font-style:normal;color:var(--hot)}
+.tag{font-size:10px;letter-spacing:.12em;color:var(--faint);text-align:right}
+.close{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid rgba(244,242,236,.22);background:rgba(5,6,8,.35);color:var(--paper);font-size:18px;cursor:pointer;backdrop-filter:blur(8px)}
+/* 映画のタイトル */
+.slate{position:fixed;left:max(22px,env(safe-area-inset-left,0px),6vw);right:max(22px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + clamp(96px,15vh,150px));z-index:5;pointer-events:none}
+.slate .kick{display:flex;gap:14px;align-items:baseline;font-size:11px;letter-spacing:.28em;color:var(--dim);font-weight:700}
+.slate .kick b{color:var(--paper);font-variant-numeric:tabular-nums;letter-spacing:.12em}
+.slate .kick .tc{color:var(--hot);letter-spacing:.14em}
+.slate h1{margin:10px 0 0;font-weight:900;font-size:clamp(34px,6vw,88px);line-height:1.06;letter-spacing:.01em;max-width:14em;text-wrap:balance;text-shadow:0 2px 30px rgba(0,0,0,.45)}
+.slate p{margin:14px 0 0;max-width:30em;font-size:clamp(14px,1.4vw,18px);line-height:1.75;color:var(--paper);font-weight:500;opacity:.92;text-shadow:0 1px 14px rgba(0,0,0,.6)}
+.ch{display:inline-block;opacity:0;transform:translateY(.35em);filter:blur(10px);animation:ch .7s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes ch{to{opacity:1;transform:none;filter:none}}
+.fade{animation:fade .8s ease both}@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.out .ch,.out p,.out .kick{animation:out .3s ease forwards}@keyframes out{to{opacity:0;filter:blur(8px)}}
+/* 下の操作 */
+.cue{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 30px);z-index:6;display:flex;justify-content:center;align-items:center;gap:14px;padding:0 18px;pointer-events:none}
+.cue>*{pointer-events:auto}
+.hint{font-size:11px;letter-spacing:.16em;color:var(--faint);display:flex;gap:14px;align-items:center;white-space:nowrap}
+.hint i{font-style:normal;display:inline-block;width:26px;height:1px;background:var(--faint)}
+.pill{border:0;border-radius:999px;background:var(--hot);color:#0a0a0a;font-family:var(--display);font-weight:900;font-size:15px;letter-spacing:.04em;padding:14px 26px;cursor:pointer;box-shadow:0 10px 40px rgba(247,255,60,.16);transition:transform .2s;white-space:nowrap}
+.pill:active{transform:scale(.97)}
+.ghost{border:1px solid rgba(244,242,236,.3);background:rgba(5,6,8,.35);color:var(--paper);font-family:var(--display);font-weight:700;font-size:13px;border-radius:999px;padding:13px 18px;cursor:pointer;backdrop-filter:blur(8px);white-space:nowrap}
+.dots{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:50%;transform:translateY(-50%);z-index:6;display:flex;flex-direction:column;gap:7px;pointer-events:none}
+.dots span{width:4px;height:4px;border-radius:50%;background:var(--faint);transition:all .35s}.dots span.on{background:var(--hot);height:18px;border-radius:3px}
+/* 再生の目盛り（観ているあいだ）。熱に分かれると、熱のあった時刻に印が立つ */
+.hud{position:fixed;left:max(22px,env(safe-area-inset-left,0px),6vw);right:max(22px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 10px);z-index:6;display:flex;align-items:center;gap:12px;font-size:10px;letter-spacing:.14em;color:var(--dim);font-variant-numeric:tabular-nums;opacity:0;transition:opacity .5s;pointer-events:none}
+.hud.on{opacity:1}
+.track{position:relative;flex:1;height:2px;background:rgba(244,242,236,.16);border-radius:2px}
+.track .fill{position:absolute;left:0;top:0;bottom:0;background:var(--paper);border-radius:2px}
+.track .tk{position:absolute;top:-4px;width:2px;height:10px;margin-left:-1px;background:var(--faint);border-radius:1px;transform:scaleY(0);transition:transform .4s cubic-bezier(.2,.8,.2,1),background .3s}
+.track .tk.show{transform:none}.track .tk.on{background:var(--hot);height:14px;top:-6px}
+.toast{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);z-index:20;background:rgba(5,6,8,.78);border:1px solid rgba(244,242,236,.2);padding:14px 18px;border-radius:14px;font-size:13px;line-height:1.6;text-align:center;backdrop-filter:blur(10px);animation:fade .3s ease both;max-width:min(340px,calc(100% - 40px))}
+@media (max-width:600px){.slate{bottom:calc(env(safe-area-inset-bottom,0px) + 104px)}.slate h1{font-size:clamp(30px,8.6vw,42px)}.slate p{font-size:14px}.hint{display:none}.dots{right:8px}.tag{display:none}}
+@media (prefers-reduced-motion: reduce){.ch{animation-duration:.01s}}
+</style>
+<canvas id="gl"></canvas>
+<div class="vig"></div>
+<div class="bar"><div class="mark">DAZN <em>100</em> MOMENTS</div><div class="tag">UIモック — 映像の代わりに動く板</div><button class="close" id="close" aria-label="戻る" hidden>←</button></div>
+<div class="slate" id="slate"></div>
+<div class="dots" id="dots"></div>
+<div class="cue" id="cue"></div>
+<div class="hud" id="hud"><span id="tc">00:00</span><div class="track" id="track"><div class="fill" id="fill"></div></div></div>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+const D = __DATA__; // m=[題, 競技, 熱ids] c=[熱の名, 一文, 主な次元, 映像内の秒]
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+// ---- 舞台 ----
+const cv = document.getElementById("gl"), R = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.setClearColor(0x050608, 1);
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(40, 1, 0.1, 2000);
+const portrait = () => innerHeight > innerWidth;
+// 競技ごとの色（映像の代わりの板の色味）
+const sportHue = {}; const HUES = [.36, .58, .03, .12, .52, .78, .08, .95]; D.m.forEach((m) => { if (sportHue[m[1]] === undefined) sportHue[m[1]] = HUES[Object.keys(sportHue).length % HUES.length]; });
+// 映像の代わりの板: 夜の競技場（照明・観客・ピッチ）と、逆光の選手の影。uShot で画角（寄り・位置・ポーズ）が変わる。
+// ピントからの外れ（CoC）で輪郭と細部をぼかす。uWin は板の横方向の切り出し（割れて帯になるとき）
+const CARD_V = `varying vec2 vUv; varying float vD; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position,1.); vD = -mv.z; gl_Position = projectionMatrix * mv; }`;
+const CARD_F = `precision highp float; varying vec2 vUv; varying float vD;
+uniform float uFocus, uRange, uOp, uTime, uLive, uHue, uSeed, uShot, uBlur, uDim; uniform vec2 uWin, uSize;
+vec3 hsv(float h, float s, float v){ vec3 k = clamp(abs(mod(h*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.); return v*mix(vec3(1.),k,s); }
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
+float cap(vec2 p, vec2 a, vec2 b, float r){ vec2 pa = p-a, ba = b-a; float h = clamp(dot(pa,ba)/dot(ba,ba),0.,1.); return length(pa-ba*h)-r; }
+float figure(vec2 p, float pose, float t){
+  // 腰を原点にした人の形（頭・胴・脚・腕）。pose: 0=両手を突き上げる 1=片手の拳 2=天を仰ぐ
+  float lift = .5+.5*sin(t*1.7);
+  vec2 hip = vec2(0.,0.), neck = vec2(.01,.25), head = vec2(.02,.33 + .01*lift);
+  float d = cap(p, hip, neck+vec2(0.,-.03), .085); d = min(d, length(p-head)-.058); d = min(d, cap(p, neck+vec2(-.07,-.04), neck+vec2(.07,-.04), .05));
+  d = min(d, cap(p, hip+vec2(-.04,0.), vec2(-.09,-.32), .05)); d = min(d, cap(p, hip+vec2(.04,0.), vec2(.1,-.32), .05));
+  vec2 sl = neck+vec2(-.08,-.04), sr = neck+vec2(.08,-.04);
+  vec2 hl = pose < .5 ? vec2(-.16,.5+.03*lift) : pose < 1.5 ? vec2(-.12,.02) : vec2(-.2,.38+.02*lift);
+  vec2 hr = pose < .5 ? vec2(.17,.52+.03*lift) : pose < 1.5 ? vec2(.1,.5+.04*lift) : vec2(.21,.4+.02*lift);
+  vec2 el = mix(sl, hl, .5) + vec2(-.03,-.01), er = mix(sr, hr, .5) + vec2(.03,-.01);
+  d = min(d, min(cap(p, sl, el, .042), cap(p, el, hl, .036))); d = min(d, min(cap(p, sr, er, .042), cap(p, er, hr, .036)));
+  return d; }
+vec3 shot(vec2 uv, float b, float t){
+  float sh = uShot + uSeed;
+  float z = 1.0 + 1.1*(.5+.5*sin(sh*1.9)); vec2 off = vec2(.2*sin(sh*2.3), .1*cos(sh*1.7) - .02);
+  off.x += .02*sin(t*.2);
+  vec2 q = (uv-.5)/z + .5 + vec2(off.x, off.y);
+  vec2 p = vec2(q.x*1.7778, q.y);
+  vec3 base = hsv(uHue + .04*sin(sh), .62, 1.);
+  // 夜空と照明の霞
+  vec3 col = mix(base*.05, vec3(.01,.012,.02), smoothstep(.55,1.05,q.y)) + base*.10*smoothstep(.7,1.,q.y);
+  // スタンドと観客（ちらつく光）
+  float band = smoothstep(.40-b,.45+b,q.y)*smoothstep(.82+b,.74-b,q.y);
+  float cr = noise(p*vec2(38.,26.))*.7 + noise(p*vec2(90.,70.))*.3; cr = mix(.5, cr, 1.-clamp(b*10.,0.,1.));
+  col += band*(vec3(.03)+base*.12)*(.3+.9*cr)*(.75+.25*sin(q.x*7.+t*.6));
+  vec2 fg = p*vec2(70.,50.); float fl = step(.985, hash(floor(fg) + floor(t*3.)))*smoothstep(.45,.1,length(fract(fg)-.5))*band*(1.-clamp(b*10.,0.,1.)); col += fl*vec3(1.,.9,.75)*.9;
+  // 照明塔
+  for (int i = 0; i < 4; i++) { float fi = float(i); vec2 c = vec2((.12+.25*fi+.04*sin(fi*3.+uSeed))*1.7778, .9+.02*sin(fi*5.)); float d = length(p-c);
+    col += vec3(1.,.93,.8)*(smoothstep(.028+b*1.5,.0,d)*1.4 + .05/(1.+d*d*40.)); }
+  // ピッチ（遠近の縞）
+  float fd = smoothstep(.44+b,.40-b,q.y); float st = .5+.5*sign(sin(((q.x-.5)/(.75-q.y))*18.)); st = mix(.5, st, 1.-clamp(b*12.,0.,1.));
+  vec3 fc = hsv(uHue+.02, .55, .32)*(.75+.25*st)*(.55+.9*q.y);
+  col = mix(col, fc, fd);
+  // 逆光の選手
+  float pose = floor(mod(sh*1.7, 3.)); float fx = .5+.2*sin(sh*1.3);
+  vec2 fp = (p - vec2(fx*1.7778, .2)) / .62; float lean = .12*sin(sh*2.7); fp = mat2(cos(lean),-sin(lean),sin(lean),cos(lean))*fp;
+  float fdst = figure(fp, pose, t) * .62; float w = .003 + b*1.4;
+  float fig = smoothstep(w, -w, fdst);
+  float rim = smoothstep(.007+b, 0., abs(fdst+.003)) * smoothstep(-.2,.5,fp.y) * (1.-clamp(b*6.,0.,1.));
+  col = mix(col, vec3(.006,.007,.01) + base*.02, fig*.97); col += rim*vec3(1.,.9,.72)*.4;
+  // 光のにじみ・周辺減光・粒子
+  col += base*.07*exp(-length(p - vec2(fx*1.7778,.75))*2.5);
+  col *= 1. - .35*pow(length(uv-.5)*1.25, 2.);
+  col += (hash(uv*900.+fract(t)*31.)-.5)*.05*(1.-clamp(b*8.,0.,1.));
+  return col; }
+void main(){
+  float coc = max(clamp(abs(vD - uFocus) / uRange, 0., 1.), uBlur);
+  vec2 hs = uSize*.5, q = abs((vUv-.5)*uSize); float r = .32; float d = length(max(q-(hs-r),0.)) - r;
+  float feather = .02 + coc*.55; float a = uOp*(1.-smoothstep(-feather, feather, d)); if (a < .002) discard;
+  vec2 uv = vec2(mix(uWin.x, uWin.y, vUv.x), vUv.y);
+  float b = coc*.05;
+  vec3 c = shot(uv, b, uTime);
+  float edge = smoothstep(.05,0.,abs(d+.03))*(1.-coc)*.1; c += edge;
+  c *= (1. - coc*.4)*uDim;
+  gl_FragColor = vec4(c*a, a); }`;
+const cardGeo = new THREE.PlaneGeometry(16, 9);
+function mkCard(hue, seed) { const mat = new THREE.ShaderMaterial({ vertexShader: CARD_V, fragmentShader: CARD_F, transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+  uniforms: { uFocus: { value: 30 }, uRange: { value: 20 }, uOp: { value: 1 }, uTime: { value: seed * 3.1 }, uLive: { value: 0 }, uHue: { value: hue }, uSeed: { value: seed }, uShot: { value: 0 }, uBlur: { value: 0 }, uDim: { value: 1 }, uWin: { value: new THREE.Vector2(0, 1) }, uSize: { value: new THREE.Vector2(16, 9) } } });
+  const mesh = new THREE.Mesh(cardGeo, mat); scene.add(mesh); return mesh; }
+// 瞬間の並び: 奥へ向かって左右（縦画面は上下）に互い違いに1本ずつ。いま見ている1本の奥に次、手前に前
+const momentPos = (k) => portrait() ? V(Math.sin(k * .9) * 1.6, k * 11, -k * 13) : V((k % 2 ? -1 : 1) * 8.5, ((k % 3) - 1) * 2.6, -k * 13);
+const cards = D.m.map((m, k) => ({ mesh: mkCard(sportHue[m[1]], k * 1.37 + .3), k }));
+const place = () => cards.forEach((c) => { c.mesh.position.copy(momentPos(c.k)); c.mesh.rotation.y = portrait() ? 0 : (c.k % 2 ? 1 : -1) * .12; });
+// 縦画面で観るとき: 映像は切らずに帯で見せ、同じ映像をぼかして背景に敷く
+const backdrop = mkCard(0, 0); backdrop.material.uniforms.uBlur.value = 1; backdrop.material.uniforms.uDim.value = .55; backdrop.material.uniforms.uOp.value = 0; backdrop.renderOrder = -1;
+// ボケの粒（空間に漂う 402 の熱）: ピントから外れるほど大きく淡い円
+const NB = 700, bp = new Float32Array(NB * 3), bc = new Float32Array(NB * 3), bs = new Float32Array(NB);
+const bokehBase = []; for (let i = 0; i < NB; i++) { bokehBase.push([Math.random() * D.m.length, (Math.random() - .5), (Math.random() - .5), (Math.random() - .5)]);
+  const col = new THREE.Color().setHSL(Math.random() < .5 ? .11 : HUES[i % 8], .7, .62).lerp(new THREE.Color("#fff3df"), .5); bc.set([col.r, col.g, col.b], i * 3); bs[i] = .35 + Math.random() * 1.1; }
+const placeBokeh = () => { bokehBase.forEach(([k, a, b2, c], i) => { const p = momentPos(k); bp.set(portrait() ? [p.x + a * 40, p.y + b2 * 60, p.z + c * 26] : [p.x + a * 80, p.y + b2 * 36, p.z + c * 26], i * 3); }); bgeo.attributes.position.needsUpdate = true; };
+const bgeo = new THREE.BufferGeometry(); bgeo.setAttribute("position", new THREE.BufferAttribute(bp, 3)); bgeo.setAttribute("color", new THREE.BufferAttribute(bc, 3)); bgeo.setAttribute("s", new THREE.BufferAttribute(bs, 1));
+const bokeh = new THREE.Points(bgeo, new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uFocus: { value: 30 }, uPx: { value: R.getPixelRatio() }, uOp: { value: 1 } },
+  vertexShader: `attribute float s; attribute vec3 color; uniform float uFocus, uPx, uOp; varying vec3 vC; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); float d = -mv.z; float coc = clamp(abs(d - uFocus) / 24.0, 0.0, 1.8);
+    gl_PointSize = uPx * (2.0 + coc * 30.0) * s * (50.0 / max(6.0, d)); vA = uOp * .5 / (1.0 + coc * coc * 7.0) * smoothstep(260.0, 90.0, d) * smoothstep(1.0, 5.0, d); vC = color; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `precision highp float; varying vec3 vC; varying float vA; void main(){ float r = length(gl_PointCoord - .5) * 2.0; float a = vA * (smoothstep(1.0, .8, r) * .7 + smoothstep(1.0, .9, r) * smoothstep(.7, .93, r) * .45); gl_FragColor = vec4(vC * a, a); }` }));
+scene.add(bokeh);
+const resize = () => { R.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.fov = portrait() ? 58 : 40; cam.updateProjectionMatrix(); place(); placeBokeh(); if (st) go(st, true); };
+// ---- 状態 ----
+const ui = { slate: document.getElementById("slate"), cue: document.getElementById("cue"), dots: document.getElementById("dots"), close: document.getElementById("close"), hud: document.getElementById("hud"), track: document.getElementById("track"), fill: document.getElementById("fill"), tc: document.getElementById("tc") };
+let st = null;
+let heats = []; // 分解したときの熱の板
+let focusMesh = null, focusC = 60, focusFrom = 0, camT = V(0, 0, 0), lookT = V(0, 0, 0), camC = V(0, 0, 60), lookC = V(0, 0, 0), now = 0, px = 0, py = 0, playT = 0, clipLen = 30;
+const chars = (s, delay = 0) => [...s].map((ch, i) => `<span class="ch" style="animation-delay:${delay + i * 28}ms">${ch === " " ? "&nbsp;" : ch}</span>`).join("");
+let slateKey = "";
+function slate(key, kick, title, line) { if (key === slateKey) return; slateKey = key; ui.slate.classList.add("out");
+  setTimeout(() => { ui.slate.classList.remove("out"); ui.slate.innerHTML = `<div class="kick fade">${kick}</div><h1>${chars(title, 120)}</h1>${line ? `<p class="fade" style="animation-delay:${220 + title.length * 28}ms">${line}</p>` : ""}`; }, reduce ? 0 : 240); }
+const cue = (html) => { if (ui.cue.dataset.h !== html) { ui.cue.dataset.h = html; ui.cue.innerHTML = html; } };
+function dots(n, i) { const m = Math.min(n, 9), at = n <= 9 ? i : Math.round((i / (n - 1)) * (m - 1)); ui.dots.innerHTML = Array.from({ length: m }, (_, j) => `<span class="${j === at ? "on" : ""}"></span>`).join(""); }
+const pad = (n) => String(n).padStart(2, "0"), mmss = (s) => `${pad(Math.floor(s / 60))}:${pad(Math.floor(s % 60))}`;
+// 構図: 見る物の手前にカメラ、ピントはその物に（少し遅れて送る）
+const fillDist = () => { const t = Math.tan((cam.fov * Math.PI) / 360); return portrait() ? 8 / (t * cam.aspect) * 1.0 : Math.max(4.5 / t, 8 / (t * cam.aspect)) * .985; };
+function frame(mesh, mode, at, sc, ry) { const p = at || mesh.position, s = sc || mesh.scale.y; let dist, dy;
+  if (mode === "fill") { dist = fillDist(); dy = portrait() ? -1.6 : 0; }
+  else { dist = (portrait() ? 34 : 22) * s; dy = (portrait() ? -4.5 : -1.5) * s; }
+  const rot = ry ?? mesh.rotation.y, side = V(Math.sin(rot), 0, Math.cos(rot));
+  camT.copy(p).addScaledVector(side, dist).add(V(0, mode === "fill" ? 0 : .9, 0)); lookT.copy(p).add(V(0, dy, 0)); focusMesh = mesh; focusFrom = now + (reduce ? 0 : .14); }
+function go(s, silent) { const prev = st || {}; st = s; ui.close.hidden = st.k === "browse";
+  const m = D.m[st.i], ids = m[2]; clipLen = Math.max(...ids.map((id) => D.c[id][3])) + 8;
+  if (st.k !== "why") clearHeats();
+  if (st.k === "browse") { frame(cards[st.i].mesh); slate(`b${st.i}`, `<span>${m[1]}</span><b>${pad(st.i + 1)} / ${D.m.length}</b>`, m[0]);
+    cue(`<div class="hint"><i></i>スワイプで次の瞬間<i></i></div><button class="pill" data-act="watch">▶ 観る</button>`); dots(D.m.length, st.i); ui.hud.classList.remove("on"); }
+  if (st.k === "watch") { frame(cards[st.i].mesh, "fill"); if (prev.k !== "watch" || prev.i !== st.i) { if (prev.k !== "why") playT = 0; ticks(ids, -1, false); }
+    slate(`w${st.i}`, `<span>${m[1]}</span><b>${pad(st.i + 1)} / ${D.m.length}</b>`, m[0]);
+    cue(`<button class="pill" data-act="why">なぜ熱い？</button>`); ui.dots.innerHTML = ""; ui.hud.classList.add("on"); }
+  if (st.k === "why") { if (prev.k !== "why" && !silent) burst(st.i); const h = heats[st.j]; if (h) frame(h.mesh, null, h.to, HS, h.rot1); const c = D.c[ids[st.j]];
+    const sl = () => slate(`h${st.i}.${st.j}`, `<span class="tc">${mmss(c[3])}</span><span>この1本を熱くしていたもの</span><b>${pad(st.j + 1)} / ${ids.length}</b>`, c[0], c[1]);
+    if (prev.k !== "why" && !silent) { ui.slate.classList.add("out"); setTimeout(sl, reduce ? 0 : 750); } else sl();
+    cue(`<button class="ghost" data-act="back">瞬間に戻る</button><button class="pill" data-act="search">この熱で100本を探す</button>`); dots(ids.length, st.j); ticks(ids, st.j, true); playT = c[3]; ui.hud.classList.add("on"); } }
+function ticks(ids, on, show) { if (ui.track.dataset.i !== String(st.i)) { ui.track.dataset.i = st.i; ui.track.querySelectorAll(".tk").forEach((e) => e.remove());
+    ids.forEach((id, j) => { const e = document.createElement("i"); e.className = "tk"; e.style.left = `${(D.c[id][3] / clipLen) * 100}%`; e.style.transitionDelay = `${j * 60}ms`; ui.track.appendChild(e); }); }
+  ui.track.querySelectorAll(".tk").forEach((e, j) => { e.classList.toggle("show", show); e.classList.toggle("on", j === on); }); }
+// 分解: 観ていた映像が熱の数の帯に割れ、帯がそれぞれの熱の場面に開きながら奥へ並ぶ（違う奥行き＝ピントを送って順に見る）
+const heatPos = (i, j) => { const p = momentPos(i); return portrait() ? p.clone().add(V(Math.sin(j * 1.3) * 1.4, j * 10, -5 - j * 12)) : p.clone().add(V((j % 2 ? -1 : 1) * 8 + 2, ((j % 3) - 1) * 2.2, -5 - j * 12)); };
+const HS = .86;
+function burst(i) { clearHeats(); const ids = D.m[i][2], base = cards[i].mesh, n = ids.length, u = base.material.uniforms;
+  ids.forEach((id, j) => { const mesh = mkCard(u.uHue.value, u.uSeed.value); mesh.position.copy(base.position); const mu = mesh.material.uniforms; mu.uTime.value = u.uTime.value; mesh.rotation.copy(base.rotation);
+    heats.push({ mesh, j, n, from: base.position.clone(), rot0: base.rotation.y, to: heatPos(i, j), rot1: portrait() ? 0 : (j % 2 ? 1 : -1) * .14, t0: now, hue: u.uHue.value }); });
+  base.userData.hide = 1; }
+function clearHeats() { for (const h of heats) { scene.remove(h.mesh); h.mesh.material.dispose(); } heats = []; for (const c of cards) c.mesh.userData.hide = 0; }
+// ---- 操作 ----
+function step(d) { if (!st) return;
+  if (st.k === "browse") go({ k: "browse", i: (st.i + d + D.m.length) % D.m.length });
+  else if (st.k === "why") { const n = D.m[st.i][2].length, j = Math.max(0, Math.min(n - 1, st.j + d)); if (j !== st.j) go({ ...st, j }); }
+  else if (st.k === "watch") go({ k: "watch", i: (st.i + d + D.m.length) % D.m.length }); }
+function toast(html) { const t = document.createElement("div"); t.className = "toast"; t.innerHTML = html; document.body.appendChild(t); setTimeout(() => t.remove(), 2600); }
+ui.cue.addEventListener("click", (e) => { const a = e.target.closest("[data-act]")?.dataset.act; if (!a) return;
+  if (a === "watch") go({ k: "watch", i: st.i }); if (a === "why") go({ k: "why", i: st.i, j: 0 }); if (a === "back") go({ k: "watch", i: st.i });
+  if (a === "search") toast("ここから「この熱で100本を探す」へ続きます<br><span style='color:var(--dim);font-size:12px'>このモックは最初の数十秒（選ぶ→観る→熱に分かれる）まで</span>"); });
+ui.close.onclick = () => { if (st.k === "why") go({ k: "watch", i: st.i }); else go({ k: "browse", i: st.i }); };
+// タップ: 奥や手前に見えている板を押すとそこへピントが移る。ピントの合った板を押すと観る
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function pick(x, y) { ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam);
+  const list = st.k === "why" ? heats.map((h) => h.mesh) : cards.filter((c) => c.mesh.visible && c.mesh.material.uniforms.uOp.value > .5).map((c) => c.mesh);
+  return ray.intersectObjects(list, false)[0]?.object; }
+let down = null;
+cv.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; });
+cv.addEventListener("pointermove", (e) => { px = e.clientX / innerWidth - .5; py = e.clientY / innerHeight - .5; });
+cv.addEventListener("pointerup", (e) => { if (!down) return; const dx = e.clientX - down[0], dy = e.clientY - down[1]; down = null;
+  if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { step(dx < 0 ? 1 : -1); return; } if (Math.abs(dy) > 40) { step(dy < 0 ? 1 : -1); return; }
+  const o = pick(e.clientX, e.clientY); if (!o) return;
+  if (st.k === "browse") { const c = cards.find((c) => c.mesh === o); if (c.k === st.i) go({ k: "watch", i: st.i }); else go({ k: "browse", i: c.k }); }
+  else if (st.k === "why") { const h = heats.find((h) => h.mesh === o); if (h && h.j !== st.j) go({ ...st, j: h.j }); } });
+let wheelLock = 0; addEventListener("wheel", (e) => { e.preventDefault(); if (performance.now() < wheelLock) return; if (Math.abs(e.deltaY) + Math.abs(e.deltaX) < 8) return; wheelLock = performance.now() + 650; step((e.deltaY || e.deltaX) > 0 ? 1 : -1); }, { passive: false });
+addEventListener("keydown", (e) => { if (e.key === "ArrowRight" || e.key === "ArrowDown") step(1); if (e.key === "ArrowLeft" || e.key === "ArrowUp") step(-1); if (e.key === "Enter") document.querySelector(".pill")?.click(); if (e.key === "Escape" && !ui.close.hidden) ui.close.click(); });
+// ---- 毎フレーム ----
+const ease = (k) => 1 - Math.pow(1 - k, 3), clamp01 = (x) => Math.max(0, Math.min(1, x)), fwd = V(0, 0, 0), tmp = V(0, 0, 0);
+let last = 0, manual = false; // manual は検証用（時間を止めて 1/30 秒ずつ進めて撮る）
+function tick(t) { requestAnimationFrame(tick); const dt = Math.min(.1, Math.max(0, (t - (last || t)) / 1000)); last = t; if (!manual) update(dt); }
+function update(dt) { now += dt;
+  const kc = 1 - Math.exp(-dt / (reduce ? .2 : .55));
+  camC.lerp(camT, kc); lookC.lerp(lookT, kc);
+  const sway = reduce ? .3 : 1, still = st && st.k === "watch" ? .25 : 1;
+  cam.position.copy(camC).add(V((Math.sin(now * .23) * .3 * sway + px * 1.1) * still, (Math.cos(now * .19) * .22 * sway - py * .7) * still, 0)); cam.lookAt(lookC);
+  // ピント送り: 見る物までの奥行きへ、カメラより少し遅れて合う
+  cam.getWorldDirection(fwd);
+  if (focusMesh && now >= focusFrom) { const d = tmp.copy(focusMesh.position).sub(cam.position).dot(fwd); focusC += (d - focusC) * (1 - Math.exp(-dt / (reduce ? .1 : .3))); }
+  const watching = st && st.k === "watch", why = st && st.k === "why";
+  for (const c of cards) { const u = c.mesh.material.uniforms, on = st && c.k === st.i; u.uFocus.value = focusC; u.uRange.value = 15;
+    u.uLive.value = on ? 1 : 0; u.uTime.value += dt * (on ? 1 : .25);
+    const target = c.mesh.userData.hide || why ? 0 : (watching && !on ? 0 : 1); u.uOp.value += (target - u.uOp.value) * (1 - Math.exp(-dt / (c.mesh.userData.hide ? .02 : .3))); c.mesh.visible = u.uOp.value > .01; }
+  if (st) { const b = backdrop.material.uniforms, src = cards[st.i].mesh, su = src.material.uniforms; const bt = watching && portrait() ? 1 : 0; b.uOp.value += (bt - b.uOp.value) * (1 - Math.exp(-dt / .4)); backdrop.visible = b.uOp.value > .01;
+    b.uHue.value = su.uHue.value; b.uSeed.value = su.uSeed.value; b.uTime.value = su.uTime.value; b.uFocus.value = focusC; backdrop.position.copy(src.position).add(V(0, 0, -6)); backdrop.scale.set(4.2, 4.2, 1); backdrop.material.uniforms.uSize.value.set(16 * 4.2, 9 * 4.2); }
+  for (const h of heats) { const u = h.mesh.material.uniforms, n = h.n, j = h.j;
+    // 1) 割れる（0〜0.5秒）: 帯の間が開き、帯ごとに前後へずれる  2) 開く（帯ごとに少しずつ遅れて 1.2 秒）: 帯が自分の熱の場面へ広がりながら奥の位置へ
+    const ka = ease(clamp01((now - h.t0) / .5)), kb = ease(clamp01((now - h.t0 - .42 - j * .09) / 1.2));
+    const sx = ((j + .5) / n - .5) * 16, gap = 1 + .14 * ka, w = 1 / n;
+    const a = h.from.clone().add(V(Math.cos(h.rot0) * sx * gap, 0, -Math.sin(h.rot0) * sx * gap + (j % 2 ? .9 : -.9) * ka));
+    h.mesh.position.lerpVectors(a, h.to, kb); h.mesh.position.y += Math.sin(kb * Math.PI) * 2.2 * (j % 2 ? 1 : -1);
+    const s = 1 + (HS - 1) * kb; h.mesh.scale.set((w + (1 - w) * kb) * s * (1 - .05 * ka * (1 - kb)), s, 1);
+    h.mesh.rotation.y = h.rot0 + (h.rot1 - h.rot0) * kb + Math.sin(kb * Math.PI) * .35 * (j % 2 ? 1 : -1) + .06 * ka * (1 - kb) * (j % 2 ? 1 : -1);
+    u.uWin.value.set((j * w) * (1 - kb), ((j + 1) * w) * (1 - kb) + kb); u.uShot.value = kb * (1.1 + j * 2.9); u.uHue.value = h.hue + kb * (j % 3 - 1) * .035; u.uSize.value.set(16 * h.mesh.scale.x, 9 * h.mesh.scale.y);
+    u.uFocus.value = focusC; u.uRange.value = 13; const on = why && j === st.j; u.uLive.value = on ? 1 : 0; u.uTime.value += dt * (on ? 1 : .25); }
+  bokeh.material.uniforms.uFocus.value = focusC; bokeh.material.uniforms.uOp.value += ((watching ? .15 : 1) - bokeh.material.uniforms.uOp.value) * (1 - Math.exp(-dt / .4));
+  // 再生の目盛り
+  if (watching) playT = (playT + dt) % clipLen; if (st && st.k !== "browse") { ui.fill.style.width = `${(playT / clipLen) * 100}%`; ui.tc.textContent = mmss(playT); }
+  R.render(scene, cam); }
+resize(); addEventListener("resize", resize);
+go({ k: "browse", i: 36 }); camC.copy(camT).add(V(0, 8, 70)); lookC.copy(lookT); focusC = 4; // 開いた瞬間: 遠くからカメラが寄り、ピントが合う
+requestAnimationFrame(tick);
+window.__f = { st: () => st, go, step, manual: (on) => { manual = on; }, adv: (sec) => { for (let k = 0; k < Math.round(sec * 30); k++) update(1 / 30); } };
+</script>
