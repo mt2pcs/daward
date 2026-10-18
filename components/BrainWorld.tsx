@@ -81,7 +81,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     const portrait = () => innerHeight > innerWidth;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     const safari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent), ext = safari ? "mp4" : "webm";
-    const R = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.setClearColor(0x020306, 1);
+    const R = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" }); let dpr = Math.min(devicePixelRatio, 1.5); R.setPixelRatio(dpr); R.setClearColor(0x020306, 1);
     el.appendChild(R.domElement); R.domElement.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none";
     const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(42, 1, 0.3, 3000);
     const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z), tmp = V();
@@ -120,15 +120,20 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     }
 
     // ===== 線（7,564本の繋がり。両側の熱から潜り、その見方の通り道を通って相手へ）=====
-    const FS = 30;
-    let fiberGeo: THREE.BufferGeometry, fiberMat: THREE.ShaderMaterial, selA: Float32Array, selB: Float32Array, dirA: Float32Array, paths: THREE.Vector3[][] = [], linksOf: number[][] = [];
-    function buildFibers() {
-      const L = N.links, nL = L.length, pos = new Float32Array(nL * FS * 6), col = new Float32Array(nL * FS * 6), sv = new Float32Array(nL * FS * 2), al = new Float32Array(nL * FS * 2);
-      selA = new Float32Array(nL * FS * 2).fill(1); selB = new Float32Array(nL * FS * 2).fill(1); dirA = new Float32Array(nL * FS * 2);
+    const FS = 16; // 1本を何区間で描くか（30 から下げた: 頂点 45万→24万）
+    let fiberGeo: THREE.BufferGeometry, fiberMat: THREE.ShaderMaterial, sel: Uint8Array, paths: THREE.Vector3[][] = [], linksOf: number[][] = [];
+    // 読み込みで画面を止めないよう、少しずつ（1回 900 本）作る。作り終えた分から見える
+    async function buildFibers() {
+      const L = N.links, nL = L.length, pos = new Float32Array(nL * FS * 6), col = new Uint8Array(nL * FS * 6), sv = new Uint8Array(nL * FS * 2), al = new Uint8Array(nL * FS * 2);
+      sel = new Uint8Array(nL * FS * 2 * 3); for (let i = 0; i < nL * FS * 2; i++) { sel[i * 3] = 1; sel[i * 3 + 1] = 1; }
       const cnt = new Array(8).fill(0); L.forEach((l) => cnt[l[3]]++);
       linksOf = N.ctx.map(() => []); paths = new Array(nL);
       const c3 = DIMC.map((h) => new THREE.Color(h));
-      L.forEach((l, n) => { const [a, b, sc, d] = l; linksOf[a].push(n); linksOf[b].push(n);
+      fiberGeo = new THREE.BufferGeometry();
+      fiberGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); fiberGeo.setAttribute("col", new THREE.BufferAttribute(col, 3, true)); fiberGeo.setAttribute("s", new THREE.BufferAttribute(sv, 1, true));
+      fiberGeo.setAttribute("al", new THREE.BufferAttribute(al, 1, true)); fiberGeo.setAttribute("sel", new THREE.BufferAttribute(sel, 3)); fiberGeo.setDrawRange(0, 0);
+      for (let n0 = 0; n0 < nL; n0 += 900) { if (!alive) return;
+      L.slice(n0, n0 + 900).forEach((l, kk) => { const n = n0 + kk; const [a, b, sc, d] = l; linksOf[a].push(n); linksOf[b].push(n);
         const A = EP[a], B = EP[b]; const ta = closestT(d, A); let dt = closestT(d, B) - ta; if (dt > Math.PI) dt -= Math.PI * 2; if (dt < -Math.PI) dt += Math.PI * 2;
         const k = Math.max(2, Math.ceil(Math.abs(dt) / 0.32)), cp: THREE.Vector3[] = [A, A.clone().lerp(loopPt(d, ta), 0.42)];
         for (let i = 0; i <= k; i++) cp.push(loopPt(d, ta + (dt * i) / k)); cp.push(B.clone().lerp(loopPt(d, ta + dt), 0.42), B);
@@ -137,31 +142,35 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
         const o = V(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize().multiplyScalar(1.2 + rnd() * rnd() * 7);
         for (let i = 0; i <= FS; i++) { const s = i / FS, tg = pts[Math.min(FS, i + 1)].clone().sub(pts[Math.max(0, i - 1)]).normalize(); pts[i].add(o.clone().addScaledVector(tg, -o.dot(tg)).multiplyScalar(Math.pow(Math.sin(Math.PI * s), 0.6))); }
         paths[n] = pts;
-        const base = Math.min(0.55, 0.23 * Math.sqrt(900 / cnt[d])) * (0.6 + (sc - 0.43) * 0.45), cc = c3[d];
+        const base = Math.min(0.55, 0.23 * Math.sqrt(900 / cnt[d])) * (0.6 + (sc - 0.43) * 0.45), cc = c3[d], q = (x: number) => Math.round(Math.max(0, Math.min(1, x)) * 255);
         for (let i = 0; i < FS; i++) { const p0 = pts[i], p1 = pts[i + 1], o6 = (n * FS + i) * 6, o2 = (n * FS + i) * 2;
           pos.set([p0.x, p0.y, p0.z, p1.x, p1.y, p1.z], o6);
-          const tg = p1.clone().sub(p0).normalize(); const r = cc.r * 0.78 + Math.abs(tg.x) * 0.22, g = cc.g * 0.78 + Math.abs(tg.y) * 0.22, bb = cc.b * 0.78 + Math.abs(tg.z) * 0.22;
-          col.set([r, g, bb, r, g, bb], o6); sv[o2] = i / FS; sv[o2 + 1] = (i + 1) / FS; al[o2] = al[o2 + 1] = base; } });
-      fiberGeo = new THREE.BufferGeometry();
-      fiberGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); fiberGeo.setAttribute("col", new THREE.BufferAttribute(col, 3)); fiberGeo.setAttribute("s", new THREE.BufferAttribute(sv, 1));
-      fiberGeo.setAttribute("al", new THREE.BufferAttribute(al, 1)); fiberGeo.setAttribute("selA", new THREE.BufferAttribute(selA, 1)); fiberGeo.setAttribute("selB", new THREE.BufferAttribute(selB, 1)); fiberGeo.setAttribute("dir", new THREE.BufferAttribute(dirA, 1));
-      fiberMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+          const tg = p1.clone().sub(p0).normalize(); const r = q(cc.r * 0.78 + Math.abs(tg.x) * 0.22), g = q(cc.g * 0.78 + Math.abs(tg.y) * 0.22), bb = q(cc.b * 0.78 + Math.abs(tg.z) * 0.22);
+          col.set([r, g, bb, r, g, bb], o6); sv[o2] = q(i / FS); sv[o2 + 1] = q((i + 1) / FS); al[o2] = al[o2 + 1] = q(base); } });
+      fiberGeo.setDrawRange(0, Math.min(nL, n0 + 900) * FS * 2); (["position", "col", "s", "al"] as const).forEach((a) => (fiberGeo.attributes[a].needsUpdate = true));
+      if (!fiberMat) { fiberMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
         uniforms: { uMix: { value: 1 }, uIntro: { value: 0 }, uSweep: { value: 10 }, uNear: { value: 200 }, uDen: { value: 1 } },
-        vertexShader: `attribute vec3 col; attribute float s, al, selA, selB, dir; uniform float uMix, uIntro, uSweep, uNear, uDen; varying vec3 vC; varying float vA;
+        vertexShader: `attribute vec3 col, sel; attribute float s, al; uniform float uMix, uIntro, uSweep, uNear, uDen; varying vec3 vC; varying float vA;
           float lv(float x){ return x < .5 ? .2 : x < 1.5 ? 1. : 4.2; }
           void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); float z = -mv.z;
-            float sel = mix(lv(selA), lv(selB), uMix);
-            float along = dir > .5 ? 1. - s : s; float hot = selB > 1.5 ? smoothstep(uSweep - .12, uSweep, along) : 0.; sel = mix(sel, max(lv(selA), .07), hot);
+            float selA = sel.x, selB = sel.y, dir = sel.z; float lvl = mix(lv(selA), lv(selB), uMix);
+            float along = dir > .5 ? 1. - s : s; float hot = selB > 1.5 ? smoothstep(uSweep - .12, uSweep, along) : 0.; lvl = mix(lvl, max(lv(selA), .07), hot);
             float e = min(s, 1. - s) * 2.; float grow = smoothstep(e - .05, e + .05, uIntro * 1.15);
-            vA = uDen * al * sel * grow * (.35 + .65 * smoothstep(uNear + 260., uNear - 60., z)) * smoothstep(1., 14., z);
+            vA = uDen * al * lvl * grow * (.35 + .65 * smoothstep(uNear + 260., uNear - 60., z)) * smoothstep(1., 14., z);
             vC = col; gl_Position = projectionMatrix * mv; }`,
         fragmentShader: `precision highp float; varying vec3 vC; varying float vA; void main(){ gl_FragColor = vec4(vC * vA, vA); }` });
-      scene.add(new THREE.LineSegments(fiberGeo, fiberMat));
+        const ls = new THREE.LineSegments(fiberGeo, fiberMat); ls.frustumCulled = false; scene.add(ls); }
+      await new Promise((r) => setTimeout(r, 0)); }
+      fibersReady = true;
     }
+    let fibersReady = false;
+    // 線を作り終える前に押されても壊れないよう、作り終えたら今の状態で塗り直す
+    function buildFibersSync() { buildFibers().then(() => { if (!alive) return; if (st.k === "free") paintFibers(() => 1); }); }
+    // 線の明るさの状態（前の状態から 0.6 秒でなめらかに）。0=沈む 1=ふつう 2=選んだもの
     function paintFibers(fn: (n: number) => number, from?: (n: number) => boolean) {
-      const k = Math.min(1, mixT); for (let i = 0; i < selA.length; i++) selA[i] = selA[i] + (selB[i] - selA[i]) * k;
-      const L = N.links; for (let n = 0; n < L.length; n++) { const v = fn(n), dr = from && from(n) ? 1 : 0; for (let i = 0; i < FS * 2; i++) { selB[n * FS * 2 + i] = v; dirA[n * FS * 2 + i] = dr; } }
-      (["selA", "selB", "dir"] as const).forEach((a) => (fiberGeo.attributes[a].needsUpdate = true)); mixT = 0; sweepT = now; }
+      if (!fibersReady) return; const half = mixT >= 0.5, L = N.links;
+      for (let n = 0; n < L.length; n++) { const v = fn(n), dr = from && from(n) ? 1 : 0; for (let i = 0; i < FS * 2; i++) { const o = (n * FS * 2 + i) * 3; sel[o] = half ? sel[o + 1] : sel[o]; sel[o + 1] = v; sel[o + 2] = dr; } }
+      fiberGeo.attributes.sel.needsUpdate = true; mixT = 0; sweepT = now; }
     // 選んだ熱からの線だけを太く（根元から先へ伸びる）
     const fatMat = new LineMaterial({ linewidth: 2.3, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending });
     let fat: LineSegments2 | null = null, fatN = 0, fatT0 = 0, fatDur = 1.3;
@@ -249,7 +258,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     // ===== 映像 =====
     type Slot = { v: HTMLVideoElement; tex: THREE.VideoTexture; tile: number; src: string };
     const mkV = (muted = true) => { const v = document.createElement("video"); v.crossOrigin = "anonymous"; v.muted = muted; v.playsInline = true; v.preload = "auto"; v.setAttribute("playsinline", ""); return v; };
-    const slots: Slot[] = Array.from({ length: portrait() ? 5 : 8 }, () => { const v = mkV(); v.loop = true; const tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace; return { v, tex, tile: -1, src: "" }; });
+    const slots: Slot[] = Array.from({ length: portrait() ? 6 : 8 }, () => { const v = mkV(); v.loop = true; const tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace; return { v, tex, tile: -1, src: "" }; });
     const clipOf = (id: number) => `${BASE}/ctx/c/${id}.${ext}`;
     function playOn(tile: number, src: string) { const t = tiles[tile]; let s = slots.find((x) => x.tile === tile);
       if (!s) s = slots.find((x) => x.tile < 0) || slots[0];
@@ -302,7 +311,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       reset(); setPlaying([]); tiles.forEach((t) => { t.dimG = t.m === m ? 1 : 0.3; t.goal = t.m === m ? 30 : 16; }); frameTile(m);
       mainV.pause(); scrub = { from: mainV.currentTime, to: Math.max(0, N.ctx[c].t - 1.2), t0: now, c, lastSeek: 0 }; setV({ k: "scrub", m, c });
     }
-    function reveal(c: number) { const m = momOf[c], near = nearHeats(c), items: Item[] = near.map((x) => ({ id: x.j, d: N.links[x.n][3] }));
+    function reveal(c: number): void { if (!fibersReady) { setTimeout(() => reveal(c), 200); return; } const m = momOf[c], near = nearHeats(c), items: Item[] = near.map((x) => ({ id: x.j, d: N.links[x.n][3] }));
       const pn = new Set(near.map((x) => x.n)), pj = new Set(near.map((x) => x.j)), pm = new Set(near.map((x) => momOf[x.j]));
       paintFibers((n) => (pn.has(n) ? 2 : 0), (n) => N.links[n][1] === c); setFat(near.map((x) => ({ pts: pathFrom(x.n, c), d: N.links[x.n][3] })));
       setNodes((i) => (i === c ? [1.6, 3.2] : pj.has(i) ? [1.3, 2.4] : [0.08, 0.7])); setRoots((i) => (i === c || pj.has(i) ? 1 : 0.03));
@@ -440,22 +449,27 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
         const isMain = t.m === mainTile, vOn = isMain ? (mainOk ? 1 : 0) : t.vid >= 0 && slots[t.vid].tile === t.m && slots[t.vid].v.readyState >= 2 ? 1 : 0; u.uUseVid.value += (vOn - u.uUseVid.value) * Math.min(1, dt * 4);
         u.uGl.value = isMain ? glitch : 0; u.uFl.value = isMain ? flash : 0; u.uT.value = now;
         t.mesh.renderOrder = t.anim ? 2000 : isMain ? 1500 : face < 0.05 && t.lift < 0.5 ? -10 : 10 + Math.round(1000 - cp.distanceTo(t.mesh.position)); });
-      if (st.k === "free" && now - liveAt > 3 && intro > 0.9) { liveAt = now; const cand = tiles.map((t) => { prj.copy(t.mesh.position).project(cam); const face = MP[t.m].n.dot(tmp.copy(cp).sub(t.mesh.position).normalize()); return { t, s: face - Math.hypot(prj.x, prj.y) * 0.8 }; }).sort((a, b) => b.s - a.s).slice(0, portrait() ? 3 : 5);
+      if (st.k === "free" && now - liveAt > 3 && intro > 0.9) { liveAt = now; const cand = tiles.map((t) => { prj.copy(t.mesh.position).project(cam); const face = MP[t.m].n.dot(tmp.copy(cp).sub(t.mesh.position).normalize()); return { t, s: face - Math.hypot(prj.x, prj.y) * 0.8 }; }).sort((a, b) => b.s - a.s).slice(0, portrait() ? 2 : 3);
         setPlaying(cand.map(({ t }) => ({ tile: t.m, src: clipOf(N.moments[t.m].ctx[0]) }))); }
       if ((st.k === "heat" || st.k === "word") && intro > 0.5) stems(st.items); else stemGeo.setDrawRange(0, 0);
       drawText();
       if (draw) R.render(scene, cam); }
-    const loop = (t: number) => { raf = requestAnimationFrame(loop); const dt = Math.min(0.1, Math.max(0, (t - (last || t)) / 1000)); last = t; if (!manual) update(dt); };
+    // 重い端末では解像度を自動で下げる（直近 90 フレームの平均が 40fps を割ったら 0.25 ずつ、0.75 まで）
+    let fa = 0, fn = 0;
+    const loop = (t: number) => { raf = requestAnimationFrame(loop); const dt = Math.min(0.1, Math.max(0, (t - (last || t)) / 1000)); last = t; if (manual) return; update(dt);
+      if (ready && intro >= 1 && !document.hidden) { fa += dt; fn++; if (fn >= 90) { if (fa / fn > 1 / 40 && dpr > 0.75) { dpr = Math.max(0.75, dpr - 0.25); R.setPixelRatio(dpr); resize(); } fa = 0; fn = 0; } } };
+    // 見えていないときは映像を止める
+    const vis = () => { if (document.hidden) { slots.forEach((x) => x.v.pause()); mainV.pause(); } else { slots.forEach((x) => { if (x.tile >= 0) x.v.play().catch(() => {}); }); if (mainTile >= 0 && !scrub) mainV.play().catch(() => {}); } };
+    document.addEventListener("visibilitychange", vis);
     resize(); addEventListener("resize", resize); raf = requestAnimationFrame(loop);
 
     // ===== 読み込み =====
     (async () => {
       N = await (await fetch("/ctx/net.json")).json(); if (!alive) return;
-      placeMoments(); buildFibers(); shellMat = buildShell();
+      placeMoments(); shellMat = buildShell();
       const loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
-      const atl = await Promise.all(Array.from({ length: Math.ceil(N.ctx.length / 256) }, (_, s) => new Promise<THREE.Texture>((res) => loader.load(`${BASE}/ctx/atlas${s}.jpg`, res, undefined, () => res(new THREE.Texture())))));
-      atl.forEach((a) => { a.colorSpace = THREE.SRGBColorSpace; a.anisotropy = 4; a.generateMipmaps = true; a.minFilter = THREE.LinearMipmapLinearFilter; });
-      if (!alive) return; buildCortex(atl);
+      const atl = Array.from({ length: Math.ceil(N.ctx.length / 256) }, (_, s) => { const t = loader.load(`${BASE}/ctx/atlas${s}.jpg`); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; });
+      buildCortex(atl); buildFibersSync();
       setNet(N); ready = true; cam0.dist = portrait() ? 760 : 520; camG.dist = portrait() ? 560 : 290;
       // シェアされたリンク: ダイジェストを流し、閉じるとそのグループの前に着地する
       if (shared?.i?.length) { const s = shared.s ?? -1, js = shared.i.filter((x) => x !== s); const items: Item[] = s >= 0 ? ids2items(s, js) : shared.i.map((id) => ({ id, d: N.ctx[id].w.indexOf(Math.max(...N.ctx[id].w)) }));
@@ -466,7 +480,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     api.current = { watch, heat, search: (q) => { search(q); }, back: () => { if (st.k === "heat" || st.k === "scrub") { reset(); setPlaying([]); watch(st.m); } else free(); }, gather, ungather,
       seek: (t) => { if (mainTile >= 0) { try { mainV.currentTime = t; lastT = t; } catch { /* */ } } }, video: () => mainV };
     (window as unknown as { __bw: object }).__bw = { st: () => st, watch, heat, search, gather, manual: (on: boolean) => { manual = on; }, adv: (s: number) => { const n = Math.max(1, Math.round(s * 30)); for (let i = 0; i < n; i++) update(1 / 30, i === n - 1); }, find: (t: string) => N.ctx.findIndex((c) => c.title === t), momOf: (c: number) => momOf[c] };
-    return () => { alive = false; cancelAnimationFrame(raf); removeEventListener("resize", resize); slots.forEach((s) => { s.v.pause(); s.v.src = ""; }); mainV.pause(); mainV.src = ""; R.dispose(); el.removeChild(R.domElement); };
+    return () => { alive = false; cancelAnimationFrame(raf); removeEventListener("resize", resize); document.removeEventListener("visibilitychange", vis); slots.forEach((s) => { s.v.pause(); s.v.src = ""; }); mainV.pause(); mainV.src = ""; R.dispose(); el.removeChild(R.domElement); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
