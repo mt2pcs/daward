@@ -131,8 +131,8 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       fiberGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3)); fiberGeo.setAttribute("col", new THREE.BufferAttribute(col, 3)); fiberGeo.setAttribute("s", new THREE.BufferAttribute(sv, 1));
       fiberGeo.setAttribute("al", new THREE.BufferAttribute(al, 1)); fiberGeo.setAttribute("selA", new THREE.BufferAttribute(selA, 1)); fiberGeo.setAttribute("selB", new THREE.BufferAttribute(selB, 1)); fiberGeo.setAttribute("dir", new THREE.BufferAttribute(dirA, 1));
       fiberMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
-        uniforms: { uMix: { value: 1 }, uIntro: { value: 0 }, uSweep: { value: 10 }, uNear: { value: 200 } },
-        vertexShader: `attribute vec3 col; attribute float s, al, selA, selB, dir; uniform float uMix, uIntro, uSweep, uNear; varying vec3 vC; varying float vA;
+        uniforms: { uMix: { value: 1 }, uIntro: { value: 0 }, uSweep: { value: 10 }, uNear: { value: 200 }, uDen: { value: 1 } },
+        vertexShader: `attribute vec3 col; attribute float s, al, selA, selB, dir; uniform float uMix, uIntro, uSweep, uNear, uDen; varying vec3 vC; varying float vA;
           float lv(float x){ return x < .5 ? .05 : x < 1.5 ? 1. : 4.2; }
           void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); float z = -mv.z;
             float sel = mix(lv(selA), lv(selB), uMix);
@@ -140,7 +140,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
             float along = dir > .5 ? 1. - s : s; float hot = selB > 1.5 ? smoothstep(uSweep - .12, uSweep, along) : 0.; sel = mix(sel, max(lv(selA), .07), hot);
             // 最初: 表面の熱から内側へ線維が伸びていく
             float e = min(s, 1. - s) * 2.; float grow = smoothstep(e - .05, e + .05, uIntro * 1.15);
-            vA = al * sel * grow * (.35 + .65 * smoothstep(uNear + 260., uNear - 60., z)) * smoothstep(1., 14., z);
+            vA = uDen * al * sel * grow * (.35 + .65 * smoothstep(uNear + 260., uNear - 60., z)) * smoothstep(1., 14., z);
             vC = col; gl_Position = projectionMatrix * mv; }`,
         fragmentShader: `precision highp float; varying vec3 vC; varying float vA; void main(){ gl_FragColor = vec4(vC * vA, vA); }` });
       scene.add(new THREE.LineSegments(fiberGeo, fiberMat));
@@ -338,7 +338,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       { const w = R.domElement.width / R.getPixelRatio(), h = R.domElement.height / R.getPixelRatio(), pr = portrait();
         const ox = pr ? 0 : st.k === "none" ? -0.13 : 0.15, oy = pr && st.k !== "none" && !fly ? 0.22 : pr ? -0.04 : 0;
         view.x += (ox - view.x) * k; view.y += (oy - view.y) * k; cam.setViewOffset(w, h, view.x * w, view.y * h, w, h); }
-      fiberMat.uniforms.uNear.value = cam.position.length();
+      fiberMat.uniforms.uNear.value = cam.position.length(); fiberMat.uniforms.uDen.value = Math.max(0.45, Math.min(1.2, Math.sqrt((Math.min(innerWidth, innerHeight * 1.8) / 1280) * (290 / Math.max(60, cam.position.distanceTo(tgtC))))));
       // 板: カメラを向き、裏側（脳の向こう）は沈む。選んだものは大きく
       const cp = cam.position;
       tiles.forEach((t) => { t.scale += (t.goal - t.scale) * k; t.dim += (t.dimG - t.dim) * k; const u = t.mat.uniforms; u.uS.value = t.scale; u.uDim.value = t.dim;
