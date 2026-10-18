@@ -64,7 +64,15 @@ Next.js 14（App Router, TS）。本番は Cloud Run `e-mooments-burst`（`/`＝
   時期の切替は `phase()`（`VOTE_PHASE`）。支給ブランド素材は `public/brand/`。
 - **投票サイト** `/moments`（TOP・詳細・確認・完了）、API `/api/v26/vote`・`/api/v26/state`。1日1回・端末ベース（Cookie）。ストアはインメモリ（Firestore 差し替え前提）。
   票数は出さず heat（相対値）だけ。データ `data/moments2026.json`（`scripts/build_moments2026.mjs`）。
-- **体験** `/experience`（旧版 `components/ExperienceApp.tsx`＋`VortexSpace` visual="burst"＋切り口エンジン `lib/cut/engine.ts`）。作り直し待ち。
+- **体験** `/experience`（2026-10-18・判定待ち）: `components/BurstWorld.tsx`。10/16 の方向案を仮説として実装（ユーザーの「作業を開始して」を受けて）。
+  炸裂の空間（SpaceStream と同じロゴ色の直線の破片が奥の一点から手前へ流れ続ける）の中を、76の瞬間が映像の破片として奥から放射しながら流れてくる →
+  押すと前に来て、その瞬間のかけら（人×その1秒、名前＝state）が輪に噴き出す → かけらを押すとそれが中心（新しい消失点）、繋がるかけらが光線（色＝繋がりの種類、
+  近さ＝rate）に乗って噴き出し、その先が外側、残り全部は奥で小さく回る。前のかけらから渡った時は繋がりの一文（links の why）を下に出す。
+  繋がりが6未満のかけらは埋め込みの近いかけら（別の瞬間）で補う（灰色の光線・一文なし）。中心を押す/「この1秒を観る」で大きく音つき再生。
+  言葉は奥の一点に立ち（読む間は全部が吸い込まれる）、答えるかけらが噴き出す（`/api/lab/net/word`）。投票サイト詳細に「熱狂の中を回遊する！ この瞬間から」→ `?no=`。
+  スマホは中心を小さく、周りは6つで上下に1つずつ（横並びの名前が重なったため）。旧版（切り口エンジン＋腕）は `/lab/cut`。
+  検証 `scripts/lab/burst_world_test.mjs W H tag`（OUT・CLIPS＝c/<i>.webm, m/<key>.webm, atlas0/1.jpg・WORD・NO）。
+  未対応: 熱（投票）を切り口の上に出す、2つの言葉の両方に答えたかけら、映像の無い24本、実機（iPhone の mp4）。
 - **体験の素材（再利用できるもの）**:
   - `data/net/layers.json`（76瞬間→327出来事→488人（かけら・その1秒）→1374要素）、`links.json`（要素どうしの繋がり、rate 0〜3）、`world.json`（体験用にまとめたもの）、
     `names.json`（かけらを中心にした塊の名前）、`emb.bin`（かけらの埋め込み）。生成は `scripts/net/*.mjs`。
