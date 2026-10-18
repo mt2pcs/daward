@@ -83,12 +83,20 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     const safari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent), ext = safari ? "mp4" : "webm";
     const R = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" }); let dpr = Math.min(devicePixelRatio, 1.5); R.setPixelRatio(dpr); R.setClearColor(0x020306, 1);
     el.appendChild(R.domElement); R.domElement.style.cssText = "position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none";
-    const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(42, 1, 0.3, 3000);
+    const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(50, 1, 0.3, 3000);
+    // 線（7,564本）は描画の大半を占める（確認環境で約9割）ので、別の場面に置いて低い解像度の板に描き、それを画面に足す
+    const fibScene = new THREE.Scene();
+    const fibType = R.capabilities.isWebGL2 && (R.extensions.has("EXT_color_buffer_float") || R.extensions.has("EXT_color_buffer_half_float")) ? THREE.HalfFloatType : THREE.UnsignedByteType;
+    const fibRT = new THREE.WebGLRenderTarget(4, 4, { type: fibType, depthBuffer: false, magFilter: THREE.LinearFilter, minFilter: THREE.LinearFilter });
+    { const cm = new THREE.ShaderMaterial({ uniforms: { tFib: { value: fibRT.texture } }, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+        vertexShader: `varying vec2 vUv; void main(){ vUv = position.xy * .5 + .5; gl_Position = vec4(position.xy, 0., 1.); }`,
+        fragmentShader: `precision highp float; uniform sampler2D tFib; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(tFib, vUv).rgb, 1.); }` });
+      const comp = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), cm); comp.frustumCulled = false; comp.renderOrder = 0; scene.add(comp); }
     const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z), tmp = V();
     let N: Net;
     let st: View = { k: "free" }, now = 0, intro = 0, sweepT = -10, mixT = 1;
     const cam0 = { yaw: 0.55, pitch: 0.22, dist: 330 }, camG = { ...cam0 }, tgtC = V(), tgtG = V();
-    let idle = true; const view = { x: -0.1, y: 0 };
+    let idle = true; const view = { x: -0.1, y: 0 }, par = { x: 0, y: 0 }, parC = { x: 0, y: 0 };
     const setV = (v: View) => { st = v; hooks.current.view?.(v); };
 
     // ===== 形 =====
@@ -156,11 +164,14 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
             float selA = sel.x, selB = sel.y, dir = sel.z; float lvl = mix(lv(selA), lv(selB), uMix);
             float along = dir > .5 ? 1. - s : s; float hot = selB > 1.5 ? smoothstep(uSweep - .12, uSweep, along) : 0.; lvl = mix(lvl, max(lv(selA), .07), hot);
             float e = min(s, 1. - s) * 2.; float grow = smoothstep(e - .05, e + .05, uIntro * 1.15);
-            vA = uDen * al * lvl * grow * (.35 + .65 * smoothstep(uNear + 260., uNear - 60., z)) * smoothstep(1., 14., z);
-            vC = col; gl_Position = projectionMatrix * mv; }`,
+            float near = smoothstep(uNear + 120., uNear - 90., z); vA = uDen * al * lvl * grow * mix(.14, 1.35, near) * smoothstep(1., 14., z);
+            vC = mix(vec3(.22, .3, .52) * (col.r + col.g + col.b) * .5, col, .35 + .65 * near); gl_Position = projectionMatrix * mv; }`,
         fragmentShader: `precision highp float; varying vec3 vC; varying float vA; void main(){ gl_FragColor = vec4(vC * vA, vA); }` });
-        const ls = new THREE.LineSegments(fiberGeo, fiberMat); ls.frustumCulled = false; scene.add(ls); }
+        const ls = new THREE.LineSegments(fiberGeo, fiberMat); ls.frustumCulled = false; fibScene.add(ls); }
       await new Promise((r) => setTimeout(r, 0)); }
+      const order = L.map((_, n) => n).sort((a, b) => L[b][2] - L[a][2]).slice(0, Math.round(nL * 0.6)), idx = new Uint32Array(order.length * FS * 2);
+      order.forEach((n, k) => { for (let i = 0; i < FS * 2; i++) idx[k * FS * 2 + i] = n * FS * 2 + i; });
+      fiberGeo.setIndex(new THREE.BufferAttribute(idx, 1)); fiberGeo.setDrawRange(0, idx.length);
       fibersReady = true;
     }
     let fibersReady = false;
@@ -182,25 +193,25 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
 
     // ===== ガラスの殻 =====
     function buildShell() {
-      const g = new THREE.SphereGeometry(1, 128, 96); g.scale(RX * 0.99, RY * 0.99, RZ * 0.99);
+      const g = new THREE.SphereGeometry(1, 72, 54); g.scale(RX * 0.99, RY * 0.99, RZ * 0.99);
       const m = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide, uniforms: { uOp: { value: 0 } },
         vertexShader: `varying vec3 vN, vV, vP; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix * mv; }`,
         fragmentShader: `precision highp float; varying vec3 vN, vV, vP; uniform float uOp;
           void main(){ float f = pow(1. - abs(dot(vN, vV)), 2.6); float sl = smoothstep(.85, 1., abs(fract(vP.z / 9.) - .5) * 2.) * .5 + smoothstep(.9, 1., abs(fract(vP.y / 9.) - .5) * 2.) * .25;
             vec3 c = vec3(.55, .66, .8) * (f * .22 + sl * f * .35); gl_FragColor = vec4(c * uOp, 0.); }` });
-      scene.add(new THREE.Mesh(g, m)); return m;
+      fibScene.add(new THREE.Mesh(g, m)); return m;
     }
 
     // ===== 表面の映像（カメラを向く板）。観ている1本は、コマ飛び・ジャギー・光で時刻を走る =====
     type Tile = { m: number; mesh: THREE.Mesh; mat: THREE.ShaderMaterial; scale: number; goal: number; dim: number; dimG: number; lift: number; liftG: number; vid: number; pos: THREE.Vector3;
       anim: null | { pts: THREE.Vector3[]; t0: number; dur: number; to: number; back: boolean } };
     let tiles: Tile[] = [];
-    const TILE_V = `uniform float uS; varying vec2 vUv; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(0.,0.,0.,1.); mv.xy += position.xy * uS; gl_Position = projectionMatrix * mv; }`;
+    const TILE_V = `uniform float uS, uBill; varying vec2 vUv; void main(){ vUv = uv; vec4 c = modelViewMatrix * vec4(0.,0.,0.,1.); vec4 bill = c + vec4(position.xy * uS, 0., 0.); vec4 wor = modelViewMatrix * vec4(position * uS, 1.); gl_Position = projectionMatrix * mix(wor, bill, uBill); }`;
     const TILE_F = `precision highp float; varying vec2 vUv; uniform sampler2D uAt, uVid; uniform vec4 uRect; uniform float uUseVid, uDim, uFace, uHi, uOp, uGl, uFl, uT; uniform vec3 uRim;
       vec3 tex(vec2 p){ p = clamp(p, .001, .999); return mix(texture2D(uAt, uRect.xy + p * uRect.zw).rgb, texture2D(uVid, p).rgb, uUseVid); }
       float h(float x){ return fract(sin(x) * 43758.5453); }
       void main(){ vec2 q = abs(vUv - .5) * vec2(16., 9.); vec2 b = vec2(8., 4.5) - .45; float d = length(max(q - b, 0.)) - .45; float a = (1. - smoothstep(-.05, .05, d)) * uOp; if (a < .003) discard;
-        vec2 uv = vUv; vec3 c;
+        vec2 uv = vUv; if (!gl_FrontFacing) uv.x = 1. - uv.x; vec3 c;
         if (uGl > .001) {
           // 時刻を走るあいだ: 横に裂け、ブロックに崩れ、色がずれる
           float row = floor(uv.y * 34.), tt = floor(uT * 24.); float tear = step(1. - uGl * .55, h(row * 7.13 + tt)); uv.x += (h(row * 3.7 + tt) - .5) * .22 * tear * uGl;
@@ -208,7 +219,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
           float sh = .018 * uGl; c = vec3(tex(uv + vec2(sh, 0.)).r, tex(uv).g, tex(uv - vec2(sh, 0.)).b);
           c *= .85 + .3 * h(row + tt); }
         else c = tex(uv);
-        c = mix(c, vec3(1.), uFl);
+        c = mix(c, vec3(1.), uFl); if (!gl_FrontFacing) c *= .3;
         float rim = smoothstep(.3, 0., abs(d + .18)); c = c * (uDim * (.45 + .55 * uFace)) + uRim * rim * (.22 + uHi * .9);
         gl_FragColor = vec4(c * a, a); }`;
     let rootGeo: THREE.BufferGeometry, rootA: Float32Array, nodeGeo: THREE.BufferGeometry, nodeA: Float32Array, nodeS: Float32Array;
@@ -216,9 +227,9 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     function buildCortex(atl: THREE.Texture[]) {
       const geo = new THREE.PlaneGeometry(1, 9 / 16), blank = new THREE.Texture();
       tiles = N.moments.map((mo, m) => { const id = mo.ctx[0], s = Math.floor(id / 256), k = id % 256;
-        const mat = new THREE.ShaderMaterial({ vertexShader: TILE_V, fragmentShader: TILE_F, transparent: true, depthWrite: false, depthTest: false,
-          uniforms: { uAt: { value: atl[s] || blank }, uVid: { value: blank }, uRect: { value: new THREE.Vector4((k % 16) / 16, 1 - (Math.floor(k / 16) + 1) / 16, 1 / 16, 1 / 16) }, uUseVid: { value: 0 }, uDim: { value: 1 }, uFace: { value: 1 }, uHi: { value: 0 }, uOp: { value: 0 }, uS: { value: 16 }, uRim: { value: new THREE.Color("#f4f2ec") }, uGl: { value: 0 }, uFl: { value: 0 }, uT: { value: 0 } } });
-        const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(MP[m].tile); mesh.frustumCulled = false; scene.add(mesh);
+        const mat = new THREE.ShaderMaterial({ vertexShader: TILE_V, fragmentShader: TILE_F, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
+          uniforms: { uAt: { value: atl[s] || blank }, uVid: { value: blank }, uRect: { value: new THREE.Vector4((k % 16) / 16, 1 - (Math.floor(k / 16) + 1) / 16, 1 / 16, 1 / 16) }, uUseVid: { value: 0 }, uDim: { value: 1 }, uFace: { value: 1 }, uHi: { value: 0 }, uOp: { value: 0 }, uS: { value: 16 }, uBill: { value: 0 }, uRim: { value: new THREE.Color("#f4f2ec") }, uGl: { value: 0 }, uFl: { value: 0 }, uT: { value: 0 } } });
+        const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(MP[m].tile); mesh.lookAt(MP[m].tile.clone().add(MP[m].n)); mesh.frustumCulled = false; scene.add(mesh);
         return { m, mesh, mat, scale: 16, goal: 16, dim: 1, dimG: 1, lift: 0, liftG: 0, vid: -1, pos: MP[m].tile.clone(), anim: null }; });
       // 根: 映像の下から、その1本の熱へ
       const nC = N.ctx.length, rp = new Float32Array(nC * 6), rc = new Float32Array(nC * 6); rootA = new Float32Array(nC * 2).fill(0.35);
@@ -287,7 +298,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     }
     function reset() { setFat([]); wordOpG = 0; tiles.forEach((t) => { t.liftG = 0; t.goal = 16; t.dimG = 1; (t.mat.uniforms.uRim.value as THREE.Color).set("#f4f2ec"); t.mat.uniforms.uHi.value = 0; }); }
     function free() { if (mainTile >= 0) releaseMain(); reset(); paintFibers(() => 1); setNodes(() => [0.7, 1]); setRoots(() => 0.35); setPlaying([]); liveAt = 0;
-      camG.dist = portrait() ? 560 : 290; tgtG.set(0, 0, 0); setV({ k: "free" }); }
+      camG.dist = portrait() ? 470 : 235; tgtG.set(0, 0, 0); setV({ k: "free" }); }
     function releaseMain() { const t = tiles[mainTile]; if (t) { t.mat.uniforms.uUseVid.value = 0; t.mat.uniforms.uVid.value = new THREE.Texture(); } mainV.pause(); mainTile = -1; mainOk = false; scrub = null; }
     // 観る: その1本に寄り、元の映像を音つきで流す
     function watch(m: number, then?: () => void) {
@@ -327,7 +338,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     async function nameGroup(body: object) { try { const r = await fetch("/api/ctx/digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json(); if (j?.name) hooks.current.name?.(j.name); } catch { /* 名前なしでも進める */ } }
     // 熱狂を探す: 言葉が中心に生まれ、線が伸び、近しい熱が浮かぶ
     async function search(q: string) { if (!q.trim() || st.k === "gather") return; if (mainTile >= 0) releaseMain(); reset(); setPlaying([]);
-      paintFibers(() => 1); wordOpG = 1; camG.dist = portrait() ? 560 : 300; tgtG.set(0, 0, 0); setV({ k: "search", q });
+      paintFibers(() => 1); wordOpG = 1; camG.dist = portrait() ? 470 : 250; tgtG.set(0, 0, 0); setV({ k: "search", q });
       try { const r = await fetch("/api/ctx/digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q }) }); const j = await r.json();
         if (!alive || st.k !== "search" || st.q !== q) return; if (!j?.items?.length) { hooks.current.name?.("（この言葉では見つかりませんでした）"); setV({ k: "word", q, items: [] }); return; }
         showWord(q, j.items.map((x: { id: number; dim: number }) => ({ id: x.id, d: x.dim >= 0 ? x.dim : N.ctx[x.id].w.indexOf(Math.max(...N.ctx[x.id].w)) })), j.name || q);
@@ -343,7 +354,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     let backTo: View = { k: "free" };
     function gather() { if (st.k !== "heat" && st.k !== "word") return; backTo = st; const items = st.items, seedC = st.k === "heat" ? st.c : -1;
       const all: Item[] = seedC >= 0 ? [{ id: seedC, d: items[0]?.d ?? 0 }, ...items] : items; if (!all.length) return;
-      cam.updateMatrixWorld(); const fwd = cam.getWorldDirection(V()), right = V(1, 0, 0).applyQuaternion(cam.quaternion), up = V(0, 1, 0).applyQuaternion(cam.quaternion);
+      Object.assign(camG, cam0); tgtG.copy(tgtC); cam.updateMatrixWorld(); const fwd = cam.getWorldDirection(V()), right = V(1, 0, 0).applyQuaternion(cam.quaternion), up = V(0, 1, 0).applyQuaternion(cam.quaternion);
       const n = all.length, cols = portrait() ? 2 : Math.min(4, n), rows = Math.ceil(n / cols), D = 90, tn = Math.tan((cam.fov * Math.PI) / 360), visW = 2 * D * tn * cam.aspect, visH = 2 * D * tn;
       const S = Math.min((visW * 0.86) / cols / 1.08, (visH * 0.62) / rows / (9 / 16) / 1.12);
       const center = cam.position.clone().addScaledVector(fwd, D).addScaledVector(up, visH * 0.04);
@@ -368,14 +379,15 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       let e = pool[used]; if (!e) { e = document.createElement("div"); tx.appendChild(e); pool[used] = e; } used++;
       const key = cls + html; type M = HTMLDivElement & { _w: number; _h: number }; const em = e as M;
       if (e.dataset.h !== key) { e.dataset.h = key; e.className = `bw-t ${cls}`; e.innerHTML = html; em._w = e.offsetWidth; em._h = e.offsetHeight; }
-      e.dataset.v = o.data || "";
+      if (e.dataset.v !== (o.data || "")) e.dataset.v = o.data || "";
       prj.copy(p).project(cam); let vis = prj.z < 1 && Math.abs(prj.x) < 1.05 && Math.abs(prj.y) < 1.05;
       const W = em._w, H = em._h, x = (prj.x * 0.5 + 0.5) * innerWidth, y = (-prj.y * 0.5 + 0.5) * innerHeight;
       let bx = o.side === "c" ? x - W / 2 : x + 10, by = y - H / 2; bx = Math.max(10, Math.min(innerWidth - W - 10, bx));
       const hit = () => rects.some(([a, b, c, d]) => bx < a + c && bx + W > a && by < b + d && by + H > b);
       for (let t = 1; t <= 6 && vis && hit(); t++) by = y - H / 2 + (t % 2 ? 1 : -1) * Math.ceil(t / 2) * (H * 0.6 + 4);
       if (vis && hit() && (o.pri ?? 0) < 2) vis = false; if (vis) rects.push([bx, by, W, H]);
-      e.style.transform = `translate3d(${bx}px,${by}px,0)`; e.style.opacity = vis ? String(o.op ?? 1) : "0"; e.style.pointerEvents = vis && o.data ? "auto" : "none"; }
+      const tf = `translate3d(${Math.round(bx)}px,${Math.round(by)}px,0)`, op = vis ? String(Math.round((o.op ?? 1) * 50) / 50) : "0", pe = vis && o.data ? "auto" : "none";
+      if (e.style.transform !== tf) e.style.transform = tf; if (e.style.opacity !== op) e.style.opacity = op; if (e.style.pointerEvents !== pe) e.style.pointerEvents = pe; }
     const upV = () => V(0, 1, 0).applyQuaternion(cam.quaternion);
     function drawText() { used = 0; rects = [];
       if (st.k === "gather") { for (let k = 0; k < pool.length; k++) { pool[k].style.opacity = "0"; pool[k].style.pointerEvents = "none"; } return; }
@@ -391,8 +403,8 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     // ===== 操作: ドラッグで回す、ピンチ/ホイールで寄る、映像に触れると観る（浮かんだ映像なら、その熱の時刻へ）=====
     const ptrs = new Map<number, [number, number]>(); let down: null | { x: number; y: number; yaw: number; pitch: number; moved: boolean } = null, pinch0 = 0;
     const cv = R.domElement;
-    cv.addEventListener("pointerdown", (e) => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); idle = false; if (ptrs.size === 1) down = { x: e.clientX, y: e.clientY, yaw: camG.yaw, pitch: camG.pitch, moved: false }; if (ptrs.size === 2) { const [a, b] = Array.from(ptrs.values()); pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); down = null; } });
-    cv.addEventListener("pointermove", (e) => { if (!ptrs.has(e.pointerId)) { hover(e.clientX, e.clientY); return; } ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    cv.addEventListener("pointerdown", (e) => { lastInput = performance.now(); ptrs.set(e.pointerId, [e.clientX, e.clientY]); idle = false; if (ptrs.size === 1) down = { x: e.clientX, y: e.clientY, yaw: camG.yaw, pitch: camG.pitch, moved: false }; if (ptrs.size === 2) { const [a, b] = Array.from(ptrs.values()); pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); down = null; } });
+    cv.addEventListener("pointermove", (e) => { lastInput = performance.now(); par.x = (e.clientX / innerWidth - 0.5) * 2; par.y = (e.clientY / innerHeight - 0.5) * 2; if (!ptrs.has(e.pointerId)) { hover(e.clientX, e.clientY); return; } ptrs.set(e.pointerId, [e.clientX, e.clientY]);
       if (st.k === "gather") return;
       if (ptrs.size === 2) { const [a, b] = Array.from(ptrs.values()), d = Math.hypot(a[0] - b[0], a[1] - b[1]); camG.dist = Math.max(30, Math.min(620, camG.dist * pinch0 / d)); pinch0 = d; return; }
       if (down) { const dx = e.clientX - down.x, dy = e.clientY - down.y; if (Math.abs(dx) + Math.abs(dy) > 6) down.moved = true; camG.yaw = down.yaw - dx * 0.0055; camG.pitch = Math.max(-1.2, Math.min(1.2, down.pitch + dy * 0.0045)); } });
@@ -411,18 +423,20 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
 
     // ===== 毎フレーム =====
     let shellMat: THREE.ShaderMaterial | null = null, last = 0, raf = 0, ready = false, liveAt = 0, manual = false;
-    const resize = () => { const w = el.clientWidth || innerWidth, h = el.clientHeight || innerHeight; R.setSize(w, h, false); fatMat.resolution.set(w, h); cam.aspect = w / h; cam.fov = portrait() ? 56 : 42; cam.updateProjectionMatrix(); };
+    const resize = () => { const w = el.clientWidth || innerWidth, h = el.clientHeight || innerHeight; R.setSize(w, h, false); fatMat.resolution.set(w, h); cam.aspect = w / h; cam.fov = portrait() ? 60 : 50; cam.updateProjectionMatrix();
+      const fs = dpr >= 1.25 ? 0.5 : 0.7; fibRT.setSize(Math.max(4, Math.round(w * dpr * fs)), Math.max(4, Math.round(h * dpr * fs))); };
     function update(dt: number, draw = true) { now += dt;
-      if (!ready) { if (draw) R.render(scene, cam); return; }
+      if (!ready) { if (draw) render(); return; }
       intro = Math.min(1, intro + dt / (reduce ? 0.5 : 3.2)); const ie = 1 - Math.pow(1 - intro, 3);
       fiberMat.uniforms.uIntro.value = ie; intros.forEach((u) => (u.value = ie)); if (shellMat) shellMat.uniforms.uOp.value = ie;
       mixT = Math.min(1, mixT + dt / 0.6); fiberMat.uniforms.uMix.value = mixT * mixT * (3 - 2 * mixT); fiberMat.uniforms.uSweep.value = (now - sweepT) / 1.2;
-      if (idle && !reduce && st.k === "free") camG.yaw += dt * 0.045;
-      const k = 1 - Math.exp(-dt / 0.55);
+      if (idle && !reduce && st.k === "free") { camG.yaw += dt * 0.05; camG.pitch = 0.2 + Math.sin(now * 0.11) * 0.22; }
+      const k = 1 - Math.exp(-dt / (intro < 1 ? 1.1 : 0.55)), kp = st.k === "gather" ? 0 : 1 - Math.exp(-dt / 0.9); parC.x += (par.x - parC.x) * kp; parC.y += (par.y - parC.y) * kp;
       cam0.yaw += (camG.yaw - cam0.yaw) * k; cam0.pitch += (camG.pitch - cam0.pitch) * k; cam0.dist += (camG.dist - cam0.dist) * k; tgtC.lerp(tgtG, k);
-      cam.position.set(Math.sin(cam0.yaw) * Math.cos(cam0.pitch), Math.sin(cam0.pitch), Math.cos(cam0.yaw) * Math.cos(cam0.pitch)).multiplyScalar(cam0.dist).add(tgtC); cam.up.set(0, 1, 0); cam.lookAt(tgtC);
+      { const pw = st.k === "watch" || st.k === "scrub" ? 0.03 : 0.1, yw = cam0.yaw - parC.x * pw, pt = Math.max(-1.3, Math.min(1.3, cam0.pitch + parC.y * pw * 0.6));
+        cam.position.set(Math.sin(yw) * Math.cos(pt), Math.sin(pt), Math.cos(yw) * Math.cos(pt)).multiplyScalar(cam0.dist).add(tgtC); } cam.up.set(0, 1, 0); cam.lookAt(tgtC);
       { const w = R.domElement.width / R.getPixelRatio(), h = R.domElement.height / R.getPixelRatio(), pr = portrait();
-        const ox = pr ? 0 : st.k === "free" || st.k === "search" ? -0.1 : 0, oy = st.k === "free" || st.k === "search" ? (pr ? -0.05 : 0) : st.k === "gather" ? 0 : pr ? 0.2 : 0.11;
+        const ox = pr ? 0 : st.k === "free" || st.k === "search" ? -0.13 : 0, oy = st.k === "free" || st.k === "search" ? (pr ? -0.05 : 0) : st.k === "gather" ? 0 : pr ? 0.2 : 0.11;
         view.x += (ox - view.x) * k; view.y += (oy - view.y) * k; cam.setViewOffset(w, h, view.x * w, view.y * h, w, h); }
       fiberMat.uniforms.uNear.value = cam.position.length(); fiberMat.uniforms.uDen.value = Math.max(0.45, Math.min(1.2, Math.sqrt((Math.min(innerWidth, innerHeight * 1.8) / 1280) * (290 / Math.max(60, cam.position.distanceTo(tgtC))))));
       if (fat) (fat.geometry as LineSegmentsGeometry).instanceCount = Math.min(fatN, Math.ceil(fatN * Math.min(1, (now - fatT0) / fatDur)));
@@ -442,9 +456,9 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
         if (t.anim) { const a = t.anim, pr = Math.min(1, Math.max(0, (now - a.t0) / a.dur)), e = pr < 0.5 ? 4 * pr * pr * pr : 1 - Math.pow(-2 * pr + 2, 3) / 2, i = e * (a.pts.length - 1), i0 = Math.floor(i);
           t.mesh.position.copy(a.pts[i0]).lerp(a.pts[Math.min(a.pts.length - 1, i0 + 1)], i - i0); t.scale += (a.to - t.scale) * Math.min(1, dt * (pr > 0 ? 3 : 0)); if (a.back && pr >= 1) t.anim = null; }
         else { t.scale += (t.goal - t.scale) * k; const home = MP[t.m].tile; t.mesh.position.copy(home).addScaledVector(MP[t.m].n, t.lift * 8).lerp(cp, t.lift * (portrait() ? 0.32 : 0.42)); }
-        u.uS.value = t.scale; u.uDim.value = t.dim;
+        u.uS.value = t.scale; u.uDim.value = t.dim; u.uBill.value += ((t.anim || t.lift > 0.3 || t.m === mainTile ? 1 : 0) - u.uBill.value) * Math.min(1, dt * 3);
         const face = t.anim ? 1 : MP[t.m].n.dot(tmp.copy(cp).sub(t.mesh.position).normalize()); u.uFace.value = Math.max(0, Math.min(1, face * 1.6 + 0.4));
-        u.uOp.value = Math.min(1, ie * 1.4) * (t.anim || t.lift > 0.5 || t.m === mainTile ? 1 : face < 0.05 ? 0.22 : 0.4 + 0.6 * Math.min(1, face * 2 + 0.3));
+        u.uOp.value = Math.min(1, ie * 1.4) * (t.anim || t.lift > 0.5 || t.m === mainTile ? 1 : face < 0.05 ? 0.35 : 0.45 + 0.55 * Math.min(1, face * 1.6 + 0.2));
         if (t.m !== mainTile && !(st.k === "heat" || st.k === "word")) u.uHi.value = hoverM === t.m ? 1 : 0;
         const isMain = t.m === mainTile, vOn = isMain ? (mainOk ? 1 : 0) : t.vid >= 0 && slots[t.vid].tile === t.m && slots[t.vid].v.readyState >= 2 ? 1 : 0; u.uUseVid.value += (vOn - u.uUseVid.value) * Math.min(1, dt * 4);
         u.uGl.value = isMain ? glitch : 0; u.uFl.value = isMain ? flash : 0; u.uT.value = now;
@@ -453,10 +467,11 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
         setPlaying(cand.map(({ t }) => ({ tile: t.m, src: clipOf(N.moments[t.m].ctx[0]) }))); }
       if ((st.k === "heat" || st.k === "word") && intro > 0.5) stems(st.items); else stemGeo.setDrawRange(0, 0);
       drawText();
-      if (draw) R.render(scene, cam); }
+      if (draw) render(); }
+    function render() { R.setRenderTarget(fibRT); R.setClearColor(0x000000, 0); R.clear(); R.render(fibScene, cam); R.setRenderTarget(null); R.setClearColor(0x020306, 1); R.render(scene, cam); }
     // 重い端末では解像度を自動で下げる（直近 90 フレームの平均が 40fps を割ったら 0.25 ずつ、0.75 まで）
-    let fa = 0, fn = 0;
-    const loop = (t: number) => { raf = requestAnimationFrame(loop); const dt = Math.min(0.1, Math.max(0, (t - (last || t)) / 1000)); last = t; if (manual) return; update(dt);
+    let fa = 0, fn = 0, odd = false, lastInput = 0, skip = 0;
+    const loop = (t: number) => { raf = requestAnimationFrame(loop); const dt = Math.min(0.1, Math.max(0, (t - (last || t)) / 1000)); last = t; if (manual) return; odd = !odd; const lazy = st.k === "free" && performance.now() - lastInput > 2500 && intro >= 1; if (lazy && odd) { skip += dt; return; } update(dt + skip); skip = 0;
       if (ready && intro >= 1 && !document.hidden) { fa += dt; fn++; if (fn >= 90) { if (fa / fn > 1 / 40 && dpr > 0.75) { dpr = Math.max(0.75, dpr - 0.25); R.setPixelRatio(dpr); resize(); } fa = 0; fn = 0; } } };
     // 見えていないときは映像を止める
     const vis = () => { if (document.hidden) { slots.forEach((x) => x.v.pause()); mainV.pause(); } else { slots.forEach((x) => { if (x.tile >= 0) x.v.play().catch(() => {}); }); if (mainTile >= 0 && !scrub) mainV.play().catch(() => {}); } };
@@ -470,7 +485,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       const loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
       const atl = Array.from({ length: Math.ceil(N.ctx.length / 256) }, (_, s) => { const t = loader.load(`${BASE}/ctx/atlas${s}.jpg`); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; });
       buildCortex(atl); buildFibersSync();
-      setNet(N); ready = true; cam0.dist = portrait() ? 760 : 520; camG.dist = portrait() ? 560 : 290;
+      setNet(N); ready = true; cam0.dist = portrait() ? 1100 : 820; cam0.yaw = camG.yaw - 1.5; cam0.pitch = 0.95; camG.dist = portrait() ? 470 : 235;
       // シェアされたリンク: ダイジェストを流し、閉じるとそのグループの前に着地する
       if (shared?.i?.length) { const s = shared.s ?? -1, js = shared.i.filter((x) => x !== s); const items: Item[] = s >= 0 ? ids2items(s, js) : shared.i.map((id) => ({ id, d: N.ctx[id].w.indexOf(Math.max(...N.ctx[id].w)) }));
         backTo = s >= 0 ? { k: "heat", m: momOf[s], c: s, items } : { k: "word", q: shared.q || "", items };
@@ -483,8 +498,8 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       // 計測用: 種類ごとに隠して1フレームの描画時間を比べる
       gpu: (hide: string[], n = 10) => { const kinds: Record<string, THREE.Object3D[]> = { fibers: [], tiles: tiles.map((t) => t.mesh), shell: [], points: [], roots: [] };
         scene.children.forEach((o) => { if (o instanceof THREE.LineSegments && (o as THREE.LineSegments).geometry === fiberGeo) kinds.fibers.push(o); else if (o instanceof THREE.Mesh && !(tiles.some((t) => t.mesh === o))) kinds.shell.push(o); else if (o instanceof THREE.Points) kinds.points.push(o); else if (o instanceof THREE.LineSegments) kinds.roots.push(o); });
-        hide.forEach((k) => kinds[k]?.forEach((o) => (o.visible = false))); const gl = R.getContext(); R.render(scene, cam); gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) R.render(scene, cam); gl.finish(); const ms = (performance.now() - t0) / n;
-        hide.forEach((k) => kinds[k]?.forEach((o) => (o.visible = true))); return ms; } };
+        fibScene.children.forEach((o) => { if (hide.includes("fibers")) o.visible = false; }); hide.forEach((k) => kinds[k]?.forEach((o) => (o.visible = false))); const gl = R.getContext(), px = new Uint8Array(4), sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); render(); sync(); const t0 = performance.now(); for (let i = 0; i < n; i++) { render(); sync(); } const ms = (performance.now() - t0) / n;
+        fibScene.children.forEach((o) => (o.visible = true)); hide.forEach((k) => kinds[k]?.forEach((o) => (o.visible = true))); return ms; } };
     return () => { alive = false; cancelAnimationFrame(raf); removeEventListener("resize", resize); document.removeEventListener("visibilitychange", vis); slots.forEach((s) => { s.v.pause(); s.v.src = ""; }); mainV.pause(); mainV.src = ""; R.dispose(); el.removeChild(R.domElement); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -594,16 +609,16 @@ const CSS = `
 .bw-mark{font-size:11px;font-weight:900;letter-spacing:.32em;white-space:nowrap}.bw-mark em{font-style:normal;color:#f7ff3c}
 .bw-stat{display:flex;gap:16px;font-size:10px;letter-spacing:.1em;color:rgba(244,242,236,.55);margin-left:auto}
 .bw-stat b{font-size:14px;color:#f4f2ec;font-weight:900;margin-right:3px;font-variant-numeric:tabular-nums}
-.bw-close{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid rgba(244,242,236,.22);background:rgba(2,3,6,.5);color:#f4f2ec;font-size:17px;cursor:pointer;backdrop-filter:blur(8px)}
+.bw-close{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid rgba(244,242,236,.22);background:rgba(2,3,6,.85);color:#f4f2ec;font-size:17px;cursor:pointer}
 .bw-intro{position:absolute;left:max(24px,4vw);top:calc(env(safe-area-inset-top,0px) + 76px);z-index:6;width:min(460px,calc(100% - 48px));animation:bwf 1s .6s ease both}
 .bw-intro .l{margin:0 0 16px;font-size:clamp(22px,2.1vw,29px);white-space:nowrap;font-weight:900;line-height:1.4;letter-spacing:.04em;text-shadow:0 2px 20px rgba(0,0,0,.8)}
-.bw-q{display:flex;gap:0;background:rgba(6,8,13,.66);border:1px solid rgba(244,242,236,.2);border-radius:999px;padding:5px;backdrop-filter:blur(10px)}
+.bw-q{display:flex;gap:0;background:rgba(8,10,16,.92);border:1px solid rgba(244,242,236,.2);border-radius:999px;padding:5px}
 .bw-q input{flex:1;min-width:0;font-family:inherit;font-size:15px;font-weight:700;color:#f4f2ec;background:transparent;border:0;outline:0;padding:9px 14px}
 .bw-q input::placeholder{color:rgba(244,242,236,.38)}
 .bw-q button{flex:none;font-family:inherit;font-size:13px;font-weight:900;color:#0a0a0a;background:#f7ff3c;border:0;border-radius:999px;padding:10px 16px;cursor:pointer}
-.bw-q button:disabled{opacity:.35;cursor:default}
+.bw-q button:disabled{opacity:.6;cursor:default}
 @keyframes bwf{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.bw-watch{position:absolute;left:0;right:0;margin:0 auto;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:6;width:min(860px,calc(100% - 32px));background:linear-gradient(180deg,rgba(8,10,16,.72),rgba(4,5,9,.86));border:1px solid rgba(244,242,236,.1);border-radius:18px;padding:14px 18px 14px;backdrop-filter:blur(14px);animation:bwf .45s ease both}
+.bw-watch{position:absolute;left:0;right:0;margin:0 auto;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:6;width:min(860px,calc(100% - 32px));background:linear-gradient(180deg,rgba(9,11,17,.94),rgba(5,6,10,.96));border:1px solid rgba(244,242,236,.1);border-radius:18px;padding:14px 18px 14px;animation:bwf .45s ease both}
 .bw-watch .who{display:flex;align-items:baseline;gap:10px;min-width:0}.bw-watch .who b{font-size:10px;font-weight:900;letter-spacing:.2em;color:#f7ff3c;white-space:nowrap}.bw-watch .who span{font-size:15px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bw-watch .tl{display:flex;align-items:center;gap:10px;margin-top:10px}.bw-watch .tm{font-size:10px;color:rgba(244,242,236,.55);font-variant-numeric:tabular-nums;width:30px}
 .bw-watch .bar{position:relative;flex:1;height:3px;border-radius:3px;background:rgba(244,242,236,.15);cursor:pointer}
