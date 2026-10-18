@@ -60,6 +60,7 @@ function scan(seed: Seed) {
   }
   return out.sort((a, b) => b.s - a.s);
 }
+const BAD_NAME = /(物語|軌跡|熱狂|瞬間|記憶|戦い|ドラマ)$|熱き/;
 const ITEM = { type: "OBJECT", properties: { id: { type: "INTEGER" }, line: { type: "STRING" } }, required: ["id", "line"] };
 
 export async function POST(req: Request) {
@@ -99,12 +100,13 @@ ok=false は差別・暴力・性的などの不適切な言葉と、意味を�
     const r = (await ask(`観る人が「${seed.label}」（${seed.line}）という熱狂の文脈を選び、100の瞬間からこの熱と響き合う瞬間を集めました。これを1本のダイジェストに編みます。
 ${body.ids?.length ? "- 並びは与えられた順のまま。" : "- 候補から、この熱と本当に響き合うものを6〜8個選び、観て胸が熱くなる順（静かに始まり、最後に一番熱いもの）に並べる。違う競技を混ぜる。"}
 - 各瞬間に、選んだ熱の側から見た一文（18〜32字）。候補の「」の名前をそのまま書かない（名前と違う言い方で、その瞬間の事実とこの熱がどう響くかを書く）。「〜も同じ」のような比較の言い方はしない。
-- ダイジェストに名前（5〜12字）。この熱とこの組にしか当てはまらない言い方。総称（感動・歓喜・ドラマ・執念・熱い瞬間）だけ・英語・比喩の飾りは不可。「熱狂」「瞬間」「物語」で終わる名前も不可（例: 良い「背中で泣く男たち」「家族が見ていた一打」、悪い「父がくれた熱狂」）。`,
+- ダイジェストに名前（5〜12字）。スポーツ紙の見出しや、ファンが口にする言い方で。この熱とこの組にしか当てはまらない言い方。総称（感動・歓喜・ドラマ・執念・熱い瞬間）だけ・英語・比喩の飾りは不可。「熱狂」「瞬間」「物語」「軌跡」「記憶」「戦い」「ドラマ」で終わる名前、「〜の熱き〜」のような飾った言い方も不可（例: 良い「背中で泣く男たち」「家族が見ていた一打」「負けて泣いた夜」、悪い「父がくれた熱狂」「敗者の熱き涙の物語」「格下が見せた熱狂の軌跡」）。`,
       (body.ids?.length ? picked : cand).map(desc).join("\n"),
       { type: "OBJECT", properties: { name: { type: "STRING" }, items: { type: "ARRAY", items: ITEM } }, required: ["name", "items"] })) as { name?: string; items?: { id: number; line: string }[] };
     if (!body.ids?.length) { const ok = new Map(cand.map((x) => [x.id, x])); const sel = (r.items || []).filter((x) => ok.has(x.id)).slice(0, 8); if (sel.length >= 4) picked = sel.map((x) => ok.get(x.id)!); }
     lines = Object.fromEntries((r.items || []).map((x) => [x.id, x.line]));
-    if (r.name && r.name.length <= 16) name = r.name;
+    if (r.name && r.name.length <= 16 && !BAD_NAME.test(r.name)) name = r.name;
+    else if (r.name) { const r2 = (await ask("スポーツのダイジェストの名前を、スポーツ紙の見出しのような5〜12字の言い方に直します。「物語」「軌跡」「熱狂」「瞬間」「記憶」「戦い」「ドラマ」で終わらない、飾らない言い方で。", `名前: 「${r.name}」 熱: 「${seed.label}」`, { type: "OBJECT", properties: { name: { type: "STRING" } }, required: ["name"] }).catch(() => ({}))) as { name?: string }; if (r2.name && r2.name.length <= 16 && !BAD_NAME.test(r2.name)) name = r2.name; }
   } catch { /* 名前と一文が無くても並びは返す */ }
   const out = { name, seedTitle: seed.label, seedLine: seed.line, items: picked.map((x) => ({ id: x.id, line: lines[x.id] || N.ctx[x.id].line, dim: x.dim, s: +x.s.toFixed(3) })),
     scanned: N.ctx.length, resonated, ms: Date.now() - t0 };

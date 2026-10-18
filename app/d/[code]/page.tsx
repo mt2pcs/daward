@@ -19,8 +19,8 @@ export function generateMetadata({ params }: { params: { code: string } }): Meta
   return { metadataBase, title, description: desc, openGraph: { title, description: desc, images: [`/d/${params.code}/og`] }, twitter: { card: "summary_large_image", title, description: desc, images: [`/d/${params.code}/og`] } };
 }
 export default function SharedDigest({ params, searchParams }: { params: { code: string }; searchParams: { v?: string } }) {
-  const list = (Array.isArray(moments) ? moments : Object.values(moments)) as { no: string; clips?: { webm?: string; loop?: string }[] }[];
-  const media = Object.fromEntries(list.map((m) => [m.no, { webm: m.clips?.[0]?.webm, loop: m.clips?.[0]?.loop }]));
+  const list = (Array.isArray(moments) ? moments : Object.values(moments)) as { no: string; clips?: { webm?: string; loop?: string; detail?: string }[] }[];
+  const media = Object.fromEntries(list.map((m) => [m.no, { webm: m.clips?.[0]?.webm, loop: m.clips?.[0]?.loop, detail: m.clips?.[0]?.detail }]));
   // ?v=brain は熱狂の脳から編んだダイジェスト
   if (searchParams.v === "brain") return <BrainWorld media={media} shared={decode(params.code) || undefined} />;
   return <HeatViewer media={media} shared={decode(params.code) || undefined} />;
