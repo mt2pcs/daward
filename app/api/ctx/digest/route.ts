@@ -94,7 +94,7 @@ ok=false は差別・暴力・性的などの不適切な言葉と、意味を�
   const seen = new Set<string>(), cand: typeof all = [];
   for (const x of all) { const no = N.ctx[x.id].no; if (seen.has(no)) continue; seen.add(no); cand.push(x); if (cand.length >= 20) break; }
   let picked = body.ids?.length ? body.ids.filter((id) => N.ctx[id]).map((id) => all.find((x) => x.id === id) || { id, s: 0, dim: -1 }) : cand.slice(0, 8);
-  let name = seed.label, lines: Record<number, string> = {};
+  let name = seed.label, lines: Record<number, string> = {}, named = false;
   const desc = (x: { id: number }) => { const c = N.ctx[x.id]; return `[${c.id}] ${sportOf[c.no]}｜${titleOf[c.no]}｜「${c.title}」${c.line}`; };
   try {
     const r = (await ask(`観る人が「${seed.label}」（${seed.line}）という熱狂の文脈を選び、100の瞬間からこの熱と響き合う瞬間を集めました。これを1本のダイジェストに編みます。
@@ -105,10 +105,10 @@ ${body.ids?.length ? "- 並びは与えられた順のまま。" : "- 候補か�
       { type: "OBJECT", properties: { name: { type: "STRING" }, items: { type: "ARRAY", items: ITEM } }, required: ["name", "items"] })) as { name?: string; items?: { id: number; line: string }[] };
     if (!body.ids?.length) { const ok = new Map(cand.map((x) => [x.id, x])); const sel = (r.items || []).filter((x) => ok.has(x.id)).slice(0, 8); if (sel.length >= 4) picked = sel.map((x) => ok.get(x.id)!); }
     lines = Object.fromEntries((r.items || []).map((x) => [x.id, x.line]));
-    if (r.name && r.name.length <= 16 && !BAD_NAME.test(r.name)) name = r.name;
-    else if (r.name) { const r2 = (await ask("スポーツのダイジェストの名前を、スポーツ紙の見出しのような5〜12字の言い方に直します。「物語」「軌跡」「熱狂」「瞬間」「記憶」「戦い」「ドラマ」で終わらない、飾らない言い方で。", `名前: 「${r.name}」 熱: 「${seed.label}」`, { type: "OBJECT", properties: { name: { type: "STRING" } }, required: ["name"] }).catch(() => ({}))) as { name?: string }; if (r2.name && r2.name.length <= 16 && !BAD_NAME.test(r2.name)) name = r2.name; }
+    if (r.name && r.name.length <= 16 && !BAD_NAME.test(r.name)) { name = r.name; named = true; }
+    else if (r.name) { const r2 = (await ask("スポーツのダイジェストの名前を、スポーツ紙の見出しのような5〜12字の言い方に直します。「物語」「軌跡」「熱狂」「瞬間」「記憶」「戦い」「ドラマ」で終わらない、飾らない言い方で。", `名前: 「${r.name}」 熱: 「${seed.label}」`, { type: "OBJECT", properties: { name: { type: "STRING" } }, required: ["name"] }).catch(() => ({}))) as { name?: string }; if (r2.name && r2.name.length <= 16 && !BAD_NAME.test(r2.name)) { name = r2.name; named = true; } }
   } catch { /* 名前と一文が無くても並びは返す */ }
   const out = { name, seedTitle: seed.label, seedLine: seed.line, items: picked.map((x) => ({ id: x.id, line: lines[x.id] || N.ctx[x.id].line, dim: x.dim, s: +x.s.toFixed(3) })),
     scanned: N.ctx.length, resonated, ms: Date.now() - t0 };
-  cache.set(key, out); return NextResponse.json(out);
+  if (named) cache.set(key, out); return NextResponse.json(out);
 }
