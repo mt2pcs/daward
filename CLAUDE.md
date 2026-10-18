@@ -85,7 +85,10 @@ Next.js 14（App Router, TS）。本番は Cloud Run `e-mooments-burst`（`/`＝
 
 - ユーザー指示「素材を使わずUIモックだけ作ればいい」「内容はさておき理想的なUIUXのモック。焼き直しを見せるな」。方向 A（映画のカメラ／ピント送り）に決定（ユーザー「aでいいんじゃないの」）。
 - 最初の数十秒だけ: 奥行きに浮かぶ瞬間をスワイプ／奥の板をタップでピント送り→▶観る（画面いっぱい・再生の目盛り）→「なぜ熱い？」で映像が熱の数の帯に割れ、帯がそれぞれの熱の場面に開いて奥へ並ぶ（目盛りに熱の時刻の印）→スワイプで熱から熱へピント送り。
-  `docs/design/mock/focus_template.html`、組み立て `node scripts/lab/build_focus.mjs <out.html>`（net.json から）、検証 `scripts/lab/focus_flow.mjs W H tag`・割れ方の連続撮影 `focus_burst.mjs`（`__f.manual/adv` で時間を止めて進める）。判定待ち。
+  `docs/design/mock/focus_template.html`、組み立て `node scripts/lab/build_focus.mjs <out.html>`（net.json から）、検証 `scripts/lab/focus_flow.mjs W H tag`・割れ方の連続撮影 `focus_burst.mjs`（`__f.manual/adv` で時間を止めて進める）。
+- **判定（2026-10-19）「全然だめ、むしろ悪化。ただの紙芝居とリコメンド。何一つワクワクしないし新しさも感じない」**。
+  原因（自分の分析）: 作ったのは「1本ずつめくる→観る→その1本の熱を1枚ずつめくる」＝どの動画アプリにもある部分だけで、カメラ演出はその皮。
+  新しい部分（選んだ熱で100本が組み替わり、競技をまたいだ瞬間が1本の映像に編まれる）を「最初の数十秒」と区切って丸ごと落とした＝圧縮の型の再発。次のモックは新しい部分から作る。
 
 ## 体験の合意（2026-10-15〜16、ユーザーと対話で確定）
 
