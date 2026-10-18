@@ -1,0 +1,175 @@
+<meta charset="utf-8">
+<title>熱の組織</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
+<style>
+/* 熱の組織（UIモック）。77本のハイライトから取り出した 402 の熱が、それぞれ1つの細胞として空間に浮かぶ。
+   細胞の枝＝その熱を8つの見方に分解したもの（向き＝見方の種類、長さ＝その見方の強さ、枝先＝その熱だけの言い方）。
+   繋がり＝2つの熱が同じ見方で響き合うこと。線維は両方の細胞の「同じ見方の枝先」どうしを結ぶ（7,564本すべて実データ）。
+   位置は意味の近さ（埋め込みの配置）。映像は入れていない */
+:root{--ink:#04050a;--paper:#f4f2ec;--dim:rgba(244,242,236,.6);--faint:rgba(244,242,236,.32);--hot:#f7ff3c;
+  --display:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;color-scheme:dark}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--display);overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none;-webkit-font-smoothing:antialiased}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+.vig{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(120% 90% at 50% 50%,transparent 55%,rgba(0,0,0,.6))}
+.bar{position:fixed;left:0;right:0;top:0;z-index:10;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:calc(env(safe-area-inset-top,0px) + 16px) max(18px,env(safe-area-inset-right,0px)) 0 max(18px,env(safe-area-inset-left,0px));pointer-events:none}
+.bar>*{pointer-events:auto}
+.mark{font-weight:900;font-size:11px;letter-spacing:.32em;white-space:nowrap;line-height:40px}.mark em{font-style:normal;color:var(--hot)}
+.count{font-size:10px;letter-spacing:.14em;color:var(--dim);font-variant-numeric:tabular-nums;text-align:right;line-height:1.9}.count b{color:var(--paper)}
+.close{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid rgba(244,242,236,.22);background:rgba(4,5,10,.45);color:var(--paper);font-size:18px;cursor:pointer;backdrop-filter:blur(8px)}
+/* 空間の中の文字（3D の位置を画面へ写す。奥ほど小さく薄い） */
+.t{position:fixed;left:0;top:0;z-index:4;pointer-events:none;white-space:nowrap;transform-origin:0 0;will-change:transform,opacity;transition:opacity .25s}
+.t.core .a{font-size:10px;font-weight:900;letter-spacing:.18em;color:var(--hot)}
+.t.core .b{font-size:22px;font-weight:900;letter-spacing:.01em;text-shadow:0 1px 14px rgba(0,0,0,.9)}
+.t.core .c{font-size:11px;color:var(--dim);margin-top:2px}
+.t.tip{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;text-shadow:0 1px 10px rgba(0,0,0,.95)}
+.t.tip i{width:7px;height:7px;border-radius:50%;flex:none}
+.t.tip.go{pointer-events:auto;cursor:pointer;padding:6px 10px;margin:-6px -10px;border-radius:999px}
+.t.tip.sel{background:rgba(244,242,236,.92);color:#0a0a0a;text-shadow:none}
+.t.peer .a{font-size:9px;font-weight:900;letter-spacing:.16em;color:var(--hot)}
+.t.peer .b{font-size:13px;font-weight:700;display:flex;gap:6px;align-items:center;text-shadow:0 1px 10px rgba(0,0,0,.95)}.t.peer .b i{width:6px;height:6px;border-radius:50%}
+.t.peer .c{font-size:10px;color:var(--dim)}
+.t.peer{pointer-events:auto;cursor:pointer}
+.hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 22px);z-index:6;text-align:center;font-size:12px;letter-spacing:.08em;line-height:1.8;color:var(--dim);pointer-events:none;padding:0 20px}
+.hint b{color:var(--paper);font-weight:700}
+.fade{animation:fade .5s ease both}@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+@media (max-width:600px){.t.core .b{font-size:19px}.t.tip{font-size:14px}.t.peer .b{font-size:14px}.t.peer .a{font-size:10px}.t.peer .c{display:none}.hint{font-size:11px}}
+</style>
+<canvas id="gl"></canvas>
+<div class="vig"></div>
+<div id="tx"></div>
+<div class="bar"><div class="mark">DAZN <em>100</em> MOMENTS</div><div class="count" id="count"></div><button class="close" id="close" aria-label="戻る" hidden>←</button></div>
+<div class="hint" id="hint"></div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { LineSegments2 } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/lines/LineSegmentsGeometry.js";
+import { LineMaterial } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/lines/LineMaterial.js";
+const D = __DATA__; // s=[競技] c=[熱の名, 競技番号, 瞬間の題, 位置, 重み(8), 言い方(8)] L=[[a, b, 強さ, 見方]]
+const V = (x, y, z) => new THREE.Vector3(x, y, z), reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const NC = D.c.length, NL = D.L.length;
+// 8つの見方: 空間の8方向（立方体の角）と色。見方の名前は画面に出さない（出るのは各熱の言い方だけ）
+const DIR = [[1, 1, 1], [-1, 1, -1], [1, -1, -1], [-1, -1, 1], [1, 1, -1], [-1, 1, 1], [1, -1, 1], [-1, -1, -1]].map(([x, y, z]) => V(x, y, z).normalize());
+const COL = ["#ff6a3d", "#ffd23f", "#ff4f9a", "#e8e4d8", "#3fc8ff", "#b892ff", "#5be39b", "#ff9f1c"].map((h) => new THREE.Color(h));
+const HEX = ["#ff6a3d", "#ffd23f", "#ff4f9a", "#e8e4d8", "#3fc8ff", "#b892ff", "#5be39b", "#ff9f1c"];
+const cv = document.getElementById("gl"), R = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.setClearColor(0x04050a, 1);
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(46, 1, 0.5, 2000); scene.fog = new THREE.FogExp2(0x04050a, 0.0042);
+const portrait = () => innerHeight > innerWidth;
+// ---- 細胞（熱）: 中心と、見方ごとの枝 ----
+const P = D.c.map((c) => V(c[3][0], c[3][1], c[3][2]));
+// 枝の向きは見方ごとにそろえ、熱ごとに少しだけ揺らす（格子に見えないように）
+const jit = (i, d) => { const h = (x) => { const s = Math.sin(x) * 43758.5453; return s - Math.floor(s) - .5; }; return V(h(i * 12.9 + d * 7.1), h(i * 78.2 + d * 3.7), h(i * 37.7 + d * 9.3)).multiplyScalar(.7); };
+const tip = (i, d) => P[i].clone().addScaledVector(DIR[d].clone().add(jit(i, d)).normalize(), 3.5 + D.c[i][4][d] * 10);
+const coreGeo = new THREE.BufferGeometry(), coreA = new Float32Array(NC), coreS = new Float32Array(NC);
+coreGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(P.flatMap((p) => [p.x, p.y, p.z])), 3)); coreGeo.setAttribute("a", new THREE.BufferAttribute(coreA, 1)); const coreCol = new Float32Array(NC * 3); coreGeo.setAttribute("col", new THREE.BufferAttribute(coreCol, 3)); coreGeo.setAttribute("sz", new THREE.BufferAttribute(coreS, 1));
+D.c.forEach((c, i) => { const dm = c[4].indexOf(Math.max(...c[4])), cc = COL[dm].clone().lerp(new THREE.Color("#fff6ea"), .45); coreCol.set([cc.r, cc.g, cc.b], i * 3); coreA[i] = .8; coreS[i] = 1.3 + c[4].reduce((s, w) => s + w, 0) * .3; });
+const PT_V = `attribute float a; attribute float sz; attribute vec3 col; uniform float uPx; varying float vA; varying vec3 vC; void main(){ vC = col; vec4 mv = modelViewMatrix * vec4(position,1.); gl_PointSize = uPx * sz * 260. / -mv.z; vA = a * smoothstep(420., 60., -mv.z); gl_Position = projectionMatrix * mv; }`;
+const PT_F = `precision highp float; varying float vA; varying vec3 vC; void main(){ float r = length(gl_PointCoord-.5)*2.; float k = exp(-r*r*5.)*.9 + smoothstep(.32,.22,r)*.6; gl_FragColor = vec4(vC*k*vA, k*vA); }`;
+const cores = new THREE.Points(coreGeo, new THREE.ShaderMaterial({ vertexShader: PT_V, fragmentShader: PT_F, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uPx: { value: R.getPixelRatio() }, uC: { value: new THREE.Color("#fff3e0") } } }));
+scene.add(cores);
+// 線（枝と線維）: 頂点ごとの色と明るさ。明るさは状態で書き換える
+const LN_V = `attribute vec3 col; attribute float a; varying vec3 vC; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); vC = col; vA = a * smoothstep(440., 50., -mv.z); gl_Position = projectionMatrix * mv; }`;
+const LN_F = `precision highp float; varying vec3 vC; varying float vA; void main(){ gl_FragColor = vec4(vC*vA, vA); }`;
+function lines(pos, col, a) { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("col", new THREE.BufferAttribute(col, 3)); g.setAttribute("a", new THREE.BufferAttribute(a, 1));
+  const m = new THREE.LineSegments(g, new THREE.ShaderMaterial({ vertexShader: LN_V, fragmentShader: LN_F, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); scene.add(m); return m; }
+// 枝: 中心 → 枝先（太さの代わりに、根元から枝先へ細かく区切って明るさを落とす）
+const brIdx = []; D.c.forEach((c, i) => c[4].forEach((w, d) => { if (w > 0) brIdx.push([i, d]); }));
+const BS = 4, brPos = new Float32Array(brIdx.length * BS * 6), brCol = new Float32Array(brIdx.length * BS * 6), brA = new Float32Array(brIdx.length * BS * 2), brBase = new Float32Array(brIdx.length * BS * 2);
+brIdx.forEach(([i, d], n) => { const a = P[i], b = tip(i, d); for (let k = 0; k < BS; k++) { const p0 = a.clone().lerp(b, k / BS), p1 = a.clone().lerp(b, (k + 1) / BS), o = (n * BS + k) * 6;
+  brPos.set([p0.x, p0.y, p0.z, p1.x, p1.y, p1.z], o); brCol.set([COL[d].r, COL[d].g, COL[d].b, COL[d].r, COL[d].g, COL[d].b], o); const f0 = .55 * (1 - k / BS * .5), f1 = .55 * (1 - (k + 1) / BS * .5); brBase[(n * BS + k) * 2] = f0; brBase[(n * BS + k) * 2 + 1] = f1; } });
+brA.set(brBase); const branches = lines(brPos, brCol, brA);
+// 線維: 同じ見方の枝先どうしを、その見方の方向へふくらむ弧で結ぶ（見方ごとに弧の向きがそろう＝響き合いの種類が空間の向きになる）
+const FS = 8, fbPos = new Float32Array(NL * FS * 6), fbCol = new Float32Array(NL * FS * 6), fbA = new Float32Array(NL * FS * 2), fbBase = new Float32Array(NL * FS * 2);
+const curve = (l) => { const [a, b, , d] = l, A = tip(a, d), B = tip(b, d), M = A.clone().add(B).multiplyScalar(.5).addScaledVector(DIR[d], A.distanceTo(B) * .22); return (t) => { const u = 1 - t; return A.clone().multiplyScalar(u * u).add(M.clone().multiplyScalar(2 * u * t)).add(B.clone().multiplyScalar(t * t)); }; };
+D.L.forEach((l, n) => { const f = curve(l), c = COL[l[3]], base = Math.min(.15, .04 + (l[2] - .43) * .09); for (let k = 0; k < FS; k++) { const p0 = f(k / FS), p1 = f((k + 1) / FS), o = (n * FS + k) * 6;
+  fbPos.set([p0.x, p0.y, p0.z, p1.x, p1.y, p1.z], o); fbCol.set([c.r, c.g, c.b, c.r, c.g, c.b], o); fbBase[(n * FS + k) * 2] = base; fbBase[(n * FS + k) * 2 + 1] = base; } });
+fbA.set(fbBase); const fibers = lines(fbPos, fbCol, fbA);
+const linksOf = Array.from({ length: NC }, () => []); D.L.forEach((l, n) => { linksOf[l[0]].push(n); linksOf[l[1]].push(n); });
+// ---- 状態 ----
+const ui = { tx: document.getElementById("tx"), hint: document.getElementById("hint"), close: document.getElementById("close"), count: document.getElementById("count") };
+let st = { k: "free" }, focus = -1, focusAt = 0, now = 0;
+let tgtC = V(0, 0, 0), tgtT = V(0, 0, 0), distC = 260, distT = 210, yaw = .6, pitch = .25, travel = null;
+const pad = (n) => n.toLocaleString();
+function counts() { if (st.k === "free") ui.count.innerHTML = `<b>77</b> 本のハイライト → <b>${NC}</b> の熱<br><b>${pad(NL)}</b> の響き合い`;
+  else { const c = D.c[st.id]; const ls = linksOf[st.id]; const sel = st.d === undefined ? ls : ls.filter((n) => D.L[n][3] === st.d); const sp = new Set(sel.map((n) => D.c[other(n, st.id)][1]));
+    ui.count.innerHTML = `${NC} の熱と照らし合わせ<br><b>${sp.size}</b> 競技 · <b>${sel.length}</b> の熱と響き合う`; } }
+const other = (n, i) => (D.L[n][0] === i ? D.L[n][1] : D.L[n][0]);
+// 選んだ熱と、その見方で響き合う相手（強い順・同じ瞬間は除く）
+function peers(i, d) { const seen = new Set(); return linksOf[i].filter((n) => D.L[n][3] === d).sort((a, b) => D.L[b][2] - D.L[a][2]).map((n) => ({ n, j: other(n, i) })).filter(({ j }) => { const key = D.c[j][2]; if (key === D.c[i][2] || seen.has(key)) return false; seen.add(key); return true; }).slice(0, 7); }
+function lock(i, d) { st = { k: "lock", id: i, d }; ui.close.hidden = false; tgtT.copy(P[i]);
+  if (d === undefined) distT = portrait() ? 62 : 50; else { const ps = peers(i, d); let r = 18; ps.forEach(({ j }) => (r = Math.max(r, P[j].distanceTo(P[i])))); distT = Math.max(60, Math.min(portrait() ? 150 : 120, r * .9 + 30)); const cen = V(0, 0, 0); ps.forEach(({ j }) => cen.addScaledVector(P[j], 1 / ps.length)); tgtT.copy(P[i]).lerp(cen, ps.length ? .35 : 0); }
+  paint(); counts(); hintFor(); }
+function free() { st = { k: "free" }; ui.close.hidden = true; distT = 210; tgtT.set(0, 0, 0); paint(); counts(); hintFor(); }
+function hintFor() { ui.hint.innerHTML = st.k === "free" ? `光の一つひとつが、ハイライトから取り出した<b>熱</b>。枝の向きは熱の種類、長さは強さ。<br>響き合う熱どうしは、同じ向きの枝先で結ばれています。気になる熱に触れてください`
+  : st.d === undefined ? `この熱を分解した言葉です。<b>枝先の言葉</b>に触れると、その意味で響き合う熱が、別の競技から光ります` : `<b>響き合った熱</b>に触れると、線維をたどってそこへ移ります`; ui.hint.classList.remove("fade"); void ui.hint.offsetWidth; ui.hint.classList.add("fade"); }
+// 明るさの塗り直し: 選んだ熱の枝と線維だけを明るく、他は沈める
+function paint() { const lockI = st.k === "lock" ? st.id : -1, d = st.d, ps = lockI >= 0 && d !== undefined ? peers(lockI, d) : [], pset = new Set(ps.map((p) => p.j)), nset = new Set(ps.map((p) => p.n));
+  brIdx.forEach(([i, dd], n) => { let f = 1; if (lockI >= 0) f = i === lockI ? (d === undefined || dd === d ? 2.2 : .5) : pset.has(i) && dd === d ? 2 : .25; for (let k = 0; k < BS * 2; k++) brA[n * BS * 2 + k] = brBase[n * BS * 2 + k] * f; });
+  D.L.forEach((l, n) => { let f = 1; if (lockI >= 0) { const mine = l[0] === lockI || l[1] === lockI; f = d === undefined ? (mine ? 6 : .35) : nset.has(n) ? 11 : mine && l[3] === d ? 3 : .25; } for (let k = 0; k < FS * 2; k++) fbA[n * FS * 2 + k] = Math.min(.95, fbBase[n * FS * 2 + k] * f); });
+  D.c.forEach((_, i) => (coreA[i] = lockI < 0 ? .8 : i === lockI ? 1.4 : pset.has(i) ? 1.2 : .3));
+  rebuildHi(); branches.geometry.attributes.a.needsUpdate = true; fibers.geometry.attributes.a.needsUpdate = true; coreGeo.attributes.a.needsUpdate = true; }
+// 線維をたどって移る: カメラの注視点が線維の弧に沿って相手の枝先へ、そこで相手の熱を捕まえる（見方はそのまま）
+function go(n, j) { const f = curve(D.L[n]), from = D.L[n][0] === st.id; travel = { f: (t) => f(from ? t : 1 - t), t0: now, j, d: st.d }; st = { k: "travel", id: st.id, d: st.d }; }
+// 選んだ熱の枝と、響き合う線維だけを太い線で描き直す
+const hiMat = new LineMaterial({ linewidth: 2.4, vertexColors: true, transparent: true, opacity: .9, depthWrite: false, blending: THREE.AdditiveBlending }); let hi = null;
+function rebuildHi() { if (hi) { scene.remove(hi); hi.geometry.dispose(); hi = null; } if (st.k !== "lock") return; const i = st.id, d = st.d, pos = [], col = [];
+  const seg = (a, b, c, f = 1) => { pos.push(a.x, a.y, a.z, b.x, b.y, b.z); col.push(c.r * f, c.g * f, c.b * f, c.r * f, c.g * f, c.b * f); };
+  D.c[i][4].forEach((w, dd) => { if (w && (d === undefined || dd === d)) seg(P[i], tip(i, dd), COL[dd]); });
+  const ns = d === undefined ? linksOf[i].map((n) => ({ n, j: other(n, i) })) : peers(i, d);
+  ns.forEach(({ n, j }) => { const l = D.L[n], f = curve(l); for (let k = 0; k < FS; k++) seg(f(k / FS), f((k + 1) / FS), COL[l[3]], d === undefined ? .55 : 1); if (d !== undefined) seg(P[j], tip(j, d), COL[d]); });
+  if (!pos.length) return; const g = new LineSegmentsGeometry(); g.setPositions(pos); g.setColors(col); hi = new LineSegments2(g, hiMat); scene.add(hi); }
+// ---- 文字 ----
+const pool = []; let used = 0; const prj = V(0, 0, 0);
+let rects = []; const prj2 = V(0, 0, 0);
+function txt(cls, html, p, o = {}) { const e = pool[used] || (pool[used] = document.createElement("div")); if (!e.parentNode) ui.tx.appendChild(e); used++;
+  if (e.dataset.h !== cls + html) { e.dataset.h = cls + html; e.className = `t ${cls}`; e.innerHTML = html; e._w = e.offsetWidth; e._h = e.offsetHeight; } e.dataset.v = o.data ?? "";
+  prj.copy(p).project(cam); const dpt = cam.position.distanceTo(p), sc = Math.max(portrait() ? .9 : .72, Math.min(1.2, 90 / dpt)); let vis = prj.z < 1 && Math.abs(prj.x) < 1.05 && Math.abs(prj.y) < 1.05;
+  const x = (prj.x * .5 + .5) * innerWidth, y = (-prj.y * .5 + .5) * innerHeight, w = e._w * sc, h = e._h * sc;
+  let right = true; if (o.from) { prj2.copy(o.from).project(cam); right = prj.x >= prj2.x - .002; }
+  let bx = right ? x + 9 : x - 9 - w, by = y - h / 2; bx = Math.max(8, Math.min(innerWidth - w - 8, bx));
+  const hit = () => rects.some(([a, b, c, d]) => bx < a + c && bx + w > a && by < b + d && by + h > b);
+  for (let t = 1; t <= 6 && vis && hit(); t++) by = y - h / 2 + (t % 2 ? 1 : -1) * Math.ceil(t / 2) * (h * .55 + 3);
+  if (vis && hit() && (o.pri ?? 0) < 2) vis = false; if (vis) rects.push([bx, by, w, h]);
+  e.style.transform = `translate(${bx}px,${by}px) scale(${sc})`; e.style.opacity = vis ? String(Math.max(.3, Math.min(1, 140 / dpt))) : "0"; e.style.pointerEvents = vis ? "" : "none"; return e; }
+ui.tx.addEventListener("pointerup", (e) => { const el = e.target.closest("[data-v]"); if (!el || !el.dataset.v) return; e.stopPropagation(); const [k, a, b] = el.dataset.v.split(":");
+  if (k === "d") lock(st.id, st.d === +a ? undefined : +a); if (k === "p") go(+a, +b); });
+// ---- 操作: ドラッグで回す、ピンチ/ホイールで寄る、タップで熱を捕まえる ----
+const pts = new Map(); let down = null, pinch0 = 0;
+cv.addEventListener("pointerdown", (e) => { pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) down = [e.clientX, e.clientY, yaw, pitch, false]; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); down = null; } });
+cv.addEventListener("pointermove", (e) => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); distT = Math.max(25, Math.min(320, distT * pinch0 / d)); pinch0 = d; return; }
+  if (down) { const dx = e.clientX - down[0], dy = e.clientY - down[1]; if (Math.abs(dx) + Math.abs(dy) > 6) down[4] = true; yaw = down[2] - dx * .005; pitch = Math.max(-1.2, Math.min(1.2, down[3] + dy * .004)); } });
+cv.addEventListener("pointerup", (e) => { pts.delete(e.pointerId); if (!down) return; const moved = down[4]; down = null; if (moved || st.k === "travel") return;
+  // 画面上でいちばん近い光（28px 以内、手前優先）
+  let best = -1, bd = 1e9; P.forEach((p, i) => { prj.copy(p).project(cam); if (prj.z > 1) return; const x = (prj.x * .5 + .5) * innerWidth, y = (-prj.y * .5 + .5) * innerHeight, d = Math.hypot(x - e.clientX, y - e.clientY) + cam.position.distanceTo(p) * .05; if (d < bd && Math.hypot(x - e.clientX, y - e.clientY) < 30) { bd = d; best = i; } });
+  if (best >= 0) lock(best); });
+cv.addEventListener("pointercancel", (e) => { pts.delete(e.pointerId); down = null; });
+addEventListener("wheel", (e) => { e.preventDefault(); distT = Math.max(25, Math.min(320, distT * Math.exp(e.deltaY * .001))); }, { passive: false });
+ui.close.onclick = () => { if (st.k === "lock" && st.d !== undefined) lock(st.id); else free(); };
+addEventListener("keydown", (e) => { if (e.key === "Escape" && !ui.close.hidden) ui.close.click(); });
+// ---- 毎フレーム ----
+let last = 0, manual = false;
+function tick(t) { requestAnimationFrame(tick); const dt = Math.min(.1, Math.max(0, (t - (last || t)) / 1000)); last = t; if (!manual) update(dt); }
+function update(dt, draw = true) { now += dt;
+  if (travel) { const k = Math.min(1, (now - travel.t0) / 1.5), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2; tgtC.copy(travel.f(e)); tgtT.copy(tgtC); distT = 34; if (k >= 1) { const { j, d } = travel; travel = null; lock(j, D.L.some((l) => (l[0] === j || l[1] === j) && l[3] === d) ? d : undefined); } }
+  if (!down && !reduce && st.k !== "travel") yaw += dt * (st.k === "free" ? .03 : .012);
+  const kc = 1 - Math.exp(-dt / (travel ? .12 : .6)); tgtC.lerp(tgtT, kc); distC += (distT - distC) * kc;
+  cam.position.set(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).multiplyScalar(distC).add(tgtC); cam.lookAt(tgtC);
+  // 文字: 何も捕まえていないときは、画面の中心にいちばん近い熱をほどいて見せる（触らなくても分解が見える）
+  used = 0; rects = [];
+  if (st.k === "free") { if (now - focusAt > .5) { focusAt = now; let best = -1, bd = 1e9; P.forEach((p, i) => { prj.copy(p).project(cam); if (prj.z > 1) return; const d = Math.hypot(prj.x * (innerWidth / innerHeight), prj.y) + cam.position.distanceTo(p) * .002; if (d < bd) { bd = d; best = i; } }); focus = best; }
+    if (focus >= 0) cellText(focus, false); }
+  else { const i = st.id; cellText(i, st.k === "lock");
+    if (st.d !== undefined && st.k === "lock") peers(i, st.d).forEach(({ n, j }) => { const c = D.c[j]; txt("peer", `<div class="a">${D.s[c[1]]}</div><div class="b"><i style="background:${HEX[st.d]}"></i>${c[5][st.d]}</div><div class="c">${c[0]}</div>`, tip(j, st.d), { from: P[j], pri: 2, data: `p:${n}:${j}` }); }); }
+  for (let k = used; k < pool.length; k++) pool[k].style.opacity = "0";
+  // 選んだ熱の線維はゆっくり脈打つ（明るさの揺れだけ）
+  if (draw) R.render(scene, cam); }
+function cellText(i, live) { const c = D.c[i]; txt("core", `<div class="a">${D.s[c[1]]}</div><div class="b">${c[0]}</div><div class="c">${c[2]}</div>`, P[i], { pri: 3 });
+  c[4].forEach((w, d) => { if (!w || !c[5][d]) return; const sel = st.d === d; if (live && st.d !== undefined && !sel) return; txt(`tip ${live ? "go" : ""} ${sel ? "sel" : ""}`, `<i style="background:${HEX[d]}"></i>${c[5][d]}`, tip(i, d), { from: P[i], pri: live ? 2 : 1, data: live ? `d:${d}` : "" }); }); }
+const resize = () => { R.setSize(innerWidth, innerHeight, false); hiMat.resolution.set(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.fov = portrait() ? 62 : 46; cam.updateProjectionMatrix(); };
+addEventListener("resize", resize); resize(); free(); requestAnimationFrame(tick);
+window.__x = { st: () => st, lock, free, go, peers, manual: (on) => { manual = on; }, adv: (s) => { const n = Math.round(s * 30); for (let k = 0; k < n; k++) update(1 / 30, k === n - 1); }, find: (t) => D.c.findIndex((c) => c[0] === t) };
+</script>
