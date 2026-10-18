@@ -1,13 +1,13 @@
-import BurstWorld from "@/components/BurstWorld";
+import NeuralWorld from "@/components/NeuralWorld";
 import moments from "@/data/moments2026.json";
 
-export const metadata = { title: "熱狂の炸裂 — DAZN 100 MOMENTS", robots: { index: false } };
+export const metadata = { title: "熱狂の神経系 — DAZN 100 MOMENTS", description: "100の瞬間を熱狂の文脈に超分解し、響き合う瞬間を探索して自分だけのダイジェストを編む。" };
 export const dynamic = "force-dynamic";
 
-// 体験: 炸裂の空間の内側を前進し、瞬間がかけら（人×その1秒）に割れ、押したかけらが新しい消失点になって組み替わる。
-// ?no=090 で投票サイトの詳細から「その1本」を開いた状態で入る。旧版（切り口エンジン）は /lab/cut
+// 体験: 100の瞬間 = 細胞体、熱狂の文脈 = 突起の先、響き合い = 線維。押して分解 → 選んで探索 → ダイジェストの旅 → シェア。
+// ?no=090 で投票サイトの詳細から「その1本」に飛び込んだ状態で入る
 export default function Experience({ searchParams }: { searchParams: { no?: string } }) {
   const list = (Array.isArray(moments) ? moments : Object.values(moments)) as { no: string; clips?: { webm?: string; loop?: string }[] }[];
   const media = Object.fromEntries(list.map((m) => [m.no, { webm: m.clips?.[0]?.webm, loop: m.clips?.[0]?.loop }]));
-  return <BurstWorld media={media} startNo={searchParams.no} />;
+  return <NeuralWorld media={media} startNo={searchParams.no} />;
 }
