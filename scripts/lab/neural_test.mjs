@@ -16,24 +16,25 @@ await p.route("https://storage.googleapis.com/e-mooments-assets/**", async (r) =
   return r.fulfill({ status: 404, body: "" });
 });
 const shot = (n) => p.screenshot({ path: `${out}/${tag}_${n}.png` });
-const st = () => p.evaluate(() => { const s = __nw.stage(); return { k: s.k, kind: s.kind, id: s.id, mode: s.mode, i: s.i, playing: __nw.playing(), sound: __nw.screenSound(), found: __nw.found() }; });
+const st = () => p.evaluate(() => { const s = __nw.stage(); return { k: s.k, kind: s.kind, id: s.id, mode: s.mode, i: s.i, playing: __nw.playing(), sound: __nw.screenSound(), ring: __nw.ringN() }; });
 const tap = async (x, y) => { if (sp) await p.touchscreen.tap(x, y); else { await p.mouse.move(x, y); await p.mouse.down(); await p.mouse.up(); } };
 const click = async (kind, id) => { const [x, y] = await p.evaluate(([k, i]) => __nw.screenOf(k, i), [kind, id]); await tap(x, y); return [Math.round(x), Math.round(y)]; };
 const N = JSON.parse(readFileSync("data/ctx/net.json", "utf8"));
 await p.goto(`${BASE}${process.env.PATH_ || "/experience"}`); await p.waitForFunction(() => window.__nw && __nw.ready(), null, { timeout: 120000 });
 await p.waitForTimeout(5000); await shot("0free");
 if (process.env.PATH_) { for (let k = 1; k < 6; k++) { await p.waitForTimeout(2500); await shot(`share${k}`); console.log("share", JSON.stringify(await st())); } console.log(logs.join("\n") || "no errors"); await b.close(); process.exit(0); }
-console.log("chips", await p.locator(".nw-chip").count());
-await p.locator(".nw-chip").first().click(); await p.waitForTimeout(500); await shot("1jump_a"); await p.waitForTimeout(1500); await shot("1jump_b"); await p.waitForTimeout(2500); await shot("1jump_c");
-console.log("jump", JSON.stringify(await st()), await p.locator(".nw-here").textContent().catch(() => ""));
-if (!sp) { for (let k = 0; k < 6; k++) { await p.mouse.move(W / 2, H / 2); await p.mouse.wheel(0, -260); await p.waitForTimeout(300); } await p.waitForTimeout(3000); await shot("2zoom"); console.log("zoom", JSON.stringify(await st())); }
-const mk = await p.evaluate(() => __nw.nearSoma()); console.log("lock m", mk, N.moments[mk]?.title, await click("m", mk)); await p.waitForTimeout(3500); await shot("3lockm"); console.log(JSON.stringify(await st()));
-await p.click(".nw-bar .a button:nth-child(2)"); await p.waitForTimeout(1500); await shot("4open_a"); await p.waitForTimeout(2200); await shot("4open_b"); await p.waitForTimeout(2500); await shot("4open_c");
-const c0 = N.moments[mk].ctx.slice().sort((a, c) => Object.keys(N.ctx[c].dn || {}).length - Object.keys(N.ctx[a].dn || {}).length)[0];
-console.log("lock c", c0, N.ctx[c0].title, await click("c", c0)); await p.waitForTimeout(3000); await shot("5lockc"); console.log(JSON.stringify(await st()));
+const ring = async (k) => { const [x, y, o, id] = await p.evaluate((k) => __nw.ringOf(k), k); await tap(x, y); return [Math.round(x), Math.round(y), id, N.ctx[id]?.title]; };
+console.log("dest", await p.locator(".nw-dest button").count());
+await p.locator(".nw-dest button").first().click(); await p.waitForTimeout(600); await shot("1jump_a"); await p.waitForTimeout(3000); await shot("1jump_b");
+console.log("jump", JSON.stringify(await st()));
+if (!sp) { for (let k = 0; k < 5; k++) { await p.mouse.move(W / 2, H / 2); await p.mouse.wheel(0, -260); await p.waitForTimeout(300); } await p.waitForTimeout(3000); await shot("2zoom"); }
+const mk = await p.evaluate(() => __nw.nearSoma()); console.log("lock m", mk, N.moments[mk]?.title, await click("m", mk));
+await p.waitForTimeout(1500); await shot("3m_play"); await p.waitForTimeout(1600); await shot("3m_burst"); await p.waitForTimeout(2500); await shot("3m_ring"); console.log(JSON.stringify(await st()), "ring", await p.evaluate(() => __nw.ringN()));
+console.log("tap ring", await ring(0)); await p.waitForTimeout(800); await shot("4c_a"); await p.waitForTimeout(2500); await shot("4c"); console.log(JSON.stringify(await st()), "ring", await p.evaluate(() => __nw.ringN()));
 const nd = await p.locator(".nw-bar .v button").count(); console.log("dims", nd);
-if (nd) { await p.locator(".nw-bar .v button").first().click(); await p.waitForTimeout(3500); await shot("6dim"); console.log("dim", JSON.stringify(await st()));
-  const s0 = await p.evaluate(() => __nw.stage()); const tg = N.ctx[c0].dn[s0.dim][0][0]; console.log("zap", tg, N.ctx[tg].title, await click("c", tg)); await p.waitForTimeout(3000); await shot("7zap"); console.log(JSON.stringify(await st())); }
+if (nd > 1) { await p.locator(".nw-bar .v button").nth(1).click(); await p.waitForTimeout(700); await shot("5dim_a"); await p.waitForTimeout(2200); await shot("5dim"); console.log("dim", JSON.stringify(await st())); }
+console.log("zap", await ring(1)); await p.waitForTimeout(800); await shot("6zap_a"); await p.waitForTimeout(2600); await shot("6zap"); console.log(JSON.stringify(await st()));
+console.log("zap2", await ring(2)); await p.waitForTimeout(3200); await shot("7zap2"); console.log(JSON.stringify(await st()));
 await p.click(".nw-bar .a .go"); await p.waitForTimeout(2500); await shot("8ex");
 await p.waitForFunction(() => __nw.stage().k === "digest", null, { timeout: 60000 }).catch(() => {}); await p.waitForTimeout(3500); await shot("9dg"); console.log("digest", JSON.stringify(await st()));
 const n = await p.evaluate(() => __nw.stage().d?.items.length || 0); if (n) { await p.click(`.nw-chain button:nth-child(${n})`); await p.waitForFunction(() => __nw.stage().k === "end", null, { timeout: 20000 }).catch(() => {}); await p.waitForTimeout(3000); await shot("10end"); }

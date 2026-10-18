@@ -23,10 +23,11 @@ type Mom = { no: string; title: string; sport: string; ctx: number[]; p: number[
 type Net = { dims: string[]; moments: Mom[]; ctx: Ctx[]; links: [number, number, number, number][]; regions: { name: string; ids: number[]; at: number[] }[] };
 export type Digest = { name: string; seedTitle: string; seedLine?: string; items: { id: number; line: string; dim: number; s: number }[]; scanned: number; resonated: number; seed?: number; q?: string };
 export type MediaMap = Record<string, { webm?: string; loop?: string }>;
-// ワンタップは必ずロックオン（lock）。そこから下のボタンで: 観る（watch）・分解する（lock open）・繋がりを見る（lock links）・視点（lock dim）・この熱で探す（explore）
+// ワンタップは必ずロックオン（lock）＝押したものが中心になり、繋がるものが周りに集まって一斉に流れる（瞬間なら分解された文脈、文脈なら一つの見方で響き合う文脈）。
+// 下の見方のボタンで周りが入れ替わる（チャンネルを替える）。周りを押すとそこへ飛び、それが中心になる＝ザッピング。音つきで観る（watch）、この熱で探す（explore）
 type Stage =
   | { k: "free" }
-  | { k: "lock"; kind: "m" | "c"; id: number; mode?: "open" | "links" | "dim"; dim?: number }
+  | { k: "lock"; kind: "m" | "c"; id: number; dim?: number }
   | { k: "watch"; kind: "m" | "c"; id: number }
   | { k: "explore"; seed?: number; q?: string }
   | { k: "digest"; d: Digest; i: number }
@@ -36,14 +37,15 @@ type Hud = { counter?: { scanned: number; resonated: number; lit: number }; titl
 const VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 // 細胞: 1秒のコマを円い膜に入れる（縁はやわらかく、状態は縁の色で）
 const CELL_FRAG = `precision highp float; varying vec2 vUv;
-uniform sampler2D uMap; uniform vec4 uRect; uniform float uOp; uniform float uHas; uniform float uRim; uniform vec3 uRimC; uniform float uDim;
+uniform sampler2D uMap; uniform vec4 uRect; uniform float uOp; uniform float uHas; uniform float uRim; uniform vec3 uRimC; uniform float uDim; uniform float uDot; uniform vec3 uDotC;
 void main(){ vec2 q = vUv * 2.0 - 1.0; float r = length(q); if (r > 1.0) discard;
   vec2 iu = vec2(0.5 + q.x * 0.5 * 0.5625 * 1.15, 0.5 + q.y * 0.5 * 1.0);
   vec3 c = uHas > 0.5 ? texture2D(uMap, uRect.xy + clamp(iu, 0.0, 1.0) * uRect.zw).rgb : vec3(0.18);
   c *= uDim;
   float rim = smoothstep(0.80, 0.92, r) * (1.0 - smoothstep(0.95, 1.0, r));
   c = mix(c, uRimC, rim * uRim);
-  float a = uOp * smoothstep(1.0, 0.9, r);
+  c = mix(c, uDotC, uDot);
+  float a = uOp * mix(smoothstep(1.0, 0.9, r), smoothstep(0.5, 0.0, r) * 0.9, uDot);
   gl_FragColor = vec4(c * a, a); }`;
 // 目の前の映像（と、それが割れた楔）
 const SCREEN_FRAG = `precision highp float; varying vec2 vUv;
@@ -117,13 +119,13 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
     const facing = (p: number[]) => { const cp = camPos(), v = new THREE.Vector3(p[0] - cp.x, p[1] - cp.y, p[2] - cp.z); return Math.atan2(-v.x, -v.z); };
 
     // ---- 細胞（細胞体と文脈） ----
-    type Cell = { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; kind: "m" | "c"; id: number; p: THREE.Vector3; size: number; s: number; gs: number; op: number; gop: number; rim: number; grim: number; rimC: THREE.Color; vid: Slot | null; still: THREE.Texture | null; rect: THREE.Vector4 };
+    type Cell = { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; kind: "m" | "c"; id: number; p: THREE.Vector3; size: number; s: number; gs: number; op: number; gop: number; rim: number; grim: number; dot: number; gdot: number; rimC: THREE.Color; vid: Slot | null; still: THREE.Texture | null; rect: THREE.Vector4 };
     const somas: Cell[] = [], tips: Cell[] = [];
     const cellGeo = new THREE.PlaneGeometry(1, 1);
     const mkCell = (kind: "m" | "c", id: number, p: number[], size: number): Cell => {
-      const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: CELL_FRAG, ...premul, uniforms: { uMap: { value: null }, uRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uOp: { value: 0 }, uHas: { value: 0 }, uRim: { value: 0 }, uRimC: { value: new THREE.Color("#fff") }, uDim: { value: 1 } } });
+      const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: CELL_FRAG, ...premul, uniforms: { uMap: { value: null }, uRect: { value: new THREE.Vector4(0, 0, 1, 1) }, uOp: { value: 0 }, uHas: { value: 0 }, uRim: { value: 0 }, uRimC: { value: new THREE.Color("#fff") }, uDim: { value: 1 }, uDot: { value: kind === "c" ? 1 : 0 }, uDotC: { value: new THREE.Color("#c4cff0") } } });
       const mesh = new THREE.Mesh(cellGeo, mat); mesh.position.set(p[0], p[1], p[2]); mesh.userData = { kind, id }; scene.add(mesh);
-      return { mesh, mat, kind, id, p: new THREE.Vector3(p[0], p[1], p[2]), size, s: size, gs: size, op: 0, gop: 1, rim: 0, grim: 0, rimC: new THREE.Color("#fff"), vid: null, still: null, rect: new THREE.Vector4(0, 0, 1, 1) };
+      return { mesh, mat, kind, id, p: new THREE.Vector3(p[0], p[1], p[2]), size, s: size, gs: size, op: 0, gop: 1, rim: 0, grim: 0, dot: kind === "c" ? 1 : 0, gdot: kind === "c" ? 1 : 0, rimC: new THREE.Color("#fff"), vid: null, still: null, rect: new THREE.Vector4(0, 0, 1, 1) };
     };
     const showStill = (c: Cell) => { c.mat.uniforms.uMap.value = c.still; c.mat.uniforms.uRect.value = c.rect; c.mat.uniforms.uHas.value = c.still ? 1 : 0; };
 
@@ -205,19 +207,37 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
         s.owner = c; c.vid = s; s.v.loop = true; s.v.muted = true; s.v.src = src; s.v.load();
         s.v.oncanplay = () => { if (c.vid === s) { c.mat.uniforms.uMap.value = s.tex; c.mat.uniforms.uRect.value = new THREE.Vector4(0, 0, 1, 1); c.mat.uniforms.uHas.value = 1; } }; s.v.play().catch(() => {}); } };
 
-    // ---- 文字（DOM）----
-    type Lbl = { key: string; at: () => THREE.Vector3; t: string; s?: string; cls: string };
-    let lbls: Lbl[] = []; const lblEls = new Map<string, HTMLDivElement>();
+    // ---- 文字: 空間の中の板（細胞の下に、奥行きのまま置く）----
+    type Lbl = { key: string; at: () => THREE.Vector3; t: string; s?: string; h?: number | (() => number); col?: string; cls?: string };
+    let lbls: Lbl[] = [];
+    type LM = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; op: number; aspect: number; sig: string };
+    const lms = new Map<string, LM>();
     const V = new THREE.Vector3();
-    const syncLabels = () => {
-      const want = new Set(lbls.map((l) => l.key));
-      for (const [k, e] of Array.from(lblEls)) if (!want.has(k)) { e.style.opacity = "0"; if (+(e.dataset.gone || 0) === 0) e.dataset.gone = String(performance.now()); else if (performance.now() - +e.dataset.gone! > 600) { e.remove(); lblEls.delete(k); } }
-      for (const l of lbls) { let e = lblEls.get(l.key); if (!e) { e = document.createElement("div"); lh.appendChild(e); lblEls.set(l.key, e); e.style.opacity = "0"; }
-        e.dataset.gone = "0"; e.className = `nw-lb ${l.cls}`; const html = `<b>${l.t}</b>${l.s ? `<span>${l.s}</span>` : ""}`; if (e.innerHTML !== html) e.innerHTML = html;
-        V.copy(l.at()).project(cam); const vis = V.z < 1 && Math.abs(V.x) < 1.1 && Math.abs(V.y) < 1.1;
-        e.style.transform = `translate(${((V.x + 1) / 2) * innerWidth}px,${((1 - V.y) / 2) * innerHeight}px) translate(-50%,0)`; e.style.opacity = vis ? "1" : "0"; } };
-    const below = (c: Cell) => () => c.p.clone().add(new THREE.Vector3(0, -c.s * 0.62, 0));
-    const above = (c: Cell) => () => c.p.clone().add(new THREE.Vector3(0, c.s * 0.62, 0)).add(new THREE.Vector3(0, c.s * 0.25, 0));
+    const mkLabel = (t: string, sub: string | undefined, col: string) => {
+      const cv = document.createElement("canvas"), g = cv.getContext("2d")!, F = '"Hiragino Sans","Noto Sans JP",system-ui,sans-serif';
+      g.font = `900 60px ${F}`; const w1 = g.measureText(t).width; g.font = `600 30px ${F}`; const w2 = sub ? g.measureText(sub).width : 0;
+      const W = Math.ceil(Math.max(w1, w2) + 48), H = sub ? 128 : 86; cv.width = W; cv.height = H;
+      g.textAlign = "center"; g.textBaseline = "top"; g.shadowColor = "rgba(0,0,0,0.95)"; g.shadowBlur = 14;
+      g.font = `900 60px ${F}`; g.fillStyle = col; g.fillText(t, W / 2, 10); g.fillText(t, W / 2, 10);
+      if (sub) { g.font = `600 30px ${F}`; g.fillStyle = "rgba(255,255,255,0.78)"; g.fillText(sub, W / 2, 84); }
+      const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, opacity: 0 });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); mesh.renderOrder = 300; scene.add(mesh); return { mesh, mat, aspect: W / H, h0: H };
+    };
+    const syncLabels = (dt: number) => {
+      const want = new Map(lbls.map((l) => [l.key, l]));
+      for (const [k, m] of Array.from(lms)) if (!want.has(k)) { m.op -= dt * 4; m.mat.opacity = Math.max(0, m.op); if (m.op <= 0) { scene.remove(m.mesh); m.mat.map?.dispose(); m.mat.dispose(); m.mesh.geometry.dispose(); lms.delete(k); } }
+      for (const l of lbls) { const sig = `${l.t}|${l.s || ""}|${l.col || ""}`; let m = lms.get(l.key);
+        if (m && m.sig !== sig) { scene.remove(m.mesh); m.mat.map?.dispose(); m.mat.dispose(); lms.delete(l.key); m = undefined; }
+        if (!m) { const x = mkLabel(l.t, l.s, l.col || "#ffffff"); m = { mesh: x.mesh, mat: x.mat, op: 0, aspect: x.aspect, sig }; lms.set(l.key, m); }
+        const p = l.at(), h = typeof l.h === "function" ? l.h() : l.h ?? 1.4, hh = l.s ? h * 1.45 : h;
+        m.mesh.position.copy(p).addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion), -hh / 2); m.mesh.quaternion.copy(cam.quaternion); m.mesh.scale.set(hh * m.aspect, hh, 1);
+        m.op = Math.min(1, m.op + dt * 3); const d = cam.position.distanceTo(p); m.mat.opacity = m.op * Math.max(0, Math.min(1, 1 - (d - 140) / 160)); }
+    };
+    const up = new THREE.Vector3();
+    const below = (c: Cell) => () => c.mesh.position.clone().addScaledVector(up.set(0, 1, 0).applyQuaternion(cam.quaternion), -c.s * 0.56);
+    const above = (c: Cell) => () => c.mesh.position.clone().addScaledVector(up.set(0, 1, 0).applyQuaternion(cam.quaternion), c.s * 0.56 + 2.6);
+    const farH = (c: Cell) => () => Math.max(1.3, Math.min(14, cam.position.distanceTo(c.mesh.position) * 0.05));
 
     // ---- 段階 ----
     let st: Stage = { k: "free" }, timers: ReturnType<typeof setTimeout>[] = [];
@@ -226,29 +246,42 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
     let digest: Digest | null = null, di = 0, pausedNow = false, wordPoint: THREE.Vector3 | null = null;
     const momIdx = (no: string) => N.moments.findIndex((m) => m.no === no);
     const focusTips = (ids: number[] | null, dimOthers = true, big = 3.4) => { const set = new Set(ids || []);
-      for (const t of tips) { const on = set.has(t.id); t.gs = on ? big : t.size; t.gop = !ids ? 1 : on ? 1 : dimOthers ? 0.35 : 1; t.grim = on ? 1 : 0; }
+      for (const t of tips) { const on = set.has(t.id); t.gs = on ? big : t.size; t.gop = !ids ? 1 : on ? 1 : dimOthers ? 0.35 : 1; t.grim = on ? 1 : 0; t.gdot = on ? 0 : 1; }
       for (const s of somas) { s.gop = !ids ? 1 : dimOthers ? 0.45 : 1; s.gs = s.size; s.grim = 0; } };
     let lodOn = true, lodT = 0, regionT = 0;
-    let foundSet = new Set<number>(); try { foundSet = new Set(JSON.parse(localStorage.getItem("nw_found") || "[]")); } catch { /* 無くても動く */ }
-    const trail: number[] = []; let trailLine: THREE.LineSegments | null = null;
-    // 旅した道筋: ロックオンした文脈を順に結ぶ細い金の線（自分の熱の地図）
-    function drawTrail() {
-      if (trailLine) { scene.remove(trailLine); trailLine.geometry.dispose(); trailLine = null; } if (trail.length < 2) return;
-      const nv = (trail.length - 1) * SEG * 2, pos = new Float32Array(nv * 3), u = new Float32Array(nv), z = new Float32Array(nv), one = new Float32Array(nv).fill(1), dm = new Float32Array(nv).fill(1);
-      for (let i = 1; i < trail.length; i++) { const f = curve(tips[trail[i - 1]].p, tips[trail[i]].p, 0.9); let prev = f(0);
-        for (let k = 0; k < SEG; k++) { const nx = f((k + 1) / SEG), o = ((i - 1) * SEG + k) * 2; pos.set([prev.x, prev.y, prev.z, nx.x, nx.y, nx.z], o * 3); u[o] = k / SEG; u[o + 1] = (k + 1) / SEG; prev = nx; } }
-      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); g.setAttribute("aU", new THREE.BufferAttribute(u, 1)); g.setAttribute("aStart", new THREE.BufferAttribute(z, 1));
-      g.setAttribute("aStr", new THREE.BufferAttribute(one, 1)); g.setAttribute("aDim", new THREE.BufferAttribute(dm, 1)); g.setAttribute("aRev", new THREE.BufferAttribute(z.slice(), 1)); g.setAttribute("aKeep", new THREE.BufferAttribute(one.slice(), 1));
-      trailLine = new THREE.LineSegments(g, new THREE.ShaderMaterial({ vertexShader: FIBER_VERT, fragmentShader: FIBER_FRAG, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, uniforms: { ...fiberUniforms(), uTime: { value: 1e5 }, uBase: { value: 0 } } }));
-      trailLine.frustumCulled = false; trailLine.renderOrder = -4; scene.add(trailLine);
+    // ---- 周りに集まる（ロックオンの中心のまわりに、繋がる文脈が空間のあちこちから飛んできて並ぶ）----
+    const RN = 8;
+    const ringCells: Cell[] = Array.from({ length: RN }, (_, k) => { const c = mkCell("c", 0, [0, 0, 0], 4); c.mesh.userData = { kind: "r", id: k }; c.gop = 0; c.dot = c.gdot = 0; return c; });
+    let ring: { center: Cell; ids: number[]; dim: number; t0: number; from: THREE.Vector3[] } | null = null;
+    const ringGeo = new THREE.BufferGeometry(); ringGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(RN * 2 * 3), 3)); ringGeo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(RN * 2 * 3), 3));
+    const ringLines = new THREE.LineSegments(ringGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
+    ringLines.frustumCulled = false; ringLines.renderOrder = 5; scene.add(ringLines);
+    const ringPos = (k: number, n: number, out: THREE.Vector3) => { if (!ring) return out; const pr = portrait(), a = -Math.PI / 2 + (k / n) * Math.PI * 2 + (pr || n % 2 ? 0 : Math.PI / n);
+      const dist = cam.position.distanceTo(ring.center.mesh.position), hh = Math.tan((cam.fov * Math.PI) / 360) * dist;
+      const R = new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion), U = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+      // 縦画面: 中心を上に、周りは下に2列（横書きの名前が重ならない）
+      if (pr) { const col = k % 2 ? 1 : -1, row = Math.floor(k / 2); return out.copy(ring.center.mesh.position).addScaledVector(R, col * hh * cam.aspect * 0.5).addScaledVector(U, -hh * (0.36 + row * 0.25)); }
+      const rx = hh * cam.aspect * 0.6, ry = hh * 0.56;
+      return out.copy(ring.center.mesh.position).addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion), Math.cos(a) * rx).addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion), Math.sin(a) * ry + hh * 0.04); };
+    function setRing(center: Cell, ids: number[], dim: number, fromCenter = false) {
+      ids = ids.slice(0, RN); ring = { center, ids, dim, t0: now, from: ids.map((i) => (fromCenter ? center.p.clone() : tips[i].p.clone())) };
+      const col = dim >= 0 ? DIM_COLOR[dim] : "#ffffff";
+      ringCells.forEach((rc, k) => { const id = ids[k]; if (id === undefined) { rc.gop = 0; return; }
+        rc.id = id; rc.p.copy(ring!.from[k]); rc.mesh.position.copy(rc.p); rc.op = 0; rc.gop = 1; rc.s = 0.4; rc.gs = portrait() ? 1 : 1; rc.grim = 1; rc.rimC.set(col); rc.mat.uniforms.uRimC.value.set(col);
+        rc.still = tips[id].still; rc.rect = tips[id].rect; if (rc.vid) { rc.vid.owner = null; rc.vid.v.pause(); rc.vid = null; } showStill(rc); });
+      playCells([center, ...ringCells.slice(0, ids.length)].slice(0, slots.length - 1));
+      lbls = [...lbls.filter((l) => l.key === "center"), ...ids.map((id, k) => ({ key: `r${k}:${id}`, at: below(ringCells[k]), t: N.ctx[id].title, s: dim >= 0 ? N.ctx[id].v[dim] || undefined : undefined, col: "#ffffff", h: () => ringCells[k].s * (portrait() ? 0.2 : 0.3) }))];
     }
-    const discover = (id: number) => { foundSet.add(id); setFound(foundSet.size); try { localStorage.setItem("nw_found", JSON.stringify(Array.from(foundSet))); } catch { /* */ }
-      if (trail[trail.length - 1] !== id) { trail.push(id); if (trail.length > 24) trail.shift(); drawTrail(); setTrailIds(trail.slice()); } };
+    function clearRing() { if (!ring) return; ring = null; ringCells.forEach((rc) => { rc.gop = 0; }); }
+    // 中心の大きさ（画面の高さに対する割合で決める＝どの距離でも同じ見え方）
+    const sizeAt = (c: Cell, frac: number) => { const d = cam.position.distanceTo(c.mesh.position); return 2 * Math.tan((cam.fov * Math.PI) / 360) * d * frac; };
+    const discover = (_id: number) => { /* ザッピングの邪魔になるので数えない */ };
+    void discover;
     function go(s: Stage) {
       clearLater(); st = s; stageRef.current = s; setStage(s); setHover(null); wedges.forEach((w) => scene.remove(w.mesh)); wedges = [];
       scrSlot.v.onended = null;
       if (s.k !== "digest" && s.k !== "end") { pausedNow = false; setPaused(false); }
-      lodOn = s.k === "free" || (s.k === "lock" && !s.mode); lodT = 0;
+      lodOn = s.k === "free"; lodT = 0; if (s.k !== "lock" && s.k !== "watch") clearRing();
       if (s.k === "free") {
         resetFibers(); lightDend([], 0); if (path) path.visible = false; wordPoint = null; scr.gop = 0; stopScreen(); focusTips(null); auto = 0.02; lbls = []; setHud({});
         if (C.d < 60) fly(C.t, 120, { tau: 1.0 });
@@ -269,63 +302,41 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
         ids.forEach((_, j) => lightChain(j, now)); getCrowd().swell(0.8);
       }
     }
-    // ロックオン: 寄って中心に捉え、その場で流れ、名前が浮かぶ。ボタンで次を選ぶ
+    // ロックオン: 押したものが中心。繋がるものが周りに集まり、一斉に流れる
     function lock(s: Extract<Stage, { k: "lock" }>) {
-      scr.gop = 0; stopScreen(); resetFibers(); if (path) path.visible = false; lightDend([], 0); wordPoint = null; auto = 0.008;
+      scr.gop = 0; stopScreen(); resetFibers(); if (path) path.visible = false; lightDend([], 0); wordPoint = null; auto = 0.004;
+      focusTips(null); for (const x of somas) { x.gop = 0.35; x.grim = 0; x.gs = x.size; } for (const x of tips) x.gop = 0.5;
+      const pr = portrait();
       if (s.kind === "m") {
-        const m = N.moments[s.id], soma = somas[s.id];
-        if (!s.mode) {
-          focusTips(null); soma.grim = 1; soma.gs = soma.size * 1.35; fly(m.p, portrait() ? 74 : 58, { yaw: facing(m.p), pitch: 0.12, tau: 0.8 }); sfx.whoosh?.(0.6);
-          lbls = [{ key: `m${s.id}`, at: above(soma), t: m.title, s: m.sport, cls: "lock" }]; playCells([soma]);
-        } else if (s.mode === "open") {
-          // 目の前でその瞬間が流れ、楔に割れて文脈の細胞へ飛ぶ
-          focusTips(m.ctx, true, 4.2); soma.gop = 1; soma.grim = 1; fly(m.p, portrait() ? 62 : 46, { tau: 0.8 });
-          scr.from = soma.p.clone(); scr.k = 0; scr.frac = portrait() ? 0.94 : 0.62; scr.gop = 1; playScreen(safari ? media[m.no]?.loop : media[m.no]?.webm, true, true);
-          lbls = []; later(reduce ? 1800 : 2600, () => decompose(s.id));
-        } else if (s.mode === "links") {
-          // この瞬間の全文脈から出ている響き合いを一斉に点ける
-          const own = new Set(m.ctx), partners = new Map<number, number>();
-          N.links.forEach(([a, b, sc], li) => { const ia = own.has(a), ib = own.has(b); if (!ia && !ib) return; if (ia && ib) return; setLink(li, now + 0.2 + hashN(li) * 0.6, ib, 1); const o = ia ? b : a; partners.set(o, Math.max(partners.get(o) || 0, sc)); });
-          aStart.needsUpdate = aRev.needsUpdate = aKeep.needsUpdate = true;
-          const top = Array.from(partners.entries()).sort((x, y) => y[1] - x[1]); const seen = new Set<string>(), pick: number[] = [];
-          for (const [id] of top) { const no = N.ctx[id].no; if (seen.has(no)) continue; seen.add(no); pick.push(id); if (pick.length >= 8) break; }
-          lightDend(m.ctx, now); focusTips([...m.ctx, ...pick], true, 3.2); soma.grim = 1;
-          lbls = [{ key: `m${s.id}`, at: above(soma), t: m.title, s: m.sport, cls: "lock" }, ...pick.map((i) => ({ key: `c${i}`, at: below(tips[i]), t: N.ctx[i].title, s: N.moments[momIdx(N.ctx[i].no)].sport, cls: "on" }))];
-          const cen = pick.reduce((a, i) => a.add(tips[i].p), soma.p.clone()).multiplyScalar(1 / (pick.length + 1)); let r = 0; pick.forEach((i) => (r = Math.max(r, tips[i].p.distanceTo(cen))));
-          fly(cen, Math.max(80, r * 2.3), { tau: 1.1 }); playCells(pick.slice(0, portrait() ? 4 : 6).map((i) => tips[i])); sfx.swish?.(); getCrowd().swell(0.5);
-        }
+        const m = N.moments[s.id], soma = somas[s.id]; clearRing(); soma.gop = 1; soma.grim = 1; soma.gs = soma.size;
+        fly(m.p, pr ? 70 : 54, { yaw: facing(m.p), pitch: 0.1, tau: 0.7 }); sfx.whoosh?.(0.7);
+        lbls = [{ key: "center", at: below(soma), t: m.title, s: m.sport, h: () => soma.s * (pr ? 0.17 : 0.24) }];
+        // 目の前で流れて、映像が割れて、その瞬間の文脈が周りに並ぶ（分解）
+        scr.from = soma.p.clone(); scr.k = 0; scr.frac = pr ? 0.94 : 0.6; later(500, () => { scr.gop = 1; playScreen(safari ? media[m.no]?.loop : media[m.no]?.webm, true, true); });
+        later(reduce ? 2000 : 2700, () => { soma.gs = sizeAt(soma, pr ? 0.15 : 0.2); setRing(soma, m.ctx, -1, true); if (ring) ring.t0 = now + 0.5; decompose(s.id); });
       } else {
-        const c = N.ctx[s.id], t = tips[s.id]; discover(s.id);
-        if (s.mode === "dim" && s.dim !== undefined) {
-          const tg = (c.dn?.[s.dim] || []).map((x) => x[0]);
-          buildPath(t.p, tg, tg.map(() => s.dim!), now); focusTips([s.id, ...tg], true, 3.4); t.grim = 1;
-          lbls = [{ key: `c${s.id}`, at: below(t), t: c.title, cls: "seed" }, ...tg.map((i) => ({ key: `c${i}`, at: below(tips[i]), t: N.ctx[i].title, s: N.ctx[i].v[s.dim!] || N.moments[momIdx(N.ctx[i].no)].sport, cls: "on" }))];
-          const cen = tg.reduce((a, i) => a.add(tips[i].p), t.p.clone()).multiplyScalar(1 / (tg.length + 1)); let r = 0; tg.forEach((i) => (r = Math.max(r, tips[i].p.distanceTo(cen))));
-          fly(cen, Math.max(70, r * 2.3), { tau: 1.0 }); playCells([t, ...tg.map((i) => tips[i])].slice(0, portrait() ? 4 : 7)); sfx.swish?.(); getCrowd().swell(0.4);
-        } else {
-          focusTips(null); t.grim = 1; t.gs = 4.4; fly(t.p, portrait() ? 34 : 26, { yaw: facing(t.p.toArray()), pitch: 0.1, tau: 0.8 }); sfx.whoosh?.(0.5);
-          lbls = [{ key: `c${s.id}`, at: below(t), t: c.title, s: undefined, cls: "lock" }]; playCells([t]);
-        }
+        const c = N.ctx[s.id], t = tips[s.id], dims = Object.keys(c.dn || {}).map(Number).sort((a, b) => c.w[b] - c.w[a]);
+        const d = s.dim ?? dims[0] ?? -1, ids = d >= 0 ? (c.dn![d] || []).map((x) => x[0]) : N.links.filter((l) => l[0] === s.id || l[1] === s.id).sort((a, b) => b[2] - a[2]).slice(0, 6).map((l) => (l[0] === s.id ? l[1] : l[0]));
+        if (s.dim === undefined && d >= 0) { const s2 = { ...s, dim: d }; st = s2; stageRef.current = s2; setStage(s2); }
+        t.gop = 1; t.grim = 1; t.gdot = 0; t.rimC.set(d >= 0 ? DIM_COLOR[d] : "#fff"); t.mat.uniforms.uRimC.value.set(d >= 0 ? DIM_COLOR[d] : "#fff");
+        const sameSpot = ring && ring.center === t; fly(t.p, pr ? 44 : 34, sameSpot ? { tau: 0.5 } : { yaw: facing(t.p.toArray()), pitch: 0.06, tau: 0.7 }); if (!sameSpot) sfx.whoosh?.(0.6); else sfx.swish?.();
+        later(sameSpot ? 0 : 350, () => { t.gs = sizeAt(t, pr ? 0.15 : 0.22); lbls = [{ key: "center", at: below(t), t: c.title, s: `${N.moments[momIdx(c.no)].sport}　${N.moments[momIdx(c.no)].title}`, h: () => t.s * (portrait() ? 0.18 : 0.24) }]; setRing(t, ids, d); getCrowd().swell(0.35); });
       }
     }
     // 近づくと動き出す: 画面の中央に近い細胞がタイトルとともに無音で流れる。さらに寄ると瞬間がほどけて文脈の世界になる
     function updateLOD() {
-      const cp = cam.position, locked = st.k === "lock" ? (st.kind === "m" ? somas[st.id] : tips[st.id]) : null;
-      const vis = (c: Cell, maxD: number) => { V.copy(c.p).project(cam); const d = cp.distanceTo(c.p); return { c, d, x: V.x, y: V.y, ok: V.z < 1 && Math.abs(V.x) < 0.85 && Math.abs(V.y) < 0.85 && d < maxD }; };
-      const ms = somas.map((x) => vis(x, 210)).filter((o) => o.ok).sort((a, b) => a.x * a.x + a.y * a.y - (b.x * b.x + b.y * b.y));
-      const close = new Set(somas.filter((x) => cp.distanceTo(x.p) < 52 && x !== locked).map((x) => x.id));
-      const ts = tips.map((x) => vis(x, 75)).filter((o) => o.ok).sort((a, b) => a.x * a.x + a.y * a.y - (b.x * b.x + b.y * b.y));
-      for (const x of somas) { if (x === locked) continue; x.gop = close.has(x.id) ? 0.22 : 1; x.gs = x.size; x.grim = 0; }
-      const nearTips = new Set(ts.slice(0, 10).map((o) => o.c.id));
-      for (const x of tips) { if (x === locked) continue; x.gs = nearTips.has(x.id) ? 3.2 : x.size; x.gop = 1; x.grim = 0; }
-      const play: Cell[] = locked ? [locked] : [];
-      const nm = portrait() ? 2 : 3;
-      if (ts.length >= 3 && (ts[0].d < 55)) play.push(...ts.slice(0, nm).map((o) => o.c)); else play.push(...ms.slice(0, nm).map((o) => o.c));
-      playCells(play.slice(0, slots.length - 1));
-      const L: Lbl[] = locked && lbls[0] ? [lbls[0]] : [];
-      for (const o of ms.slice(0, nm)) if (o.c !== locked && !(ts.length >= 3 && ts[0].d < 55)) L.push({ key: `m${o.c.id}`, at: above(o.c), t: N.moments[o.c.id].title, s: N.moments[o.c.id].sport, cls: "lod" });
-      for (const o of ts.slice(0, portrait() ? 5 : 8)) if (o.c !== locked && o.d < 60) L.push({ key: `c${o.c.id}`, at: below(o.c), t: N.ctx[o.c.id].title, cls: "lod" });
-      lbls = L;
+      const cp = cam.position;
+      const vis = (c: Cell, maxD: number) => { V.copy(c.p).project(cam); const d = cp.distanceTo(c.p); return { c, d, x: V.x, y: V.y, ok: V.z < 1 && Math.abs(V.x) < 0.8 && Math.abs(V.y) < 0.8 && d < maxD }; };
+      const ms = somas.map((x) => vis(x, 230)).filter((o) => o.ok).sort((a, b) => a.x * a.x + a.y * a.y - (b.x * b.x + b.y * b.y));
+      const ts = tips.map((x) => vis(x, 80)).filter((o) => o.ok).sort((a, b) => a.x * a.x + a.y * a.y - (b.x * b.x + b.y * b.y));
+      const ctxWorld = ts.length >= 3 && ts[0].d < 60, nm = portrait() ? 2 : 3;
+      for (const x of somas) { const d = cp.distanceTo(x.p); x.gop = d < 50 ? 0.2 : 1; x.gs = x.size; x.grim = 0; }
+      const near = new Set(ts.slice(0, ctxWorld ? 6 : 0).map((o) => o.c.id));
+      for (const x of tips) { const on = near.has(x.id); x.gs = on ? 3.4 : x.size; x.gdot = on ? 0 : 1; x.gop = 1; x.grim = 0; }
+      const play = ctxWorld ? ts.slice(0, nm).map((o) => o.c) : ms.slice(0, nm).map((o) => o.c);
+      for (const c of play) if (c.kind === "m") c.gs = c.size * 1.3;
+      playCells(play);
+      lbls = play.map((c) => (c.kind === "m" ? { key: `m${c.id}`, at: above(c), t: N.moments[c.id].title, s: N.moments[c.id].sport, h: farH(c) } : { key: `c${c.id}`, at: below(c), t: N.ctx[c.id].title, h: farH(c) }));
     }
     // 航路: いまの位置から見た領域の方角と名前（画面の縁に）。いま居る領域の名前
     function updateRegions() {
@@ -342,7 +353,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       const out = items.map((o) => { const x = W2 + Math.cos(o.ang) * rx * W2, y = H2 - (Math.sin(o.ang) * ry + cy) * H2; return { k: o.k, name: o.name, x, y, a: Math.atan2(-(o.ty - y), o.tx - x) }; });
       setChips((prev) => (prev.length === out.length && prev.every((p, i) => p.k === out[i].k && Math.abs(p.x - out[i].x) < 6 && Math.abs(p.y - out[i].y) < 6) ? prev : out));
     }
-    let fovKick = 0;
+    let fovKick = 0, viewOff = 0;
     const jumpRegion = (k: number) => { const g = N.regions[k]; go({ k: "free" }); fly(g.at, portrait() ? 95 : 75, { tau: 0.55 }); fovKick = 1; sfx.whoosh?.(1.2); getCrowd().swell(0.5);
       later(1300, () => { setToast({ t: g.name, s: `${g.ids.length}の熱狂の文脈`, key: Date.now() }); for (const i of g.ids) { if (tips[i].p.distanceTo(V.set(g.at[0], g.at[1], g.at[2])) < 60) tips[i].grim = 1; } }); };
     function decompose(mi: number) {
@@ -352,10 +363,9 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
         mt.uniforms.uMap.value = sm.uniforms.uMap.value; mt.uniforms.uHas.value = sm.uniforms.uHas.value; mt.uniforms.uWedge.value = 1;
         const a0 = -Math.PI + (j / n) * Math.PI * 2 + (hashN(mi * 31 + j) - 0.5) * 0.3, a1 = -Math.PI + ((j + 1) / n) * Math.PI * 2 + (hashN(mi * 31 + j + 1) - 0.5) * 0.3;
         mt.uniforms.uA0.value = a0; mt.uniforms.uA1.value = a1; mt.uniforms.uOp.value = 1; mesh.position.copy(p); mesh.quaternion.copy(cam.quaternion); mesh.scale.setScalar(w); mesh.renderOrder = 101; scene.add(mesh);
-        wedges.push({ mesh, to: tips[id].p.clone(), dir: (a0 + a1) / 2, t0: now + j * 0.05 }); });
+        wedges.push({ mesh, to: ring ? ringPos(j, Math.min(n, RN), new THREE.Vector3()) : tips[id].p.clone(), dir: (a0 + a1) / 2, t0: now + j * 0.05 }); });
       scr.op = 0; scr.gop = 0; stopScreen(); sfx.boom?.(); getCrowd().swell(0.6);
-      later(650, () => { lightDend(ids, now); playCells(ids.map((i) => tips[i]));
-        lbls = ids.map((i, j) => ({ key: `c${i}`, at: below(tips[i]), t: N.ctx[i].title, s: undefined, cls: `on d${j}` })); });
+
       later(1600, () => { wedges.forEach((w) => scene.remove(w.mesh)); wedges = []; });
     }
     const hashN = (i: number) => { const x = Math.sin(i * 127.1) * 43758.5453; return x - Math.floor(x); };
@@ -425,7 +435,6 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       tips.forEach((t) => setStill(t, t.id)); somas.forEach((s, k) => setStill(s, N.moments[k].ctx[0]));
       setNet(N); setStats({ m: N.moments.length, c: N.ctx.length, l: N.links.length });
       C.d = G.d = portrait() ? 560 : 430; go({ k: "free" }); fly([0, 0, 0], portrait() ? 400 : 290, { tau: 1.4 });
-      if (shared?.t?.length) { trail.push(...shared.t.filter((i) => tips[i])); drawTrail(); }
       if (shared) later(1800, async () => { // シェアされたダイジェスト: 一文を作り直して、そのまま旅を始める
         try { const r = await fetch("/api/ctx/digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: shared.i, ...(shared.s !== undefined && shared.s >= 0 ? { seed: shared.s } : { q: shared.q }) }) });
           const d = (await r.json()) as Digest; if (!d.items?.length) return; const dd = { ...d, name: shared.n || d.name, seed: shared.s, q: shared.q };
@@ -437,10 +446,12 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
     // ---- 操作 ----
     const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
     const hit = (x: number, y: number): Cell | null => { if (!N) return null; ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam);
-      const objs = [...somas, ...tips].filter((c) => c.op > 0.3).map((c) => c.mesh);
+      const objs = [...ringCells, ...somas, ...tips].filter((c) => c.op > 0.3).map((c) => c.mesh);
       // 光っているもの（ロックオン中の行き先）を、手前の暗いものより優先して拾う
-      const hs = ray.intersectObjects(objs, false).map((h) => { const u = h.object.userData as { kind: "m" | "c"; id: number }; return (u.kind === "m" ? somas : tips)[u.id]; });
-      return hs.find((c) => c.rim > 0.5 || c.grim > 0.5) || hs.find((c) => c.op > 0.6) || hs[0] || null; };
+      const hs = ray.intersectObjects(objs, false).map((h) => { const u = h.object.userData as { kind: "m" | "c" | "r"; id: number }; return u.kind === "r" ? tips[ringCells[u.id].id] : (u.kind === "m" ? somas : tips)[u.id]; });
+      const rr = ray.intersectObjects(ringCells.filter((c) => c.op > 0.3).map((c) => c.mesh), false)[0]; if (rr) return tips[ringCells[(rr.object.userData as { id: number }).id].id];
+      // 光の点（遠くの文脈）より、映像の出ている細胞を優先する
+      return hs.find((c) => c.op > 0.6 && c.dot < 0.5) || hs.find((c) => c.op > 0.6) || hs[0] || null; };
     const ptrs = new Map<number, [number, number]>(); let pinch = 0, moved = 0, downAt: [number, number] | null = null, hovered: Cell | null = null;
     const onDown = (e: PointerEvent) => { setIntro(false); getCrowd().start(); sfx.start(); ptrs.set(e.pointerId, [e.clientX, e.clientY]); el.setPointerCapture(e.pointerId); moved = 0; downAt = [e.clientX, e.clientY];
       if (ptrs.size === 2) { const [a, b] = Array.from(ptrs.values()); pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } };
@@ -456,7 +467,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
         else setHover(null); } };
     const onUp = (e: PointerEvent) => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = 0;
       if (!downAt || moved > 10) { downAt = null; return; } downAt = null; const c = hit(e.clientX, e.clientY); if (!c) return;
-      if (st.k === "lock" && st.kind === c.kind && st.id === c.id && !st.mode) return;
+      if (st.k === "lock" && st.kind === c.kind && st.id === c.id) { go({ k: "watch", kind: c.kind, id: c.id }); return; }
       go({ k: "lock", kind: c.kind, id: c.id }); };
     const onWheel = (e: WheelEvent) => { e.preventDefault(); setIntro(false); const f = Math.exp(e.deltaY * 0.0012); G.d = Math.max(8, Math.min(1100, G.d * f)); tau = 0.3;
       if (e.deltaY < 0) { ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); const pt = ray.ray.at(C.d, new THREE.Vector3()); G.t.lerp(pt, Math.min(0.5, (1 - f) * 2.2)); } };
@@ -476,6 +487,8 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       const k = 1 - Math.exp(-dt / tau);
       C.t.lerp(G.t, k); C.d += (G.d - C.d) * k; C.yaw += (G.yaw - C.yaw) * k; C.pitch += (G.pitch - C.pitch) * k;
       cam.position.copy(camPos()); cam.lookAt(C.t);
+      const offGoal = st.k === "lock" ? innerHeight * (portrait() ? (ring ? 0.25 : 0.1) : 0.08) : 0; viewOff += (offGoal - viewOff) * (1 - Math.exp(-dt / 0.4));
+      if (Math.abs(viewOff) > 0.5) cam.setViewOffset(innerWidth, innerHeight, 0, viewOff, innerWidth, innerHeight); else cam.clearViewOffset();
       fovKick = Math.max(0, fovKick - dt * 1.1); const fb = portrait() ? 64 : 50, fk = Math.sin(Math.min(1, fovKick) * Math.PI) * 26;
       if (Math.abs(cam.fov - (fb + fk)) > 0.01) { cam.fov = fb + fk; cam.updateProjectionMatrix(); }
       if (N) { lodT -= dt; if (lodOn && lodT <= 0) { lodT = 0.45; updateLOD(); } regionT -= dt; if (regionT <= 0 && (st.k === "free" || st.k === "lock")) { regionT = 0.3; updateRegions(); } }
@@ -483,13 +496,24 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       if (dendMat) dendMat.uniforms.uTime.value = now;
       if (path) ((path.material as THREE.ShaderMaterial).uniforms.uTime.value = now);
       const ko = 1 - Math.exp(-dt / 0.4);
-      for (const c of [...somas, ...tips]) {
-        c.s += (c.gs - c.s) * ko; c.op += (c.gop - c.op) * ko; c.rim += (c.grim - c.rim) * ko;
-        c.mesh.scale.setScalar(c.s); c.mesh.quaternion.copy(cam.quaternion);
+      for (const c of [...somas, ...tips, ...ringCells]) {
+        c.s += (c.gs - c.s) * ko; c.op += (c.gop - c.op) * ko; c.rim += (c.grim - c.rim) * ko; c.dot += (c.gdot - c.dot) * ko; c.mat.uniforms.uDot.value = c.dot;
+        const dd = cam.position.distanceTo(c.p), dotK = c.dot > 0.5 ? Math.max(0.22, Math.min(1, dd / 110)) : 1;
+        if (!ringCells.includes(c)) c.mesh.position.copy(c.p); c.mesh.scale.setScalar(c.s * dotK); c.mesh.quaternion.copy(cam.quaternion);
         const dist = cam.position.distanceTo(c.p), fog = Math.max(0.12, Math.min(1, 1 - (dist - 160) / 700));
         c.mat.uniforms.uOp.value = c.op * fog; c.mat.uniforms.uRim.value = c.rim; c.mesh.visible = c.op > 0.01;
         c.mesh.renderOrder = Math.round(-dist);
       }
+      // 周り: 空間のあちこちから飛んできて、中心のまわりに並ぶ（少し呼吸する）
+      if (ring) { const n = ring.ids.length, pa = ringGeo.getAttribute("position") as THREE.BufferAttribute, ca = ringGeo.getAttribute("color") as THREE.BufferAttribute, col = new THREE.Color(ring.dim >= 0 ? DIM_COLOR[ring.dim] : "#ffffff"), T = new THREE.Vector3();
+        for (let k = 0; k < RN; k++) { const rc = ringCells[k];
+          if (k >= n) { pa.setXYZ(k * 2, 0, 0, 0); pa.setXYZ(k * 2 + 1, 0, 0, 0); continue; }
+          const u = Math.max(0, Math.min(1, (now - ring.t0 - k * 0.06) / 1.0)), e = u * u * (3 - 2 * u);
+          ringPos(k, n, T); rc.mesh.position.copy(ring.from[k]).lerp(T, e); rc.p.copy(rc.mesh.position);
+          rc.gs = sizeAt(rc, portrait() ? 0.085 : 0.13) * (1 + (reduce ? 0 : Math.sin(now * 1.3 + k) * 0.02));
+          const cp0 = ring.center.mesh.position; pa.setXYZ(k * 2, cp0.x, cp0.y, cp0.z); pa.setXYZ(k * 2 + 1, rc.mesh.position.x, rc.mesh.position.y, rc.mesh.position.z);
+          const a = e * 0.75; ca.setXYZ(k * 2, col.r * a * 0.3, col.g * a * 0.3, col.b * a * 0.3); ca.setXYZ(k * 2 + 1, col.r * a, col.g * a, col.b * a); }
+        pa.needsUpdate = ca.needsUpdate = true; ringLines.visible = true; } else ringLines.visible = false;
       // 目の前の映像: 細胞の位置から育って目の前に来る
       const { p: sp, w: sw } = screenXf(scr.frac); scr.op += (scr.gop - scr.op) * (1 - Math.exp(-dt / 0.25)); scr.k = Math.min(1, scr.k + dt / 0.7);
       const e = 1 - Math.pow(1 - scr.k, 3), from = scr.from || sp;
@@ -501,7 +525,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
         const fk = Math.max(0, Math.min(1, (u - 0.18) / 0.75)), fe = fk * fk * (3 - 2 * fk);
         w.mesh.position.copy(sp).add(out).lerp(w.to, fe); w.mesh.scale.setScalar(Math.max(0.01, sw * (1 - 0.94 * fe))); w.mesh.quaternion.copy(cam.quaternion); m.uniforms.uOp.value = 1 - fk * fk; }
       renderer.render(scene, cam);
-      if (N) syncLabels();
+      if (N) syncLabels(dt);
       const wp = document.querySelector(".nw-wordpt") as HTMLElement | null;
       if (wp) { if (wordPoint) { V.copy(wordPoint).project(cam); wp.style.left = `${((V.x + 1) / 2) * innerWidth}px`; wp.style.top = `${((1 - V.y) / 2) * innerHeight}px`; wp.style.opacity = V.z < 1 ? "1" : "0"; } else wp.style.opacity = "0"; }
     }
@@ -510,7 +534,8 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       ready: () => !!N && tips.length > 0, stage: () => stageRef.current, go,
       screenOf: (kind: "m" | "c", id: number) => { const c = (kind === "m" ? somas : tips)[id]; V.copy(c.p).project(cam); return [((V.x + 1) / 2) * innerWidth, ((1 - V.y) / 2) * innerHeight, V.z]; },
       nearSoma: () => somas.map((s, k) => { V.copy(s.p).project(cam); return { k, z: V.z, x: V.x, y: V.y, o: s.op }; }).filter((x) => x.o > 0.6 && x.z < 1 && Math.abs(x.x) < 0.6 && Math.abs(x.y) < 0.6).sort((a, b) => a.z - b.z)[0]?.k,
-      playing: () => slots.filter((s) => s.owner && !s.v.paused && s.v.readyState >= 2).length, screenSound: () => !scrSlot.v.muted && !scrSlot.v.paused, found: () => foundSet.size, regions: () => N.regions.length,
+      ringOf: (k: number) => { const c = ringCells[k]; V.copy(c.mesh.position).project(cam); return [((V.x + 1) / 2) * innerWidth, ((1 - V.y) / 2) * innerHeight, c.op, c.id]; }, ringN: () => (ring ? ring.ids.length : 0),
+      playing: () => slots.filter((s) => s.owner && !s.v.paused && s.v.readyState >= 2).length, screenSound: () => !scrSlot.v.muted && !scrSlot.v.paused, regions: () => N.regions.length,
     };
     return () => { alive = false; clearLater(); removeEventListener("resize", resize); renderer.dispose(); el.innerHTML = ""; lh.innerHTML = ""; slots.forEach((s) => { s.v.pause(); s.v.src = ""; }); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -518,7 +543,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
 
   const submit = (e?: React.FormEvent) => { e?.preventDefault(); const w = (q.trim() || EX[ph]).slice(0, 40); setNote(""); setQ(""); getCrowd().start(); sfx.start(); api.current?.word(w); };
   const d = stage.k === "digest" || stage.k === "end" ? stage.d : null;
-  const shareUrl = d && typeof window !== "undefined" ? `${location.origin}/d/${enc({ n: d.name, s: d.seed ?? -1, q: d.q, i: d.items.map((x) => x.id), t: trailIds.slice(-16) })}` : "";
+  const shareUrl = d && typeof window !== "undefined" ? `${location.origin}/d/${enc({ n: d.name, s: d.seed ?? -1, q: d.q, i: d.items.map((x) => x.id), t: [] })}` : "";
   const shareText = d ? `熱狂ダイジェスト「${d.name}」— ${d.items.length}本の瞬間が「${d.seedTitle}」で繋がった #DAZNAWARDS2026` : "";
   const share = async () => { if (!d) return; try { if (navigator.share) { await navigator.share({ title: d.name, text: shareText, url: shareUrl }); return; } } catch { /* 下のボタンで */ }
     try { await navigator.clipboard.writeText(`${shareText} ${shareUrl}`); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* */ } };
@@ -531,20 +556,19 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       <div className="nw-wordpt">{stage.k === "explore" && stage.q ? stage.q : ""}</div>
       <header className="nw-head">
         <a href="/moments" className="nw-logo">DAZN <em>100</em> MOMENTS</a>
-        <div className="nw-found" title="ロックオンした熱狂の文脈">見つけた熱 <b>{found}</b> / {stats?.c ?? "—"}</div>
       </header>
       {stage.k === "free" && stats && (intro || here) && (
         <div className="nw-intro">
           {intro && <div className="nw-stat"><b>{stats.m}</b>の瞬間<i>→</i><b>{stats.c}</b>の熱狂の文脈<i>→</i><b>{stats.l.toLocaleString()}</b>の響き合い</div>}
-          {intro && <p>近づくと瞬間が動き出す。押すとロックオン。縁の行き先を押すと、その熱の領域へ跳ぶ。</p>}
+          {intro && <p>近づくと瞬間が流れ出す。押すと、それを中心に熱が集まる。</p>}
           {here && <div className="nw-here">いま「{here}」の領域</div>}
         </div>
       )}
-      {(stage.k === "free" || stage.k === "lock") && chips.map((c) => (
-        <button key={c.k} className="nw-chip" style={{ left: c.x, top: c.y }} onClick={() => { setIntro(false); api.current?.fly(c.k); }}>
-          <i style={{ transform: `rotate(${-c.a}rad)` }}>➤</i>{c.name}
-        </button>
-      ))}
+      {stage.k === "free" && chips.length > 0 && (
+        <div className="nw-dest">{chips.slice(0, 3).map((c) => (
+          <button key={c.k} onClick={() => { setIntro(false); api.current?.fly(c.k); }}><i style={{ transform: `rotate(${-c.a}rad)` }}>➤</i>{c.name}</button>
+        ))}</div>
+      )}
       {toast && <div className="nw-toast" key={toast.key}><b>{toast.t}</b>{toast.s && <span>{toast.s}</span>}</div>}
       {stage.k === "lock" && net && <LockBar s={stage} net={net} api={api} />}
       {stage.k === "watch" && <button className="nw-close" onClick={() => api.current?.go({ k: "lock", kind: stage.kind, id: stage.id })}>← 戻る</button>}
@@ -599,42 +623,34 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
   );
 }
 
-// ロックオンしたものでできること（画面下のボタン）
+// ロックオンしたもの（中心）の下の欄: 名前と、見方を替えるボタン（チャンネル）と、音つきで観る・この熱で探す
 function LockBar({ s, net, api }: { s: Extract<Stage, { k: "lock" }>; net: Net; api: React.MutableRefObject<{ go: (s: Stage) => void } | null> }) {
   const go = (x: Stage) => api.current?.go(x);
   if (s.kind === "m") {
     const m = net.moments[s.id];
     return (
       <div className="nw-bar">
-        <button className="x" onClick={() => go({ k: "free" })} aria-label="ロックを外す">×</button>
-        <div className="h"><b>{m.title}</b><span>{m.sport}・{m.ctx.length}つの熱狂の文脈</span></div>
-        <div className="a">
-          <button onClick={() => go({ k: "watch", kind: "m", id: s.id })}>▶ 観る</button>
-          <button className={s.mode === "open" ? "on" : ""} onClick={() => go({ k: "lock", kind: "m", id: s.id, mode: "open" })}>分解する</button>
-          <button className={s.mode === "links" ? "on" : ""} onClick={() => go({ k: "lock", kind: "m", id: s.id, mode: "links" })}>繋がりを見る</button>
-        </div>
+        <button className="x" onClick={() => go({ k: "free" })} aria-label="外す">×</button>
+        <div className="h"><b>{m.title}</b><span>{m.sport}　周りの熱を押すと、そこから繋がる瞬間へ飛ぶ</span></div>
+        <div className="a"><button onClick={() => go({ k: "watch", kind: "m", id: s.id })}>▶ 音つきで観る</button></div>
       </div>
     );
   }
-  const c = net.ctx[s.id], mo = net.moments.find((x) => x.no === c.no)!;
+  const c = net.ctx[s.id];
   const dims = Object.keys(c.dn || {}).map(Number).sort((a, b) => c.w[b] - c.w[a]).slice(0, 4);
   return (
     <div className="nw-bar">
-      <button className="x" onClick={() => go({ k: "free" })} aria-label="ロックを外す">×</button>
-      <div className="h"><b>{c.title}</b><span>{c.line}</span><em>{mo.sport}　{mo.title}</em></div>
+      <button className="x" onClick={() => go({ k: "free" })} aria-label="外す">×</button>
+      <div className="h"><b>{c.title}</b><span>{c.line}</span></div>
       {dims.length > 0 && (
         <div className="v">
-          <small>この熱を、どの見方で繋ぐ？</small>
           {dims.map((d) => (
-            <button key={d} className={s.mode === "dim" && s.dim === d ? "on" : ""} style={{ borderColor: DIM_COLOR[d] }} onClick={() => go({ k: "lock", kind: "c", id: s.id, mode: "dim", dim: d })}>
-              <i style={{ background: DIM_COLOR[d] }} />{c.v[d]}
-            </button>
+            <button key={d} className={s.dim === d ? "on" : ""} style={{ borderColor: DIM_COLOR[d], ...(s.dim === d ? { background: DIM_COLOR[d], color: "#000" } : {}) }} onClick={() => go({ k: "lock", kind: "c", id: s.id, dim: d })}>{c.v[d]}</button>
           ))}
         </div>
       )}
       <div className="a">
-        <button onClick={() => go({ k: "watch", kind: "c", id: s.id })}>▶ この熱の4秒</button>
-        <button onClick={() => go({ k: "lock", kind: "m", id: net.moments.indexOf(mo) })}>この瞬間へ</button>
+        <button onClick={() => go({ k: "watch", kind: "c", id: s.id })}>▶ 音つきで観る</button>
         <button className="go" onClick={() => go({ k: "explore", seed: s.id })}>この熱で100本を探す</button>
       </div>
     </div>
@@ -712,20 +728,21 @@ const CSS = `
 .nw-found{font-size:11px;color:rgba(255,255,255,.75);background:rgba(0,0,0,.45);padding:6px 10px;border:1px solid rgba(255,255,255,.18);white-space:nowrap}.nw-found b{color:#ffee55;font-size:14px;margin:0 2px}
 .nw-head{gap:8px}.nw-head>.nw-back{margin-left:auto}
 .nw-here{display:inline-block;margin-top:10px;font-size:12px;color:#ffee55;letter-spacing:.06em}
-.nw-chip{position:absolute;transform:translate(-50%,-50%);z-index:4;background:rgba(0,0,0,.62);border:1px solid rgba(255,238,85,.55);color:#fff;font-size:12px;font-weight:700;padding:7px 11px 7px 8px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;transition:left .25s linear,top .25s linear}
-.nw-chip i{font-style:normal;color:#ffee55;display:inline-block;font-size:11px}
-.nw-chip:hover{background:rgba(255,238,85,.18)}
+.nw-dest{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 74px);display:flex;gap:8px;z-index:4;max-width:calc(100% - 24px);justify-content:center;flex-wrap:wrap}
+.nw-dest button{background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.28);color:#fff;font-size:12px;font-weight:700;padding:7px 11px 7px 9px;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;backdrop-filter:blur(4px)}
+.nw-dest button i{font-style:normal;color:#ffee55;display:inline-block;font-size:10px}
+.nw-dest button:hover{border-color:#ffee55}
 .nw-toast{position:absolute;left:0;right:0;top:38%;text-align:center;pointer-events:none;z-index:4;animation:nwToast 3.2s ease both}.nw-toast b{display:block;font-size:clamp(28px,4.6vw,56px);font-weight:900;text-shadow:0 2px 24px #000,0 0 4px #000}.nw-toast span{font-size:12px;color:rgba(255,255,255,.75)}
 @keyframes nwToast{0%{opacity:0;letter-spacing:.3em}15%{opacity:1;letter-spacing:.04em}75%{opacity:1}100%{opacity:0}}
 .nw-lb.lock b{font-size:16px;color:#fff}.nw-lb.lock span{font-size:11px}
 .nw-lb.lod b{font-size:12px;animation:nwRise .7s ease both}.nw-lb.lod span{animation:nwRise .7s .1s ease both}
 @keyframes nwRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.nw-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);width:min(760px,calc(100% - 24px));z-index:5;background:rgba(0,0,0,.72);border:1px solid rgba(255,255,255,.18);padding:12px 14px 12px;box-sizing:border-box;animation:nwBar .35s ease both}
+.nw-bar{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 12px);width:min(640px,calc(100% - 24px));z-index:5;background:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.75));border:0;border-top:1px solid rgba(255,255,255,.14);padding:12px 14px 12px;backdrop-filter:blur(6px);box-sizing:border-box;animation:nwBar .35s ease both}
 @keyframes nwBar{from{opacity:0}to{opacity:1}}
 .nw-bar .x{position:absolute;right:6px;top:4px;background:none;border:0;color:rgba(255,255,255,.7);font-size:20px;cursor:pointer;padding:2px 8px}
-.nw-bar .h{padding-right:28px}.nw-bar .h b{display:block;font-size:17px;font-weight:900}.nw-bar .h span{display:block;font-size:12px;color:rgba(255,255,255,.85);margin-top:3px;line-height:1.5}.nw-bar .h em{display:block;font-style:normal;font-size:10px;color:rgba(255,255,255,.55);margin-top:2px}
-.nw-bar .v{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;align-items:center}.nw-bar .v small{width:100%;font-size:10px;color:rgba(255,255,255,.55)}
-.nw-bar .v button{background:rgba(255,255,255,.05);border:1px solid;color:#fff;font-size:12px;padding:6px 10px;cursor:pointer;display:flex;align-items:center;gap:6px}.nw-bar .v button i{width:7px;height:7px;display:inline-block}
+.nw-bar .h{padding-right:28px}.nw-bar .h b{display:block;font-size:17px;font-weight:900}.nw-bar .h span{display:block;font-size:12px;color:rgba(255,255,255,.75);margin-top:3px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.nw-bar .h em{display:block;font-style:normal;font-size:10px;color:rgba(255,255,255,.55);margin-top:2px}
+.nw-bar .v{display:flex;gap:6px;margin-top:9px;align-items:center;overflow-x:auto;scrollbar-width:none}
+.nw-bar .v button{flex:0 0 auto;background:rgba(0,0,0,.4);border:1px solid;color:#fff;font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer;border-radius:999px;transition:background .2s}
 .nw-bar .v button.on{background:rgba(255,255,255,.2)}
 .nw-bar .a{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}.nw-bar .a button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:13px;font-weight:700;padding:9px 14px;cursor:pointer}
 .nw-bar .a button.on{background:rgba(255,255,255,.25)}.nw-bar .a .go{background:#ffff00;color:#000;border-color:#ffff00;margin-left:auto}
