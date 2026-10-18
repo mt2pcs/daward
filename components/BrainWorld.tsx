@@ -1,11 +1,11 @@
 "use client";
-// 競技を越えて、同じ熱が集まる（/lab/brain）。2026-10-19 のユーザー判定で組み直した流れ:
+// 競技を越えて、同じ熱が集まる（/lab/brain）。2026-10-19 夜のユーザー判定で作り直した流れ:
 //   開く: 表面に77本の映像が並び、手前の数本が動き、内側を色の線が走る（拡散MRIのトラクトグラフィーの表現）。一行と「熱狂を探す」の入力欄。
-//   映像を観る: 映像に触れると寄って、その1本が音つきで流れる。流れ出してすぐ、光の帯が映像を読み、映像の小片が剥がれて熱の言葉に変わる（時刻の目盛りは出さない）。
-//   熱を選ぶ: 本物のコマを通ってその時刻へ走り（コマ飛び→一瞬のジャギーと光）、その場面が流れて言葉が打ち込まれる。
-//   熱狂接続中: 場面のあと、カメラが引いて全体が映り、全体が鼓動し、選んだ熱から照合の波が広がる。繋がった熱への線だけが残って光る。
-//   旅（＝ダイジェスト）: 線をたどって1本ずつ飛び、着いた映像が音つきで流れ、似た熱の名前がバッと出る。最後に引いた全体図と「この熱狂グループをシェア」。
-//   「熱狂を探す」: 打った言葉が中心の光になり、同じく接続→旅→全体図。
+//   観る（熱を採る）: 映像に触れると寄って音つきで流れ、光の帯が映像を読み、読んだところが光の粒にほどける。熱の場所から粒が螺旋で流れ出し、言葉の場所で滴になり、言葉が一字ずつ滲み出る。
+//   熱を選ぶ（時を走る）: 滴が映像へ戻る → 通った本物のコマがフィルムの帯になって横へ流れる → 最後のコマが映像いっぱいに広がり、光と衝撃の輪 → 少しゆっくり流れ出し、名前と一文が打ち込まれる。
+//   熱狂接続中: カメラが引いて全体が鼓動し、選んだ熱から照合の波が広がる → 繋がった熱への線だけが残る。
+//   旅（＝ダイジェスト）: 前の旅（cfca682）を土台に、出発の熱の入口へ降り、線の中を端から端まで通って相手の熱から表へ出る（約5秒。同じ見方の線が光る。飛行中は両端の言い方）
+//     → 着いたら両端の熱・言い方・理由の一文を見せてから、その熱の4秒を音つきで流す → 次へ。最後に引いた全体図と「この熱狂グループをシェア」。
 //   画面に出さない言葉: 脳・束・線維・葉（会話のための言葉）。見方の切り替えは無い（2026-10-19 決定）。
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
@@ -23,7 +23,7 @@ type View =
   | { k: "free" }
   | { k: "watch"; m: number; ready: boolean }
   | { k: "scrub"; m: number; c: number }
-  | { k: "trip"; seed: number; q?: string; items: Item[]; i: number; mv?: boolean }
+  | { k: "trip"; seed: number; q?: string; items: Item[]; i: number; ph?: "fly" | "link" | "play" }
   | { k: "search"; q: string }
   | { k: "map"; seed: number; q?: string; items: Item[] };
 type Shared = { n: string; s?: number; q?: string; i: number[] };
@@ -59,7 +59,7 @@ type Api = { watch: (m: number) => void; heat: (c: number) => void; search: (q: 
 export default function BrainWorld({ media, shared }: { media: MediaMap; shared?: Shared }) {
   const host = useRef<HTMLDivElement>(null), txRef = useRef<HTMLDivElement>(null);
   const api = useRef<Api | null>(null);
-  const hooks = useRef<{ slam?: (c: number) => void; view?: (v: View) => void; name?: (n: string) => void }>({});
+  const hooks = useRef<{ slam?: (c: number) => void; view?: (v: View) => void; name?: (n: string) => void; lines?: (l: Record<number, string>) => void }>({});
   const [net, setNet] = useState<Net | null>(null);
   const [view, setView] = useState<View>({ k: "free" });
   const [q, setQ] = useState("");
@@ -67,6 +67,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
   const [gname, setGname] = useState("");
   const [share, setShare] = useState(false);
   const [toast, setToast] = useState("");
+  const [lines, setLines] = useState<Record<number, string>>({});
 
   useEffect(() => {
     const el = host.current!, tx = txRef.current!; let alive = true;
@@ -227,7 +228,9 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
         gl_FragColor = vec4(c * a, a); }`;
     let rootGeo: THREE.BufferGeometry, rootA: Float32Array, nodeGeo: THREE.BufferGeometry, nodeA: Float32Array, nodeS: Float32Array;
     const intros: { value: number }[] = [];
-    function buildCortex(atl: THREE.Texture[]) {
+    let atls: THREE.Texture[] = [];
+    const setTileFrame = (m: number, id: number) => { const u = tiles[m].mat.uniforms, k = id % 256; if (atls[Math.floor(id / 256)]) u.uAt.value = atls[Math.floor(id / 256)]; (u.uRect.value as THREE.Vector4).set((k % 16) / 16, 1 - (Math.floor(k / 16) + 1) / 16, 1 / 16, 1 / 16); };
+    function buildCortex(atl: THREE.Texture[]) { atls = atl;
       const geo = new THREE.PlaneGeometry(1, 9 / 16), blank = new THREE.Texture();
       tiles = N.moments.map((mo, m) => { const id = mo.ctx[0], s = Math.floor(id / 256), k = id % 256;
         const mat = new THREE.ShaderMaterial({ vertexShader: TILE_V, fragmentShader: TILE_F, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
@@ -248,7 +251,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       N.ctx.forEach((c, i) => { np.set([EP[i].x, EP[i].y, EP[i].z], i * 3); const cc = c3[c.w.indexOf(Math.max(...c.w))].clone().lerp(new THREE.Color("#ffffff"), 0.35); nc.set([cc.r, cc.g, cc.b], i * 3); });
       nodeGeo = new THREE.BufferGeometry(); nodeGeo.setAttribute("position", new THREE.BufferAttribute(np, 3)); nodeGeo.setAttribute("col", new THREE.BufferAttribute(nc, 3)); nodeGeo.setAttribute("a", new THREE.BufferAttribute(nodeA, 1)); nodeGeo.setAttribute("sz", new THREE.BufferAttribute(nodeS, 1));
       const nm = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, uniforms: { uPx: { value: R.getPixelRatio() }, uIntro: { value: 0 } },
-        vertexShader: `attribute vec3 col; attribute float a, sz; uniform float uPx, uIntro; varying vec3 vC; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); gl_PointSize = uPx * sz * 300. / -mv.z; vC = col; vA = a * uIntro; gl_Position = projectionMatrix * mv; }`,
+        vertexShader: `attribute vec3 col; attribute float a, sz; uniform float uPx, uIntro; varying vec3 vC; varying float vA; void main(){ vec4 mv = modelViewMatrix * vec4(position,1.); gl_PointSize = min(uPx * sz * 300. / -mv.z, uPx * 46.); vC = col; vA = a * uIntro; gl_Position = projectionMatrix * mv; }`,
         fragmentShader: `precision highp float; varying vec3 vC; varying float vA; void main(){ float r = length(gl_PointCoord - .5) * 2.; float k = smoothstep(1., .55, r) * .5 + smoothstep(.42, .3, r); gl_FragColor = vec4(vC * k * vA, k * vA); }` });
       scene.add(new THREE.Points(nodeGeo, nm)); intros.push(nm.uniforms.uIntro);
     }
@@ -421,7 +424,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     }
     const linkOf = (c: number, j: number) => { let best = -1, bn = -1; linksOf[c]?.forEach((n) => { if (other(n, c) === j && N.links[n][2] > best) { best = N.links[n][2]; bn = n; } }); return bn; };
     const pathTo = (seed: number, it: Item) => { if (seed < 0) return wordPath(it.id); const n = linkOf(seed, it.id); return n >= 0 ? pathFrom(n, seed) : wordPath(it.id); };
-    function reset() { setFat([]); wordOpG = 0; ext = null; beatG = 0; waveA = 0; stems([]); tiles.forEach((t) => { t.liftG = 0; t.goal = 16; t.dimG = 1; (t.mat.uniforms.uRim.value as THREE.Color).set("#f4f2ec"); t.mat.uniforms.uHi.value = 0; }); }
+    function reset() { setFat([]); wordOpG = 0; ext = null; beatG = 0; waveA = 0; stems([]); tiles.forEach((t) => { setTileFrame(t.m, N.moments[t.m].ctx[0]); t.liftG = 0; t.goal = 16; t.dimG = 1; (t.mat.uniforms.uRim.value as THREE.Color).set("#f4f2ec"); t.mat.uniforms.uHi.value = 0; }); }
     function releaseMain() { const t = tiles[mainTile]; if (t) { t.mat.uniforms.uUseVid.value = 0; t.mat.uniforms.uVid.value = new THREE.Texture(); } mainV.pause(); mainTile = -1; mainOk = false; scrub = null; }
     function free() { go({ k: "free" }); if (mainTile >= 0) releaseMain(); reset(); paintFibers(() => 1); setNodes(() => [0.7, 1]); setRoots(() => 0.35); setPlaying([]); liveAt = 0;
       camG.dist = portrait() ? 470 : 235; tgtG.set(0, 0, 0); }
@@ -459,7 +462,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       const from = seed >= 0 ? MP[momOf[seed]].tile : WORDP, dir = from.clone().normalize();
       camG.yaw = Math.atan2(dir.x, dir.z) + 0.35; camG.pitch = 0.32; camG.dist = portrait() ? 460 : 270; tgtG.set(0, 0, 0);
       paintFibers(() => 1); beatG = 1; waveC.copy(seed >= 0 ? EP[seed] : WORDP); waveR = 0; waveA = 1;
-      grp++; if (nm) setName(nm); else { setName(""); if (seed >= 0) nameGroup({ seed, ids: [seed, ...items.map((x) => x.id)] }); }
+      grp++; if (nm) setName(nm); else { setName(""); setLines({}); } if (seed >= 0 && (!nm || !Object.keys(lines).length)) nameGroup({ seed, ids: [seed, ...items.map((x) => x.id)] }, !!nm);
       // 繋がる: 照合の波が一周したところで、行き先の線だけが選んだ熱から伸びる
       later(reduce ? 0.6 : 2.6, () => { const pj = new Set(items.map((x) => x.id)), pn = new Set(items.map((x) => (seed >= 0 ? linkOf(seed, x.id) : -1)));
         paintFibers((n) => (pn.has(n) ? 2 : 0), (n) => N.links[n][1] === seed); setFat(items.map((it) => ({ pts: pathTo(seed, it), d: it.d })), 1.2);
@@ -467,26 +470,40 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
         tiles.forEach((t) => { const it = items.find((x) => momOf[x.id] === t.m); t.dimG = it || (seed >= 0 && t.m === momOf[seed]) ? 1.1 : 0.22; (t.mat.uniforms.uRim.value as THREE.Color).set(it ? DIMC[it.d] : "#f4f2ec"); t.mat.uniforms.uHi.value = it ? 0.9 : 0; });
         if (st.k === "trip") setV({ ...st, i: -1 }); waveA = 0;
         later(reduce ? 0.6 : 1.9, () => hop(0)); }); }
-    // 旅: 線をたどって1本ずつ。着くとその映像が大きく流れ、似た熱の名前がバッと出る
-    let fly: null | { pts: THREE.Vector3[]; t0: number; dur: number; look: THREE.Vector3; done: () => void } = null;
+    // 旅（＝ダイジェスト）。前の旅（cfca682: 外から入口へ降り、線を端から端まで通り、出口から出る。5.2秒）を土台に:
+    //   出発の熱（選んだ熱、言葉なら中心の光）の入口へ外から降りる → その熱から相手の熱まで線の中を端から端まで通る（通る線と同じ見方の線が光り、出発側から光が走る。飛んでいる間は両端の言い方）
+    //   → 相手の熱の出口から表へ抜け、横から回り込んで映像の正面へ → 繋がりを見せる（両端の熱・言い方・理由の一文。映像はまだ止まったまま）→ その熱の4秒が音つきで流れる → 次へ
+    let fly: null | { pts: THREE.Vector3[]; t0: number; dur: number; look: THREE.Vector3; from: THREE.Vector3; lf: number; lk0: number; done: () => void } = null;
     function hop(i: number) { if (st.k !== "trip") return; const s = st, it = s.items[i]; if (!it) { toMap(); return; }
-      beatG = 0; mainV.pause(); setV({ ...s, mv: true }); const m = momOf[it.id], t = tiles[m], S = 30, f = portrait() ? 0.94 : 0.56, tn = Math.tan((fov0() * Math.PI) / 360), dist = S / (f * 2 * tn * (portrait() ? innerWidth / innerHeight : Math.min(1.9, innerWidth / innerHeight)));
-      // 線の中を通って、行き先の手前で表へ抜け、横から回り込んで正面へ（板を突き抜けない・外の暗がりを向かない）
-      const P = pathTo(s.seed, it), inner = P.slice(Math.floor(P.length * (i === 0 ? 0.15 : 0.4)), Math.floor(P.length * 0.75) + 1).filter((_, k) => k % 2 === 0);
-      const T = MP[m].tile, nn = MP[m].n, side = cam.position.clone().sub(T); side.addScaledVector(nn, -side.dot(nn)); if (side.lengthSq() < 1) side.copy(nn).cross(V(0, 1, 0)); side.normalize();
-      const end = T.clone().addScaledVector(nn, dist), exit = T.clone().addScaledVector(nn, dist * 0.45).addScaledVector(side, dist * 0.6);
-      const pts = new THREE.CatmullRomCurve3([cam.position.clone(), ...inner, exit, end], false, "centripetal").getPoints(160);
-      setPlaying([]); t.goal = S; t.liftG = 0; t.dimG = 1.15;
-      fly = { pts, t0: now, dur: reduce ? 0.8 : i === 0 ? 2.1 : 1.7, look: MP[m].tile.clone(), done: () => { setV({ ...s, i, mv: false }); playOn(m, clipOf(it.id), true);
-        camG.yaw = Math.atan2(MP[m].n.x, MP[m].n.z); camG.pitch = Math.max(-1, Math.min(1, Math.asin(MP[m].n.y))); camG.dist = dist; tgtG.copy(MP[m].tile); syncCam();
-        later(reduce ? 2 : 4.2, () => { t.goal = 16; t.dimG = 1.1; hop(i + 1); }); } }; }
+      beatG = 0; mainV.pause(); setPlaying([]);
+      const m = momOf[it.id], t = tiles[m], S = 30, f = portrait() ? 0.94 : 0.56, tn = Math.tan((fov0() * Math.PI) / 360), dist = S / (f * 2 * tn * (portrait() ? innerWidth / innerHeight : Math.min(1.9, innerWidth / innerHeight)));
+      const n = s.seed >= 0 ? linkOf(s.seed, it.id) : -1, P = pathTo(s.seed, it), A = P[0];
+      const in0 = s.seed >= 0 ? A.clone().addScaledVector(normalAt(A), 60) : A.clone().add(cam.position.clone().sub(A).normalize().multiplyScalar(40));
+      const T = MP[m].tile, nn = MP[m].n, side = in0.clone().sub(T); side.addScaledVector(nn, -side.dot(nn)); if (side.lengthSq() < 1) side.copy(nn).cross(V(0, 1, 0)); side.normalize();
+      const end = T.clone().addScaledVector(nn, dist), exit = T.clone().addScaledVector(nn, dist * 0.42).addScaledVector(side, dist * 0.62);
+      const ctrl = [cam.position.clone(), in0, ...P, exit, end], pts = new THREE.CatmullRomCurve3(ctrl, false, "centripetal").getPoints(360);
+      let len = 0; for (let k = 1; k < pts.length; k++) len += pts[k].distanceTo(pts[k - 1]);
+      const dur = reduce ? 1.4 : Math.max(5.0, Math.min(6.6, 3.9 + len / 520));
+      // 通る線と同じ見方の線を光らせ、出発の熱から光が走る（前の旅と同じ）。通る線は太く、カメラと一緒に伸びる
+      if (n >= 0) paintFibers((x) => (x === n || N.links[x][3] === it.d ? 2 : 1), (x) => N.links[x][0] !== s.seed); else paintFibers((x) => (N.links[x][3] === it.d ? 2 : 1));
+      setFat([{ pts: P, d: it.d }], dur * 0.8); setNodes((x) => (x === it.id || x === s.seed ? [1.6, 3] : [0.4, 0.9])); setRoots((x) => (x === it.id || x === s.seed ? 1 : 0.15));
+      tiles.forEach((x) => { x.goal = 16; x.liftG = 0; x.dimG = x.m === m ? 1.15 : 0.6; }); t.goal = S; setTileFrame(m, it.id); (t.mat.uniforms.uRim.value as THREE.Color).set(DIMC[it.d]); t.mat.uniforms.uHi.value = 0.9;
+      setV({ ...s, i, ph: "fly" });
+      fly = { pts, t0: now, dur, look: T.clone(), from: A.clone(), lf: 2.4 / (ctrl.length - 1), lk0: (ctrl.length - 3.6) / (ctrl.length - 1), done: () => arrive(s, i, n, dist) }; }
+    function arrive(s: Extract<View, { k: "trip" }>, i: number, n: number, dist: number) { const it = s.items[i], m = momOf[it.id];
+      camG.yaw = Math.atan2(MP[m].n.x, MP[m].n.z); camG.pitch = Math.max(-1, Math.min(1, Math.asin(MP[m].n.y))); camG.dist = dist; tgtG.copy(MP[m].tile); syncCam();
+      // 繋がりを見せる間、映像はその熱の最初のコマで止めておく（先に読み込んでおく）
+      if (n >= 0) paintFibers((x) => (x === n ? 2 : N.links[x][3] === it.d ? 1 : 0)); setPlaying([{ tile: m, src: clipOf(it.id) }]); slots.forEach((x) => { if (x.tile === m) x.v.pause(); });
+      setV({ ...s, i, ph: "link" }); later(reduce ? 0.8 : 2.6, () => play(s, i)); }
+    function play(s: Extract<View, { k: "trip" }>, i: number) { const it = s.items[i], m = momOf[it.id];
+      setPlaying([{ tile: m, src: clipOf(it.id), sound: true }]); setV({ ...s, i, ph: "play" }); later(reduce ? 2 : 4.2, () => hop(i + 1)); }
     // 飛んだ後・途中で止めた後に、今のカメラの位置と向きから回る動きへ戻す（跳ばないように）
     function syncCam() { const fwd = cam.getWorldDirection(V()), d = Math.max(40, cam.position.distanceTo(tgtG)); tgtC.copy(cam.position).addScaledVector(fwd, d); const o = cam.position.clone().sub(tgtC);
       cam0.dist = d; cam0.yaw = Math.atan2(o.x, o.z); cam0.pitch = Math.asin(Math.max(-1, Math.min(1, o.y / d))); }
     // 全体図: 引いて、集めた熱の映像が浮かび、線で結ばれた形を見せる → シェア
     function toMap() { if (st.k !== "trip") return; const s = st; go({ k: "map", seed: s.seed, q: s.q, items: s.items }); setPlaying([]);
       const ms = [...(s.seed >= 0 ? [momOf[s.seed]] : []), ...s.items.map((x) => momOf[x.id])];
-      tiles.forEach((t) => { const it = s.items.find((x) => momOf[x.id] === t.m); const isSeed = s.seed >= 0 && t.m === momOf[s.seed]; t.goal = it ? 22 : isSeed ? 24 : 15; t.liftG = it || isSeed ? 1 : 0; t.dimG = it || ms.includes(t.m) ? 1.05 : 0.18; });
+      tiles.forEach((t) => { const it = s.items.find((x) => momOf[x.id] === t.m); const isSeed = s.seed >= 0 && t.m === momOf[s.seed]; if (it) setTileFrame(t.m, it.id); else if (isSeed) setTileFrame(t.m, s.seed); t.goal = it ? 22 : isSeed ? 24 : 15; t.liftG = it || isSeed ? 1 : 0; t.dimG = it || ms.includes(t.m) ? 1.05 : 0.18; });
       setFat(s.items.map((it) => ({ pts: pathTo(s.seed, it), d: it.d })), 0.8); wordOpG = s.seed < 0 ? 1 : 0;
       later(0.5, () => setPlaying(s.items.map((x) => ({ tile: momOf[x.id], src: clipOf(x.id) }))));
       frameGroup(ms); }
@@ -499,15 +516,19 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       let ex = 0, ey = 0; xy.forEach(([x, y]) => { ex = Math.max(ex, Math.abs(x * Math.cos(rl) + y * Math.sin(rl))); ey = Math.max(ey, Math.abs(-x * Math.sin(rl) + y * Math.cos(rl))); });
       const tn = Math.tan((fov0() * Math.PI) / 360), asp = innerWidth / innerHeight * (pr ? 1 : 0.92);
       camG.yaw = yaw; camG.pitch = pitch; rollG = rl; camG.dist = Math.max(110, Math.max((ey + 16) / (tn * (pr ? 0.7 : 0.86)), (ex + 14) / (tn * asp)) * 1.04 + 20); tgtG.copy(c); }
-    let grp = 0, gn = ""; const setName = (n: string) => { gn = n; hooks.current.name?.(n); };
-    async function nameGroup(body: object) { const g = grp; try { const r = await fetch("/api/ctx/digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json(); if (j?.name && g === grp) setName(j.name); } catch { /* 名前なしでも進める */ } }
+    // 名前（AI）と、行き先ごとの理由の一文（選んだ熱の側から見た一文。API が返す）
+    let grp = 0, gn = "", lines: Record<number, string> = {}; const setName = (n: string) => { gn = n; hooks.current.name?.(n); };
+    const setLines = (l: Record<number, string>) => { lines = l; hooks.current.lines?.(l); };
+    const linesOf = (items?: { id: number; line?: string }[]) => Object.fromEntries((items || []).filter((x) => x.line).map((x) => [x.id, x.line as string]));
+    async function nameGroup(body: object, keepName = false) { const g = grp; try { const r = await fetch("/api/ctx/digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json();
+      if (g !== grp) return; if (j?.items) setLines(linesOf(j.items)); if (j?.name && !keepName) setName(j.name); } catch { /* 名前と一文が無くても進める */ } }
     // 熱狂を探す: 言葉が中心の光になり、同じく接続 → 旅
-    async function search(q: string) { if (!q.trim()) return; go({ k: "search", q }); grp++; setName(""); if (mainTile >= 0) releaseMain(); reset(); setPlaying([]);
+    async function search(q: string) { if (!q.trim()) return; go({ k: "search", q }); grp++; setName(""); setLines({}); if (mainTile >= 0) releaseMain(); reset(); setPlaying([]);
       paintFibers(() => 1); wordOpG = 1; camG.dist = portrait() ? 460 : 270; tgtG.set(0, 0, 0); beatG = 1; waveC.copy(WORDP); waveR = 0; waveA = 1; const t = tok;
       try { const r = await fetch("/api/ctx/digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q }) }); const j = await r.json();
         if (!alive || t !== tok) return; if (!j?.items?.length) { beatG = 0; waveA = 0; setName("この言葉では見つかりませんでした"); return; }
         const seen = new Set<number>(), items: Item[] = (j.items as { id: number; dim: number }[]).filter((x) => N.ctx[x.id] && !seen.has(momOf[x.id]) && seen.add(momOf[x.id])).slice(0, 7).map((x) => ({ id: x.id, d: x.dim >= 0 ? x.dim : N.ctx[x.id].w.indexOf(Math.max(...N.ctx[x.id].w)) }));
-        connect(-1, q, items, j.name || q);
+        setLines(linesOf(j.items)); connect(-1, q, items, j.name || q);
       } catch { if (t === tok) { beatG = 0; waveA = 0; setName("この言葉では見つかりませんでした"); } } }
     function back() { if (st.k === "scrub" || (st.k === "watch")) { free(); return; } if ((st.k === "map" || st.k === "trip") && st.seed >= 0) { const c = st.seed; watch(momOf[c]); return; } free(); }
 
@@ -579,13 +600,14 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       beatAmp += (beatG - beatAmp) * Math.min(1, dt * 2.5); const hb = reduce ? 0 : heartbeat(now) * beatAmp;
       fiberMat.uniforms.uIntro.value = ie; intros.forEach((u) => (u.value = ie)); if (shellMat) shellMat.uniforms.uOp.value = ie * (1 + hb * 1.6);
       mixT = Math.min(1, mixT + dt / 0.6); fiberMat.uniforms.uMix.value = mixT * mixT * (3 - 2 * mixT); fiberMat.uniforms.uSweep.value = (now - sweepT) / 1.2;
-      waveR = (now % 0.92) * 175; fiberMat.uniforms.uWave.value.set(waveC.x, waveC.y, waveC.z, waveR); fiberMat.uniforms.uWaveA.value += (waveA - fiberMat.uniforms.uWaveA.value) * Math.min(1, dt * 4); fiberMat.uniforms.uBeat.value = hb; fiberMat.uniforms.uLift.value += ((fly ? 0.9 : st.k === "trip" && st.i >= 0 ? 0.28 : 0) - fiberMat.uniforms.uLift.value) * Math.min(1, dt * 3);
+      waveR = (now % 0.92) * 175; fiberMat.uniforms.uWave.value.set(waveC.x, waveC.y, waveC.z, waveR); fiberMat.uniforms.uWaveA.value += (waveA - fiberMat.uniforms.uWaveA.value) * Math.min(1, dt * 4); fiberMat.uniforms.uBeat.value = hb; fiberMat.uniforms.uLift.value += ((st.k === "trip" && st.i >= 0 ? 0.25 : 0) - fiberMat.uniforms.uLift.value) * Math.min(1, dt * 3);
       if (idle && !reduce && st.k === "free") { camG.yaw += dt * 0.05; camG.pitch = 0.2 + Math.sin(now * 0.11) * 0.22; }
       if (st.k === "trip" && st.i < 0) camG.yaw += dt * 0.12; // 接続中はゆっくり回り込む
       const k = 1 - Math.exp(-dt / (intro < 1 ? 1.1 : st.k === "trip" && st.i < 0 ? 0.9 : 0.55)), kp = 1 - Math.exp(-dt / 0.9); parC.x += (par.x - parC.x) * kp; parC.y += (par.y - parC.y) * kp;
-      if (fly) { const f = fly, t = Math.min(1, (now - f.t0) / f.dur), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2, i = e * (f.pts.length - 1), i0 = Math.floor(i);
-        cam.position.copy(f.pts[i0]).lerp(f.pts[Math.min(f.pts.length - 1, i0 + 1)], i - i0); const ahead = f.pts[Math.min(f.pts.length - 1, i0 + 12)]; const lw = Math.min(1, Math.max(0, (t - 0.3) / 0.42)); tmp.copy(ahead).lerp(f.look, lw * lw * (3 - 2 * lw)); cam.up.set(0, 1, 0); cam.lookAt(tmp);
-        cam.fov += ((portrait() ? 74 : 66) * (1 - Math.max(0, (t - 0.7) / 0.3)) + (portrait() ? 60 : 50) * Math.max(0, (t - 0.7) / 0.3) - cam.fov) * Math.min(1, dt * 6); cam.updateProjectionMatrix();
+      if (fly) { const f = fly, t = Math.min(1, (now - f.t0) / f.dur), e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2, L = f.pts.length - 1, fi = e * L, i0 = Math.floor(fi), u = fi / L;
+        const p = f.pts[i0].clone().lerp(f.pts[Math.min(L, i0 + 1)], fi - i0); cam.position.lerp(p, t >= 1 ? 1 : Math.min(1, dt * 14));
+        const lw = Math.min(1, Math.max(0, (u - f.lk0) / (1 - f.lk0) * 1.25)), lf = Math.min(1, Math.max(0, u / f.lf)); tmp.copy(f.from).lerp(f.pts[Math.min(L, i0 + 10)], lf * lf * (3 - 2 * lf)).lerp(f.look, lw * lw * (3 - 2 * lw)); cam.up.set(0, 1, 0); cam.lookAt(tmp);
+        const wide = portrait() ? 74 : 64, fv = wide + ((portrait() ? 60 : 50) - wide) * lw; cam.fov += (fv - cam.fov) * Math.min(1, dt * 4); cam.updateProjectionMatrix();
         if (t >= 1) { fly = null; f.done(); } }
       else { const f0 = portrait() ? 60 : 50; if (Math.abs(cam.fov - f0) > 0.02) { cam.fov += (f0 - cam.fov) * Math.min(1, dt * 5); cam.updateProjectionMatrix(); }
         cam0.yaw += (camG.yaw - cam0.yaw) * k; cam0.pitch += (camG.pitch - cam0.pitch) * k; cam0.dist += (camG.dist - cam0.dist) * k; tgtC.lerp(tgtG, k);
@@ -641,22 +663,23 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       placeMoments(); shellMat = buildShell();
       const loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
       const atl = Array.from({ length: Math.ceil(N.ctx.length / 256) }, (_, s) => { const t = loader.load(`${BASE}/ctx/atlas${s}.jpg`); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; });
-      buildCortex(atl); buildFibersSync();
+      buildCortex(atl); buildFibersSync(); atl.forEach((_, s) => { const im = new Image(); im.src = `${BASE}/ctx/atlas${s}.jpg`; });
       setNet(N); ready = true; cam0.dist = portrait() ? 1100 : 820; cam0.yaw = camG.yaw - 1.5; cam0.pitch = 0.95; camG.dist = portrait() ? 470 : 235;
       // シェアされたリンク: 接続から旅が始まり、全体図で終わる
       if (shared?.i?.length) { const s = shared.s ?? -1, js = shared.i.filter((x) => x !== s);
         later(2.2, () => { const items: Item[] = s >= 0 ? ids2items(s, js) : shared.i.map((id) => ({ id, d: N.ctx[id].w.indexOf(Math.max(...N.ctx[id].w)) })); connect(s, shared.q, items, shared.n); }); }
     })();
 
-    api.current = { watch: (m) => watch(m), heat, search: (q) => { search(q); }, back, next: () => { if (st.k === "trip" && st.i >= 0 && !fly) { const s = st; go({ ...s }); hop(s.i + 1); } }, skip: () => { if (st.k === "trip") { fly = null; toMap(); } },
+    api.current = { watch: (m) => watch(m), heat, search: (q) => { search(q); }, back, next: () => { if (st.k !== "trip" || st.i < 0 || fly) return; const s = st; go({ ...s }); if (s.ph === "link") play(s, s.i); else hop(s.i + 1); }, skip: () => { if (st.k === "trip") { fly = null; toMap(); } },
       replay: () => { if (st.k === "map") { const s = st; connect(s.seed, s.q, s.items, gn); } } };
-    (window as unknown as { __bw: object }).__bw = { st: () => st, watch, heat, search, back, next: () => api.current?.next(), skip: () => api.current?.skip(), replay: () => api.current?.replay(), manual: (on: boolean) => { manual = on; }, adv: (s: number) => { const n = Math.max(1, Math.round(s * 30)); for (let i = 0; i < n; i++) update(1 / 30, i === n - 1); }, find: (t: string) => N.ctx.findIndex((c) => c.title === t), dbg: () => ({ stripN, head: stripHead, vis: ghosts.filter((g) => g.mesh.visible).map((g) => [g.k, +g.mat.uniforms.uOp.value.toFixed(2), +g.mat.uniforms.uS.value.toFixed(1)]), rs: mainV.readyState, seeking: mainV.seeking, scrub }), momOf: (c: number) => momOf[c], queue: () => queue.length };
+    (window as unknown as { __bw: object }).__bw = { st: () => st, watch, heat, search, back, next: () => api.current?.next(), skip: () => api.current?.skip(), replay: () => api.current?.replay(), manual: (on: boolean) => { manual = on; }, adv: (s: number) => { const n = Math.max(1, Math.round(s * 30)); for (let i = 0; i < n; i++) update(1 / 30, i === n - 1); }, find: (t: string) => N.ctx.findIndex((c) => c.title === t), momOf: (c: number) => momOf[c], queue: () => queue.length,
+      media: () => { const vs = [mainV, ...slots.map((x) => x.v)]; return { audible: vs.filter((v) => !v.paused && !v.muted).length, playing: vs.filter((v) => !v.paused).length }; } };
     return () => { alive = false; cancelAnimationFrame(raf); removeEventListener("resize", resize); tx.removeEventListener("click", onTx); pool.forEach((e) => e.remove()); document.removeEventListener("visibilitychange", vis); slots.forEach((s) => { s.v.pause(); s.v.src = ""; }); mainV.pause(); mainV.src = ""; R.dispose(); el.removeChild(R.domElement); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ===== 画面の文字と操作 =====
-  useEffect(() => { hooks.current.view = (v) => setView(v); hooks.current.slam = (c) => setSlam({ c, key: Date.now() }); hooks.current.name = (n) => setGname(n); });
+  useEffect(() => { hooks.current.view = (v) => setView(v); hooks.current.slam = (c) => setSlam({ c, key: Date.now() }); hooks.current.name = (n) => setGname(n); hooks.current.lines = (l) => setLines(l); });
   useEffect(() => { if (!slam) return; const t = setTimeout(() => setSlam(null), 3700); return () => clearTimeout(t); }, [slam]);
   // 接続中の数（照らし合わせた熱が数え上がる）
   const [scan, setScan] = useState(0);
@@ -694,17 +717,27 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       )}
       {N && watching >= 0 && (() => { const m = N.moments[watching]; return <div className="bw-who" key={watching}><b>{m.sport}</b><span>{m.title}</span></div>; })()}
       {N && slam && (() => { const c = N.ctx[slam.c], d = c.w.indexOf(Math.max(...c.w)); return <div className="bw-slam" key={slam.key} style={{ ["--c" as string]: DIMC[d] }}><h2>{Array.from(c.title).map((ch, i) => <i key={i} style={{ animationDelay: `${i * 45}ms` }}>{ch}</i>)}</h2><span className="bar" /><p>{c.line}</p></div>; })()}
-      {N && ((view.k === "trip" && view.i < 0 && !view.mv) || view.k === "search") && (
+      {N && ((view.k === "trip" && view.i < 0) || view.k === "search") && (
         <div className={`bw-conn ${view.k === "trip" && view.i === -1 ? "done" : ""}`}>
           <div className="s">{view.k === "trip" && view.seed >= 0 ? N.ctx[view.seed].title : `「${view.q}」`}</div>
           <div className="pulse"><i /><i /><i /></div>
           <div className="t">{view.k === "trip" && view.i === -1 ? "熱狂、接続" : "熱狂接続中"}<em>{view.k === "trip" && view.i === -1 ? "" : "..."}</em></div>
           <div className="n">{view.k === "trip" && view.i === -1 ? <><b>{view.items.length}</b>つの熱が、<b>{sports(view.items)}</b>つの競技から</> : <><b>{scan}</b> / {N.ctx.length} の熱と照らし合わせています</>}</div>
         </div>)}
-      {N && view.k === "trip" && view.i >= 0 && (() => { const c = stop ? N.ctx[stop.id] : null, m = stop ? momOfC(stop.id) : null; return (
-        <div className="bw-stop" onClick={() => api.current?.next()}>
+      {N && view.k === "trip" && view.i >= 0 && stop && (() => { const c = N.ctx[stop.id], m = momOfC(stop.id)!, d = stop.d, sd = view.seed >= 0 ? N.ctx[view.seed] : null, sm = view.seed >= 0 ? momOfC(view.seed) : null;
+        const from = sd ? sd.v[d] || sd.title : `「${view.q}」`, to = c.v[d] || c.title, why = lines[stop.id] || c.line;
+        return (
+        <div className="bw-stop" style={{ ["--c" as string]: DIMC[d] }} onClick={() => api.current?.next()}>
           <div className="bar">{view.items.map((_, i) => <i key={i} className={i < view.i ? "done" : i === view.i ? "now" : ""} />)}</div>
-          {stop && c && m && !view.mv && <div className="cap" key={view.i}><div className="k">{m.sport}</div><h3 style={{ ["--c" as string]: DIMC[stop.d] }}>{c.title}</h3><p>{c.v[stop.d] || c.line}</p></div>}
+          {view.ph === "fly" && <div className="bw-fly" key={`f${view.i}`}><span className="a">{from}</span><i /><span className="b"><b>{m.sport}</b>{to}</span></div>}
+          {view.ph === "link" && (
+            <div className="bw-link" key={`l${view.i}`}>
+              <div className="e a">{sd ? <Thumb id={view.seed} /> : <span className="th q">{view.q}</span>}<div><small>{sd ? sm!.sport : "あなたの言葉"}</small><b>{sd ? sd.title : `「${view.q}」`}</b>{sd && sd.v[d] && <em>{sd.v[d]}</em>}</div></div>
+              <div className="w"><span /></div>
+              <div className="e b"><Thumb id={stop.id} /><div><small>{m.sport}</small><b>{c.title}</b>{c.v[d] && <em>{c.v[d]}</em>}</div></div>
+              <p className="why">{why}</p>
+            </div>)}
+          {view.ph === "play" && <div className="cap" key={`p${view.i}`}><div className="fr"><i />{sd ? sd.title : `「${view.q}」`}</div><div className="k">{m.sport}</div><h3>{c.title}</h3><p>{why}</p></div>}
           <button className="skip" onClick={(e) => { e.stopPropagation(); api.current?.skip(); }}>全体を見る</button>
         </div>); })()}
       {N && view.k === "map" && !share && (
@@ -720,6 +753,9 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     </div>
   );
 }
+
+// 熱の1コマ（アトラスから切り出す）
+function Thumb({ id }: { id: number }) { const k = id % 256; return <span className="th" style={{ backgroundImage: `url(${BASE}/ctx/atlas${Math.floor(id / 256)}.jpg)`, backgroundPosition: `${((k % 16) / 15) * 100}% ${(Math.floor(k / 16) / 15) * 100}%` }} />; }
 
 const CSS = `
 .bw{position:fixed;inset:0;background:#020306;color:#f4f2ec;font-family:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;overflow:hidden;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
@@ -786,7 +822,25 @@ const CSS = `
 .bw-stop{position:absolute;inset:0;z-index:7;cursor:pointer}
 .bw-stop .bar{position:absolute;left:max(20px,4vw);right:max(20px,4vw);top:calc(env(safe-area-inset-top,0px) + 66px);display:flex;gap:5px}
 .bw-stop .bar i{flex:1;height:3px;background:rgba(244,242,236,.2);border-radius:3px}.bw-stop .bar i.done{background:#f4f2ec}.bw-stop .bar i.now{background:#f7ff3c}
-.bw-stop .cap{position:absolute;left:max(24px,5vw);right:24px;bottom:calc(env(safe-area-inset-bottom,0px) + 9vh);text-shadow:0 2px 20px rgba(0,0,0,.85);pointer-events:none}
+.bw-stop .cap{position:absolute;left:max(24px,5vw);right:24px;bottom:calc(env(safe-area-inset-bottom,0px) + 7vh);text-shadow:0 2px 20px rgba(0,0,0,.85);pointer-events:none}
+.bw-stop .cap .fr{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:rgba(244,242,236,.75);margin-bottom:10px;animation:bwf .4s ease both}.bw-stop .cap .fr i{width:26px;height:2px;background:var(--c)}
+/* 飛んでいる間: 両端の言い方 */
+.bw-fly{position:absolute;left:0;right:0;margin:0 auto;bottom:calc(env(safe-area-inset-bottom,0px) + 9vh);width:min(760px,calc(100% - 32px));display:flex;align-items:center;justify-content:center;gap:16px;pointer-events:none;text-shadow:0 2px 18px rgba(0,0,0,.95);animation:bwf .5s .2s ease both}
+.bw-fly span{font-size:clamp(16px,1.9vw,24px);font-weight:900}.bw-fly .a{text-align:right;flex:1}.bw-fly .b{flex:1}.bw-fly b{display:block;font-size:10.5px;letter-spacing:.2em;color:#f7ff3c;margin-bottom:3px}
+.bw-fly i{flex:none;width:90px;height:2px;background:linear-gradient(90deg,transparent,var(--c),transparent);position:relative;overflow:hidden}
+.bw-fly i::after{content:"";position:absolute;top:-2px;left:-30%;width:30%;height:6px;background:#fff;filter:blur(2px);animation:bwrun 1.1s linear infinite}
+@keyframes bwrun{to{left:100%}}
+/* 着いたら: 繋がり（両端と理由）*/
+.bw-link{position:absolute;left:0;right:0;margin:0 auto;bottom:calc(env(safe-area-inset-bottom,0px) + 6vh);width:min(900px,calc(100% - 28px));display:grid;grid-template-columns:1fr 120px 1fr;align-items:center;gap:0;pointer-events:none;text-shadow:0 2px 16px rgba(0,0,0,.95)}
+.bw-link .e{display:flex;align-items:center;gap:12px;min-width:0}.bw-link .a{flex-direction:row-reverse;text-align:right;animation:bwinl .6s cubic-bezier(.2,.9,.2,1) both}.bw-link .b{animation:bwinr .6s .55s cubic-bezier(.2,.9,.2,1) both}
+.bw-link .th{flex:none;width:112px;height:63px;border-radius:7px;background-size:1600% 1600%;box-shadow:0 0 0 2px var(--c),0 8px 24px rgba(0,0,0,.6)}
+.bw-link .th.q{display:flex;align-items:center;justify-content:center;background:rgba(255,250,220,.08);font-size:14px;font-weight:900;padding:0 8px;text-align:center}
+.bw-link small{display:block;font-size:10px;font-weight:900;letter-spacing:.2em;color:#f7ff3c}.bw-link b{display:block;font-size:clamp(15px,1.6vw,21px);font-weight:900;line-height:1.3;margin-top:2px}
+.bw-link em{display:inline-block;font-style:normal;font-size:12.5px;font-weight:700;color:#0a0a0a;background:var(--c);border-radius:4px;padding:2px 7px;margin-top:6px;text-shadow:none}
+.bw-link .w{height:3px;position:relative;margin:0 10px}.bw-link .w span{position:absolute;inset:0;background:var(--c);box-shadow:0 0 16px var(--c);transform-origin:left;animation:bwbar .5s .3s cubic-bezier(.2,.8,.2,1) both}
+.bw-link .why{grid-column:1/-1;margin:16px auto 0;max-width:640px;text-align:center;font-size:clamp(14px,1.4vw,18px);font-weight:700;line-height:1.6;color:#f4f2ec;animation:bwf .6s 1.05s ease both}
+@keyframes bwinl{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}
+@keyframes bwinr{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
 .bw-stop .k{font-size:12px;font-weight:900;letter-spacing:.24em;color:#f7ff3c;animation:bwf .4s .15s ease both}
 .bw-stop h3{margin:8px 0 0;font-size:clamp(30px,4.6vw,64px);font-weight:900;line-height:1.12;border-left:5px solid var(--c);padding-left:16px;animation:bwslam2 .7s cubic-bezier(.2,.9,.2,1) both}
 @keyframes bwslam2{0%{opacity:0;transform:translateX(-30px) scale(1.15);filter:blur(10px)}100%{opacity:1;transform:none;filter:none}}
@@ -809,6 +863,9 @@ const CSS = `
   .bw-t.hw span{font-size:13px;padding:7px 11px}.bw-t.ht span{font-size:11.5px}.bw-t.lobe{font-size:10px}
   .bw-slam{bottom:calc(env(safe-area-inset-bottom,0px) + 14vh)}.bw-slam h2{font-size:30px}.bw-slam p{font-size:13px}
   .bw-stop .bar{top:calc(env(safe-area-inset-top,0px) + 56px)}.bw-stop .skip{top:calc(env(safe-area-inset-top,0px) + 70px)}.bw-stop h3{font-size:26px}
+  .bw-fly{flex-direction:column;gap:8px}.bw-fly .a,.bw-fly .b{text-align:center}.bw-fly i{width:2px;height:28px;background:linear-gradient(180deg,transparent,var(--c),transparent)}.bw-fly i::after{display:none}.bw-fly span{font-size:16px}
+  .bw-link{grid-template-columns:1fr;gap:6px;bottom:calc(env(safe-area-inset-bottom,0px) + 3vh)}.bw-link .a{flex-direction:row;text-align:left}.bw-link .w{height:22px;width:3px;margin:0 0 0 54px}.bw-link .w span{transform-origin:top}
+  .bw-link .th{width:96px;height:54px}.bw-link b{font-size:15px}.bw-link .why{font-size:13px;margin-top:10px}
   .bw-map{flex-direction:column;align-items:stretch;gap:12px;width:calc(100% - 20px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px)}.bw-map .row{justify-content:stretch}.bw-map .row .pill{flex:1}
 }
 `;
