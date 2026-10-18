@@ -82,6 +82,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
   const [toast, setToast] = useState<{ t: string; s?: string; key: number } | null>(null);
   const [trailIds, setTrailIds] = useState<number[]>([]);
   const [intro, setIntro] = useState(true);
+  const [coach, setCoach] = useState<"" | "ring" | "dim">("");
   const [hud, setHud] = useState<Hud>({});
   const [stats, setStats] = useState<{ m: number; c: number; l: number } | null>(null);
   const [hover, setHover] = useState<{ x: number; y: number; t: string; s?: string } | null>(null);
@@ -252,7 +253,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
     // ---- 周りに集まる（ロックオンの中心のまわりに、繋がる文脈が空間のあちこちから飛んできて並ぶ）----
     const RN = 8;
     const ringCells: Cell[] = Array.from({ length: RN }, (_, k) => { const c = mkCell("c", 0, [0, 0, 0], 4); c.mesh.userData = { kind: "r", id: k }; c.gop = 0; c.dot = c.gdot = 0; return c; });
-    let ring: { center: Cell; ids: number[]; dim: number; t0: number; from: THREE.Vector3[] } | null = null;
+    let ring: { center: Cell; ids: number[]; dim: number; t0: number; from: THREE.Vector3[]; cf: number } | null = null;
     const ringGeo = new THREE.BufferGeometry(); ringGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(RN * 2 * 3), 3)); ringGeo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(RN * 2 * 3), 3));
     const ringLines = new THREE.LineSegments(ringGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
     ringLines.frustumCulled = false; ringLines.renderOrder = 5; scene.add(ringLines);
@@ -264,7 +265,8 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       const rx = hh * cam.aspect * 0.6, ry = hh * 0.56;
       return out.copy(ring.center.mesh.position).addScaledVector(new THREE.Vector3(1, 0, 0).applyQuaternion(cam.quaternion), Math.cos(a) * rx).addScaledVector(new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion), Math.sin(a) * ry + hh * 0.04); };
     function setRing(center: Cell, ids: number[], dim: number, fromCenter = false) {
-      ids = ids.slice(0, RN); ring = { center, ids, dim, t0: now, from: ids.map((i) => (fromCenter ? center.p.clone() : tips[i].p.clone())) };
+      if (center.kind === "m") coachNext(1); else if (coached >= 1) coachNext(2);
+      ids = ids.slice(0, RN); ring = { center, ids, dim, t0: now, from: ids.map((i) => (fromCenter ? center.p.clone() : tips[i].p.clone())), cf: center.kind === "m" ? (portrait() ? 0.15 : 0.2) : (portrait() ? 0.15 : 0.22) };
       const col = dim >= 0 ? DIM_COLOR[dim] : "#ffffff";
       ringCells.forEach((rc, k) => { const id = ids[k]; if (id === undefined) { rc.gop = 0; return; }
         rc.id = id; rc.p.copy(ring!.from[k]); rc.mesh.position.copy(rc.p); rc.op = 0; rc.gop = 1; rc.s = 0.4; rc.gs = portrait() ? 1 : 1; rc.grim = 1; rc.rimC.set(col); rc.mat.uniforms.uRimC.value.set(col);
@@ -272,6 +274,9 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       playCells([center, ...ringCells.slice(0, ids.length)].slice(0, slots.length - 1));
       lbls = [...lbls.filter((l) => l.key === "center"), ...ids.map((id, k) => ({ key: `r${k}:${id}`, at: below(ringCells[k]), t: N.ctx[id].title, s: dim >= 0 ? N.ctx[id].v[dim] || undefined : undefined, col: "#ffffff", h: () => ringCells[k].s * (portrait() ? 0.2 : 0.3) }))];
     }
+    let coached = 0; try { coached = +(localStorage.getItem("nw_coach") || 0); } catch { /* */ }
+    const coachNext = (step: number) => { if (coached >= step) return; later(1300, () => setCoach(step === 1 ? "ring" : "dim")); };
+    const coachDone = (step: number) => { if (coached >= step) return; coached = step; setCoach(""); try { localStorage.setItem("nw_coach", String(step)); } catch { /* */ } };
     function clearRing() { if (!ring) return; ring = null; ringCells.forEach((rc) => { rc.gop = 0; }); }
     // 中心の大きさ（画面の高さに対する割合で決める＝どの距離でも同じ見え方）
     const sizeAt = (c: Cell, frac: number) => { const d = cam.position.distanceTo(c.mesh.position); return 2 * Math.tan((cam.fov * Math.PI) / 360) * d * frac; };
@@ -313,14 +318,14 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
         lbls = [{ key: "center", at: below(soma), t: m.title, s: m.sport, h: () => soma.s * (pr ? 0.17 : 0.24) }];
         // 目の前で流れて、映像が割れて、その瞬間の文脈が周りに並ぶ（分解）
         scr.from = soma.p.clone(); scr.k = 0; scr.frac = pr ? 0.94 : 0.6; later(500, () => { scr.gop = 1; playScreen(safari ? media[m.no]?.loop : media[m.no]?.webm, true, true); });
-        later(reduce ? 2000 : 2700, () => { soma.gs = sizeAt(soma, pr ? 0.15 : 0.2); setRing(soma, m.ctx, -1, true); if (ring) ring.t0 = now + 0.5; decompose(s.id); });
+        later(reduce ? 1400 : 1900, () => { setRing(soma, m.ctx, -1, true); if (ring) ring.t0 = now + 0.5; decompose(s.id); });
       } else {
         const c = N.ctx[s.id], t = tips[s.id], dims = Object.keys(c.dn || {}).map(Number).sort((a, b) => c.w[b] - c.w[a]);
         const d = s.dim ?? dims[0] ?? -1, ids = d >= 0 ? (c.dn![d] || []).map((x) => x[0]) : N.links.filter((l) => l[0] === s.id || l[1] === s.id).sort((a, b) => b[2] - a[2]).slice(0, 6).map((l) => (l[0] === s.id ? l[1] : l[0]));
         if (s.dim === undefined && d >= 0) { const s2 = { ...s, dim: d }; st = s2; stageRef.current = s2; setStage(s2); }
         t.gop = 1; t.grim = 1; t.gdot = 0; t.rimC.set(d >= 0 ? DIM_COLOR[d] : "#fff"); t.mat.uniforms.uRimC.value.set(d >= 0 ? DIM_COLOR[d] : "#fff");
         const sameSpot = ring && ring.center === t; fly(t.p, pr ? 44 : 34, sameSpot ? { tau: 0.5 } : { yaw: facing(t.p.toArray()), pitch: 0.06, tau: 0.7 }); if (!sameSpot) sfx.whoosh?.(0.6); else sfx.swish?.();
-        later(sameSpot ? 0 : 350, () => { t.gs = sizeAt(t, pr ? 0.15 : 0.22); lbls = [{ key: "center", at: below(t), t: c.title, s: `${N.moments[momIdx(c.no)].sport}　${N.moments[momIdx(c.no)].title}`, h: () => t.s * (portrait() ? 0.18 : 0.24) }]; setRing(t, ids, d); getCrowd().swell(0.35); });
+        later(sameSpot ? 0 : 350, () => { lbls = [{ key: "center", at: below(t), t: c.title, s: `${N.moments[momIdx(c.no)].sport}　${N.moments[momIdx(c.no)].title}`, h: () => t.s * (portrait() ? 0.18 : 0.24) }]; setRing(t, ids, d); getCrowd().swell(0.35); });
       }
     }
     // 近づくと動き出す: 画面の中央に近い細胞がタイトルとともに無音で流れる。さらに寄ると瞬間がほどけて文脈の世界になる
@@ -440,7 +445,10 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
           const d = (await r.json()) as Digest; if (!d.items?.length) return; const dd = { ...d, name: shared.n || d.name, seed: shared.s, q: shared.q };
           const from = shared.s !== undefined && shared.s >= 0 ? tips[shared.s].p.clone() : new THREE.Vector3(); buildPath(from, dd.items.map((x) => x.id), dd.items.map((x) => x.dim), now);
           setHud({ big: dd.name, sub: `${dd.items.length}本の瞬間が「${dd.seedTitle}」と響き合った` }); later(2400, () => go({ k: "digest", d: dd, i: 0 })); } catch { /* 空間はそのまま触れる */ } });
-      else if (startNo) { const k = momIdx(startNo); if (k >= 0) later(1600, () => go({ k: "lock", kind: "m", id: k })); }
+      else { // 投票サイトから来たらその1本、そうでなければ胸の熱い1本から始める（最初の数秒で「割れて、集まる」を見せる）
+        const pick = ["051", "090", "059", "061", "001"].map(momIdx).filter((k) => k >= 0);
+        const k = startNo ? momIdx(startNo) : pick[Math.floor(Math.random() * pick.length)];
+        if (k >= 0) later(1800, () => go({ k: "lock", kind: "m", id: k })); }
     })();
 
     // ---- 操作 ----
@@ -468,10 +476,12 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
     const onUp = (e: PointerEvent) => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = 0;
       if (!downAt || moved > 10) { downAt = null; return; } downAt = null; const c = hit(e.clientX, e.clientY); if (!c) return;
       if (st.k === "lock" && st.kind === c.kind && st.id === c.id) { go({ k: "watch", kind: c.kind, id: c.id }); return; }
+      if (st.k === "lock" && c.kind === "c") coachDone(1);
       go({ k: "lock", kind: c.kind, id: c.id }); };
     const onWheel = (e: WheelEvent) => { e.preventDefault(); setIntro(false); const f = Math.exp(e.deltaY * 0.0012); G.d = Math.max(8, Math.min(1100, G.d * f)); tau = 0.3;
       if (e.deltaY < 0) { ndc.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam); const pt = ray.ray.at(C.d, new THREE.Vector3()); G.t.lerp(pt, Math.min(0.5, (1 - f) * 2.2)); } };
     el.addEventListener("pointerdown", onDown); el.addEventListener("pointermove", onMove); el.addEventListener("pointerup", onUp); el.addEventListener("pointercancel", onUp); el.addEventListener("wheel", onWheel, { passive: false });
+    (window as unknown as { __coachDim: () => void }).__coachDim = () => coachDone(2);
     api.current = {
       go, word: (w: string) => go({ k: "explore", q: w }), pick: (id: number) => go({ k: "explore", seed: id }),
       jump: (i: number) => { if (digest) go({ k: "digest", d: digest, i }); }, fly: (k: number) => jumpRegion(k),
@@ -513,7 +523,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
           rc.gs = sizeAt(rc, portrait() ? 0.085 : 0.13) * (1 + (reduce ? 0 : Math.sin(now * 1.3 + k) * 0.02));
           const cp0 = ring.center.mesh.position; pa.setXYZ(k * 2, cp0.x, cp0.y, cp0.z); pa.setXYZ(k * 2 + 1, rc.mesh.position.x, rc.mesh.position.y, rc.mesh.position.z);
           const a = e * 0.75; ca.setXYZ(k * 2, col.r * a * 0.3, col.g * a * 0.3, col.b * a * 0.3); ca.setXYZ(k * 2 + 1, col.r * a, col.g * a, col.b * a); }
-        pa.needsUpdate = ca.needsUpdate = true; ringLines.visible = true; } else ringLines.visible = false;
+        pa.needsUpdate = ca.needsUpdate = true; ringLines.visible = true; ring.center.gs = sizeAt(ring.center, ring.cf); } else ringLines.visible = false;
       // 目の前の映像: 細胞の位置から育って目の前に来る
       const { p: sp, w: sw } = screenXf(scr.frac); scr.op += (scr.gop - scr.op) * (1 - Math.exp(-dt / 0.25)); scr.k = Math.min(1, scr.k + dt / 0.7);
       const e = 1 - Math.pow(1 - scr.k, 3), from = scr.from || sp;
@@ -560,7 +570,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       {stage.k === "free" && stats && (intro || here) && (
         <div className="nw-intro">
           {intro && <div className="nw-stat"><b>{stats.m}</b>の瞬間<i>→</i><b>{stats.c}</b>の熱狂の文脈<i>→</i><b>{stats.l.toLocaleString()}</b>の響き合い</div>}
-          {intro && <p>近づくと瞬間が流れ出す。押すと、それを中心に熱が集まる。</p>}
+
           {here && <div className="nw-here">いま「{here}」の領域</div>}
         </div>
       )}
@@ -571,6 +581,8 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       )}
       {toast && <div className="nw-toast" key={toast.key}><b>{toast.t}</b>{toast.s && <span>{toast.s}</span>}</div>}
       {stage.k === "lock" && net && <LockBar s={stage} net={net} api={api} />}
+      {stage.k === "lock" && coach === "ring" && <div className="nw-coach r">まわりの熱を押すと、そこへ飛ぶ</div>}
+      {stage.k === "lock" && coach === "dim" && stage.kind === "c" && <div className="nw-coach d">下の見方を替えると、集まる熱が変わる</div>}
       {stage.k === "watch" && <button className="nw-close" onClick={() => api.current?.go({ k: "lock", kind: stage.kind, id: stage.id })}>← 戻る</button>}
       {stage.k !== "free" && stage.k !== "lock" && stage.k !== "watch" && (hud.big || hud.title) && (
         <div className={`nw-hud${stage.k === "digest" ? " dg" : ""}`} key={(hud.big || "") + (hud.title || "")}>
@@ -645,7 +657,7 @@ function LockBar({ s, net, api }: { s: Extract<Stage, { k: "lock" }>; net: Net; 
       {dims.length > 0 && (
         <div className="v">
           {dims.map((d) => (
-            <button key={d} className={s.dim === d ? "on" : ""} style={{ borderColor: DIM_COLOR[d], ...(s.dim === d ? { background: DIM_COLOR[d], color: "#000" } : {}) }} onClick={() => go({ k: "lock", kind: "c", id: s.id, dim: d })}>{c.v[d]}</button>
+            <button key={d} className={s.dim === d ? "on" : ""} style={{ borderColor: DIM_COLOR[d], ...(s.dim === d ? { background: DIM_COLOR[d], color: "#000" } : {}) }} onClick={() => { (window as unknown as { __coachDim?: () => void }).__coachDim?.(); go({ k: "lock", kind: "c", id: s.id, dim: d }); }}>{c.v[d]}</button>
           ))}
         </div>
       )}
@@ -746,6 +758,9 @@ const CSS = `
 .nw-bar .v button.on{background:rgba(255,255,255,.2)}
 .nw-bar .a{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}.nw-bar .a button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:13px;font-weight:700;padding:9px 14px;cursor:pointer}
 .nw-bar .a button.on{background:rgba(255,255,255,.25)}.nw-bar .a .go{background:#ffff00;color:#000;border-color:#ffff00;margin-left:auto}
+.nw-coach{position:absolute;left:50%;transform:translateX(-50%);z-index:6;pointer-events:none;background:#ffff00;color:#000;font-weight:900;font-size:14px;padding:9px 14px;white-space:nowrap;animation:nwCoach 1.6s ease-in-out infinite}
+.nw-coach.r,.nw-coach.d{top:calc(env(safe-area-inset-top,0px) + 54px)}.nw-coach i{font-style:normal;margin-left:6px}
+@keyframes nwCoach{0%,100%{opacity:1}50%{opacity:.72}}
 .nw-close{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 24px);z-index:5;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:13px;padding:10px 18px;cursor:pointer}
 @media (max-width:600px){.nw-bar .a .go{margin-left:0;width:100%}.nw-bar .h b{font-size:15px}.nw-chip{font-size:11px;padding:6px 9px 6px 7px}.nw-found{font-size:10px;padding:5px 7px}.nw-logo{font-size:11px}}
 @media (max-width:600px){.nw-count{gap:14px}.nw-count span{font-size:9px;white-space:normal;max-width:96px;text-align:center}.nw-stat i{margin:0 4px}.nw-chain button{width:72px}.nw-chain button img{width:72px;height:40px}.nw-hud.dg{bottom:calc(env(safe-area-inset-bottom,0px) + 118px)}}
