@@ -75,6 +75,7 @@ export default function Feed({ items, start, phase, votedNo }: Props) {
                   <Link href="/moments" className="v26-icon" aria-label="一覧へ"><IconList />一覧</Link>
                 </div>
                 <a className="dazn" href="https://www.dazn.com/" target="_blank" rel="noreferrer">DAZN フル版を視聴する（有料会員のみ）</a>
+                <a className="dazn" href={`/experience?no=${m.no}`}>熱狂の中を回遊する！ この瞬間から →</a>
                 {next && (
                   <button className="nexthint" onClick={() => go(1)}>
                     {next.thumb && <img src={near ? next.thumb : undefined} alt="" />}
