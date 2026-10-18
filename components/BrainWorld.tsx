@@ -479,7 +479,12 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
 
     api.current = { watch, heat, search: (q) => { search(q); }, back: () => { if (st.k === "heat" || st.k === "scrub") { reset(); setPlaying([]); watch(st.m); } else free(); }, gather, ungather,
       seek: (t) => { if (mainTile >= 0) { try { mainV.currentTime = t; lastT = t; } catch { /* */ } } }, video: () => mainV };
-    (window as unknown as { __bw: object }).__bw = { st: () => st, watch, heat, search, gather, manual: (on: boolean) => { manual = on; }, adv: (s: number) => { const n = Math.max(1, Math.round(s * 30)); for (let i = 0; i < n; i++) update(1 / 30, i === n - 1); }, find: (t: string) => N.ctx.findIndex((c) => c.title === t), momOf: (c: number) => momOf[c] };
+    (window as unknown as { __bw: object }).__bw = { st: () => st, watch, heat, search, gather, manual: (on: boolean) => { manual = on; }, adv: (s: number) => { const n = Math.max(1, Math.round(s * 30)); for (let i = 0; i < n; i++) update(1 / 30, i === n - 1); }, find: (t: string) => N.ctx.findIndex((c) => c.title === t), momOf: (c: number) => momOf[c],
+      // 計測用: 種類ごとに隠して1フレームの描画時間を比べる
+      gpu: (hide: string[], n = 10) => { const kinds: Record<string, THREE.Object3D[]> = { fibers: [], tiles: tiles.map((t) => t.mesh), shell: [], points: [], roots: [] };
+        scene.children.forEach((o) => { if (o instanceof THREE.LineSegments && (o as THREE.LineSegments).geometry === fiberGeo) kinds.fibers.push(o); else if (o instanceof THREE.Mesh && !(tiles.some((t) => t.mesh === o))) kinds.shell.push(o); else if (o instanceof THREE.Points) kinds.points.push(o); else if (o instanceof THREE.LineSegments) kinds.roots.push(o); });
+        hide.forEach((k) => kinds[k]?.forEach((o) => (o.visible = false))); const gl = R.getContext(); R.render(scene, cam); gl.finish(); const t0 = performance.now(); for (let i = 0; i < n; i++) R.render(scene, cam); gl.finish(); const ms = (performance.now() - t0) / n;
+        hide.forEach((k) => kinds[k]?.forEach((o) => (o.visible = true))); return ms; } };
     return () => { alive = false; cancelAnimationFrame(raf); removeEventListener("resize", resize); document.removeEventListener("visibilitychange", vis); slots.forEach((s) => { s.v.pause(); s.v.src = ""; }); mainV.pause(); mainV.src = ""; R.dispose(); el.removeChild(R.domElement); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
