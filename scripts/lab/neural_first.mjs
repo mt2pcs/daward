@@ -13,8 +13,11 @@ const shot = (n) => p.screenshot({ path: `${out}/${tag}_${n}.png` });
 const tap = async (x, y) => { if (sp) await p.touchscreen.tap(x, y); else await p.mouse.click(x, y); };
 await p.goto(`${BASE}/experience`); await p.waitForFunction(() => window.__nw && __nw.ready(), null, { timeout: 120000 });
 for (const t of [2, 4, 6, 8]) { await p.waitForTimeout(2000); await shot(`t${t}`); }
-console.log("start", JSON.stringify(await p.evaluate(() => ({ s: __nw.stage(), ring: __nw.ringN() }))), await p.locator(".nw-coach").textContent().catch(() => "-"));
-const [x, y] = await p.evaluate(() => __nw.ringOf(1)); await tap(x, y); await p.waitForTimeout(3500); await shot("zap1");
+console.log("start", JSON.stringify(await p.evaluate(() => ({ s: __nw.stage(), t: __nw.targets().length }))), await p.locator(".nw-coach").textContent().catch(() => "-"));
+const pickT = async () => { const ts = (await p.evaluate(() => __nw.targets())).filter((t) => t[3] < 1 && t[0] > 20 && t[0] < W - 20 && t[1] > 60 && t[1] < H * 0.7); return ts[0]; };
+let tg = await pickT(); console.log("targets", JSON.stringify(await p.evaluate(() => __nw.targets().length)), tg);
+await tap(tg[0], tg[1]); for (const t of [0.4, 0.9, 1.5, 2.4, 3.5, 4.5]) { await p.waitForTimeout(t === 0.4 ? 400 : 600); await shot(`zap_${t}`); } await p.waitForTimeout(1500); await shot("zap1");
+tg = await pickT(); if (tg) { await tap(tg[0], tg[1]); await p.waitForTimeout(5500); await shot("zap2"); }
 console.log("zap", JSON.stringify(await p.evaluate(() => __nw.stage())), await p.locator(".nw-coach").textContent().catch(() => "-"));
 await p.locator(".nw-bar .v button").nth(1).click(); await p.waitForTimeout(3000); await shot("dim");
 console.log("dim", JSON.stringify(await p.evaluate(() => __nw.stage())), await p.locator(".nw-coach").count());
