@@ -115,13 +115,13 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
         const A = EP[a], B = EP[b]; const ta = closestT(d, A); let dt = closestT(d, B) - ta; if (dt > Math.PI) dt -= Math.PI * 2; if (dt < -Math.PI) dt += Math.PI * 2;
         const k = Math.max(2, Math.ceil(Math.abs(dt) / 0.32)), cp: THREE.Vector3[] = [A, A.clone().lerp(loopPt(d, ta), 0.42)];
         for (let i = 0; i <= k; i++) cp.push(loopPt(d, ta + (dt * i) / k)); cp.push(B.clone().lerp(loopPt(d, ta + dt), 0.42), B);
-        const beta = 0.86, m = cp.length; cp.forEach((p, i) => p.lerp(A.clone().lerp(B, i / (m - 1)), 1 - beta));
+        const beta = 0.9, m = cp.length; cp.forEach((p, i) => p.lerp(A.clone().lerp(B, i / (m - 1)), 1 - beta));
         const pts = new THREE.CatmullRomCurve3(cp, false, "centripetal").getPoints(FS);
         // 束に太さを: 1本ごとに決まった向きへ、端では0・中ほどで最大のずれ（束の断面が丸く満ちる）
-        const o = V(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize().multiplyScalar(2 + rnd() * 7);
+        const o = V(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).normalize().multiplyScalar(1.2 + rnd() * rnd() * 7);
         for (let i = 0; i <= FS; i++) { const s = i / FS, tg = pts[Math.min(FS, i + 1)].clone().sub(pts[Math.max(0, i - 1)]).normalize(); const off = o.clone().addScaledVector(tg, -o.dot(tg)).multiplyScalar(Math.pow(Math.sin(Math.PI * s), 0.6)); pts[i].add(off); }
         paths[n] = pts;
-        const base = Math.min(0.42, 0.17 * Math.sqrt(900 / cnt[d])) * (0.6 + (sc - 0.43) * 0.45), cc = c3[d];
+        const base = Math.min(0.55, 0.23 * Math.sqrt(900 / cnt[d])) * (0.6 + (sc - 0.43) * 0.45), cc = c3[d];
         for (let i = 0; i < FS; i++) { const p0 = pts[i], p1 = pts[i + 1], o6 = (n * FS + i) * 6, o2 = (n * FS + i) * 2;
           pos.set([p0.x, p0.y, p0.z, p1.x, p1.y, p1.z], o6);
           // MRI のように、線維の向きで色が少し揺れる（同じ束の中でも曲がるところで色が変わる）
@@ -223,7 +223,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     function peers(c: number, d: number) { const seen = new Set<string>([N.ctx[c].no]); return linksOf[c].filter((n) => N.links[n][3] === d).sort((a, b) => N.links[b][2] - N.links[a][2]).map((n) => ({ n, j: other(n, c) })).filter(({ j }) => { if (seen.has(N.ctx[j].no)) return false; seen.add(N.ctx[j].no); return true; }); }
     function select(s: Sel) { st = s; idle = false;
       const L = N.links;
-      if (s.k !== "moment" && s.k !== "heat") setFat([]);
+      if (s.k !== "moment" && s.k !== "heat") setFat([]); if (s.k !== "heat") tiles.forEach((t) => (t.mat.uniforms.uRim.value as THREE.Color).set("#f4f2ec"));
       if (s.k === "none") { paintFibers(() => 1); tiles.forEach((t) => { t.dimG = 1; t.goal = 16; }); setNodes(() => [0.7, 1]); setRoots(() => 0.35); setPlaying([]); }
       if (s.k === "tract") { paintFibers((n) => (L[n][3] === s.d ? 2 : 0)); const ms = new Set<number>(); L.forEach((l) => { if (l[3] === s.d) { ms.add(momOfCtx(l[0])); ms.add(momOfCtx(l[1])); } });
         tiles.forEach((t) => { t.dimG = ms.has(t.m) ? 1 : 0.3; t.goal = 16; }); const inT = new Set<number>(); L.forEach((l) => { if (l[3] === s.d) { inT.add(l[0]); inT.add(l[1]); } });
@@ -237,7 +237,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       if (s.k === "heat") { const ps = peers(s.c, s.d), pn = new Set(ps.map((p) => p.n)), pj = new Set(ps.map((p) => p.j)), mine = new Set(linksOf[s.c]);
         paintFibers((n) => (pn.has(n) ? 2 : mine.has(n) ? 1 : 0), (n) => L[n][1] === s.c);
         const m0 = momOfCtx(s.c), pm = new Map<number, number>(); ps.forEach(({ j }) => { const m = momOfCtx(j); if (!pm.has(m)) pm.set(m, j); });
-        tiles.forEach((t) => { t.dimG = t.m === m0 ? 1.15 : pm.has(t.m) ? 1.05 : 0.2; t.goal = t.m === m0 ? 28 : pm.has(t.m) ? 22 : 15; });
+        tiles.forEach((t) => { (t.mat.uniforms.uRim.value as THREE.Color).set(t.m === m0 || pm.has(t.m) ? DIMC[s.d] : "#f4f2ec"); t.dimG = t.m === m0 ? 1.15 : pm.has(t.m) ? 1.05 : 0.2; t.goal = t.m === m0 ? 28 : pm.has(t.m) ? 22 : 15; });
         setFat(ps.map(({ n }) => ({ n, rev: L[n][0] !== s.c, w: 1 })));
         setNodes((i) => (i === s.c ? [1.6, 3.2] : pj.has(i) ? [1.3, 2.4] : [0.1, 0.8])); setRoots((i) => (i === s.c || pj.has(i) ? 1 : 0.04));
         setPlaying([{ tile: m0, src: clipOf(s.c) }, ...Array.from(pm.entries()).slice(0, 6).map(([m, j]) => ({ tile: m, src: clipOf(j) }))]);
@@ -284,6 +284,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       if (sel.k === "moment") { const m = N.moments[sel.m]; const up = V(0, 1, 0).applyQuaternion(cam.quaternion); txt("mo big", `<b>${m.sport}</b><span>${m.title}</span>`, MP[sel.m].tile.clone().addScaledVector(up, tiles[sel.m].scale * 0.36 + 4), { pri: 3, side: "c" }); }
       if (sel.k === "heat") { const c = N.ctx[sel.c], m0 = momOfCtx(sel.c); txt("ht big", `<b>${N.moments[m0].sport}</b><span style="--c:${DIMC[sel.d]}">${c.v[sel.d] || c.title}</span>`, EP[sel.c], { pri: 3 });
         peers(sel.c, sel.d).slice(0, portrait() ? 4 : 7).forEach(({ j }) => { const cj = N.ctx[j], mj = momOfCtx(j); txt("ht", `<b>${N.moments[mj].sport}</b><span style="--c:${DIMC[sel.d]}">${cj.v[sel.d]}</span>`, EP[j], { pri: 2, data: `t:${j}` }); }); }
+      if (hoverM >= 0 && !(sel.k === "moment" && sel.m === hoverM)) { const m = N.moments[hoverM], up = V(0, 1, 0).applyQuaternion(cam.quaternion); txt("mo", `<b>${m.sport}</b><span>${m.title}</span>`, MP[hoverM].tile.clone().addScaledVector(up, tiles[hoverM].scale * 0.36 + 3), { pri: 3, side: "c" }); }
       // 束の名前（地理）
       tractAnchor.forEach((p, d) => { const on = sel.k === "tract" ? sel.d === d : sel.k === "heat" ? sel.d === d : sel.k === "none";
         txt(`tr ${on ? "on" : ""}`, `<i style="background:${DIMC[d]}"></i>${N.dims[d]}`, p, { pri: on ? 2 : 1, op: on ? 1 : sel.k === "none" ? 0.85 : 0.28, data: `d:${d}` }); });
@@ -335,20 +336,23 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
         cam.position.set(Math.sin(cam0.yaw) * Math.cos(cam0.pitch), Math.sin(cam0.pitch), Math.cos(cam0.yaw) * Math.cos(cam0.pitch)).multiplyScalar(cam0.dist).add(tgtC); cam.up.set(0, 1, 0); cam.lookAt(tgtC);
         const fv = portrait() ? 56 : 42; if (Math.abs(cam.fov - fv) > 0.05) { cam.fov += (fv - cam.fov) * k; cam.updateProjectionMatrix(); } }
       { const w = R.domElement.width / R.getPixelRatio(), h = R.domElement.height / R.getPixelRatio(), pr = portrait();
-        const ox = pr ? 0 : st.k === "none" ? -0.1 : 0.15, oy = pr && st.k !== "none" && !fly ? 0.22 : pr ? -0.04 : 0;
+        const ox = pr ? 0 : st.k === "none" ? -0.13 : 0.15, oy = pr && st.k !== "none" && !fly ? 0.22 : pr ? -0.04 : 0;
         view.x += (ox - view.x) * k; view.y += (oy - view.y) * k; cam.setViewOffset(w, h, view.x * w, view.y * h, w, h); }
       fiberMat.uniforms.uNear.value = cam.position.length();
       // 板: カメラを向き、裏側（脳の向こう）は沈む。選んだものは大きく
       const cp = cam.position;
       tiles.forEach((t) => { t.scale += (t.goal - t.scale) * k; t.dim += (t.dimG - t.dim) * k; const u = t.mat.uniforms; u.uS.value = t.scale; u.uDim.value = t.dim;
         const face = MP[t.m].n.dot(tmp.copy(cp).sub(t.mesh.position).normalize()); u.uFace.value = Math.max(0, Math.min(1, face * 1.6 + 0.4)); u.uOp.value = Math.min(1, ie * 1.4) * (face < 0.05 ? 0.22 : 0.4 + 0.6 * Math.min(1, face * 2 + 0.3));
-        u.uHi.value = hoverM === t.m || (st.k === "moment" && st.m === t.m) ? 1 : 0;
+        u.uHi.value = hoverM === t.m || (st.k === "moment" && st.m === t.m) ? 1 : st.k === "heat" && t.goal > 16 ? 0.8 : 0;
         const vOn = t.vid >= 0 && slots[t.vid].tile === t.m && slots[t.vid].v.readyState >= 2 ? 1 : 0; u.uUseVid.value += (vOn - u.uUseVid.value) * Math.min(1, dt * 4);
         t.mesh.renderOrder = face < 0.05 ? -10 : 10 + Math.round(1000 - cp.distanceTo(t.mesh.position)); });
       if (fat) { (fat.geometry as LineSegmentsGeometry).instanceCount = Math.min(fatN, Math.ceil(fatN * Math.min(1, (now - fatT0) / (fly ? 0.6 : 1.3)))); }
       if (rootIntro) rootIntro.value = ie; if (nodeIntro) nodeIntro.value = ie;
+      if (st.k === "none" && !fly && now - liveAt > 3 && intro > 0.9) { liveAt = now; const cand = tiles.map((t) => { prj.copy(t.mesh.position).project(cam); const face = MP[t.m].n.dot(tmp.copy(cp).sub(t.mesh.position).normalize()); return { t, s: face - Math.hypot(prj.x, prj.y) * 0.8 }; }).sort((a, b) => b.s - a.s).slice(0, portrait() ? 3 : 5);
+        setPlaying(cand.map(({ t }) => ({ tile: t.m, src: clipOf(N.moments[t.m].ctx[0]) }))); }
       drawText();
       if (draw) R.render(scene, cam); }
+    let liveAt = 0;
     let rootIntro: { value: number } | null = null, nodeIntro: { value: number } | null = null;
     const loop = (t: number) => { raf = requestAnimationFrame(loop); const dt = Math.min(0.1, Math.max(0, (t - (last || t)) / 1000)); last = t; if (!manual) update(dt); };
     let manual = false;
@@ -369,7 +373,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     })();
 
     api.current = {
-      select, travel: (c, d) => { if (st.k === "heat") travelTo(st.c, c, d); }, hoverTract: () => {},
+      select, travel: (c, d) => { if (st.k === "heat") travelTo(st.c, c, d); }, hoverTract: (d) => { if (st.k !== "none" || fly) return; if (d < 0) { paintFibers(() => 1); return; } paintFibers((n) => (N.links[n][3] === d ? 2 : 0)); },
       digest: () => { if (st.k !== "heat" && !shared) return; const items = shared ? shared.i.map((id) => ({ id, d: N.ctx[id].w.indexOf(Math.max(...N.ctx[id].w)) })) : [{ id: (st as { c: number }).c, d: (st as { d: number }).d }, ...peers((st as { c: number }).c, (st as { d: number }).d).slice(0, 6).map(({ j }) => ({ id: j, d: (st as { d: number }).d }))];
         const name = shared ? shared.n : `「${N.ctx[items[0].id].v[items[0].d] || N.ctx[items[0].id].title}」の熱`; setPlaying([]); setDg({ items, i: 0, name, done: false }); },
     };
@@ -408,7 +412,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       )}
       {N && !dg && (
         <nav className="bw-legend">{N.dims.map((name, d) => (
-          <button key={d} className={(sel.k === "tract" || sel.k === "heat") && sel.d === d ? "on" : ""} onClick={() => go(sel.k === "tract" && sel.d === d ? { k: "none" } : { k: "tract", d })}><i style={{ background: DIMC[d] }} />{name}<small>{cnt[d].toLocaleString()}</small></button>))}</nav>
+          <button key={d} className={(sel.k === "tract" || sel.k === "heat") && sel.d === d ? "on" : ""} onMouseEnter={() => api.current?.hoverTract(d)} onMouseLeave={() => api.current?.hoverTract(-1)} onClick={() => go(sel.k === "tract" && sel.d === d ? { k: "none" } : { k: "tract", d })}><i style={{ background: DIMC[d] }} />{name}<small>{cnt[d].toLocaleString()}</small></button>))}</nav>
       )}
       {N && sel.k === "tract" && !dg && !trip && (() => { const d = sel.d; const L = N.links.filter((l) => l[3] === d); const deg = new Map<number, number>(); L.forEach((l) => { deg.set(l[0], (deg.get(l[0]) || 0) + 1); deg.set(l[1], (deg.get(l[1]) || 0) + 1); });
         const fams = new Set(Array.from(deg.keys()).map((c) => famName(momOf(c)!.sport))); const top = Array.from(deg.entries()).sort((a, b) => b[1] - a[1]).slice(0, 8);
