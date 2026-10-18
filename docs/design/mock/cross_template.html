@@ -1,0 +1,212 @@
+<meta charset="utf-8">
+<title>熱の横断</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&display=swap">
+<style>
+/* 熱の横断（UIモック・映像なし）。77本の瞬間は最初から熱の数の帯に割れた状態（402の熱）で、競技ごとの領域に浮かぶ。
+   熱を1つ持つと、その熱の「見方」ごとに、別の競技の瞬間から響き合う熱の帯が抜け出して飛んでくる。見方を替えると別の競技から別の6つが来る。
+   来た熱を押すとそれを持ち直す（ザッピング）。映像の代わりに動く板（本番は各熱の4秒の映像） */
+:root{--ink:#050608;--paper:#f4f2ec;--dim:rgba(244,242,236,.62);--faint:rgba(244,242,236,.34);--hot:#f7ff3c;
+  --display:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;color-scheme:dark}
+html,body{height:100%}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--display);overflow:hidden;-webkit-user-select:none;user-select:none;touch-action:none;-webkit-font-smoothing:antialiased}
+#gl{position:fixed;inset:0;width:100%;height:100%;display:block}
+.vig{position:fixed;inset:0;pointer-events:none;z-index:2;background:radial-gradient(130% 95% at 50% 45%,transparent 60%,rgba(0,0,0,.55)),linear-gradient(180deg,rgba(0,0,0,.45),transparent 16%,transparent 70%,rgba(0,0,0,.75))}
+.bar{position:fixed;left:0;right:0;top:0;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(env(safe-area-inset-top,0px) + 16px) max(18px,env(safe-area-inset-right,0px)) 0 max(18px,env(safe-area-inset-left,0px));pointer-events:none}
+.bar>*{pointer-events:auto}
+.mark{font-weight:900;font-size:11px;letter-spacing:.32em;white-space:nowrap}.mark em{font-style:normal;color:var(--hot)}
+.count{font-size:10px;letter-spacing:.16em;color:var(--dim);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}.count b{color:var(--paper);font-weight:700}
+.close{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid rgba(244,242,236,.22);background:rgba(5,6,8,.4);color:var(--paper);font-size:18px;cursor:pointer;backdrop-filter:blur(8px)}
+/* 空間に付く文字（3D の位置を画面へ写す） */
+.lbl{position:fixed;left:0;top:0;z-index:4;pointer-events:none;will-change:transform;transition:opacity .35s}
+.lbl .sp{font-size:10px;font-weight:900;letter-spacing:.18em;color:var(--hot);white-space:nowrap}
+.lbl .ph{margin-top:3px;font-size:13px;font-weight:700;line-height:1.35;max-width:13em;text-shadow:0 1px 10px rgba(0,0,0,.8)}
+.lbl .tt{margin-top:2px;font-size:10px;color:var(--dim);max-width:16em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lbl.center .ph{font-size:clamp(20px,2.4vw,30px);font-weight:900;max-width:16em;line-height:1.2}
+.lbl.center .tt{font-size:12px}
+.lbl.terr{font-size:clamp(11px,1.1vw,14px);font-weight:900;letter-spacing:.3em;color:rgba(244,242,236,.5);white-space:nowrap;transform-origin:0 0}
+/* 下: 持っている熱の見方（ここを替えると、来る競技と瞬間が入れ替わる） */
+.dock{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);z-index:6;display:flex;flex-direction:column;align-items:center;gap:12px;padding:0 14px;pointer-events:none}
+.dock>*{pointer-events:auto}
+.facets{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:900px}
+.facet{border:1px solid rgba(244,242,236,.26);background:rgba(5,6,8,.45);color:var(--paper);font-family:var(--display);font-weight:700;font-size:13px;border-radius:999px;padding:10px 15px;cursor:pointer;backdrop-filter:blur(8px);transition:background .25s,color .25s,border-color .25s}
+.facet.on{background:var(--paper);color:#0a0a0a;border-color:var(--paper)}
+.row{display:flex;gap:12px;align-items:center}
+.pill{border:0;border-radius:999px;background:var(--hot);color:#0a0a0a;font-family:var(--display);font-weight:900;font-size:14px;letter-spacing:.04em;padding:13px 22px;cursor:pointer;white-space:nowrap}
+.hint{font-size:12px;letter-spacing:.12em;color:var(--dim);text-align:center;line-height:1.7}
+.cap{position:fixed;left:max(22px,6vw);right:22px;bottom:calc(env(safe-area-inset-bottom,0px) + 90px);z-index:6;pointer-events:none}
+.cap .k{font-size:11px;font-weight:900;letter-spacing:.24em;color:var(--hot)}
+.cap h2{margin:8px 0 0;font-size:clamp(28px,4.6vw,60px);font-weight:900;line-height:1.1;text-shadow:0 2px 24px rgba(0,0,0,.6)}
+.cap p{margin:10px 0 0;font-size:14px;color:var(--dim)}
+.ch{display:inline-block;opacity:0;transform:translateY(.3em);filter:blur(8px);animation:ch .6s cubic-bezier(.2,.7,.2,1) forwards}@keyframes ch{to{opacity:1;transform:none;filter:none}}
+.fade{animation:fade .6s ease both}@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.card{position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);z-index:20;width:min(360px,calc(100% - 40px));background:rgba(5,6,8,.85);border:1px solid rgba(244,242,236,.2);border-radius:18px;padding:20px;backdrop-filter:blur(12px);animation:fade .4s ease both}
+.card .k{font-size:10px;letter-spacing:.24em;color:var(--hot);font-weight:900}.card h3{margin:8px 0 6px;font-size:22px;font-weight:900;line-height:1.3}.card p{margin:0 0 14px;font-size:12px;color:var(--dim);line-height:1.7}
+.card .row{justify-content:flex-end}.ghost{border:1px solid rgba(244,242,236,.3);background:transparent;color:var(--paper);font-family:var(--display);font-weight:700;font-size:13px;border-radius:999px;padding:11px 16px;cursor:pointer}
+@media (max-width:600px){.lbl .ph{font-size:11.5px;max-width:9.5em}.lbl .tt{display:none}.lbl.center .ph{font-size:19px;max-width:13em}.facet{font-size:12px;padding:9px 12px}.cap{bottom:calc(env(safe-area-inset-bottom,0px) + 84px)}}
+</style>
+<canvas id="gl"></canvas>
+<div class="vig"></div>
+<div id="labels"></div>
+<div class="bar"><div class="mark">DAZN <em>100</em> MOMENTS</div><div class="count" id="count"></div><button class="close" id="close" aria-label="戻る" hidden>←</button></div>
+<div class="cap" id="cap"></div>
+<div class="dock" id="dock"></div>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+const D = __DATA__; // s=[競技] m=[題, 競技番号, 熱ids] c=[熱の名, 一文, 秒, 見方ごとの言い方[8], {次元: 響き合う熱ids}]
+const V = (x, y, z) => new THREE.Vector3(x, y, z), reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const cv = document.getElementById("gl"), R = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.setClearColor(0x050608, 1);
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(40, 1, 0.5, 3000);
+const portrait = () => innerHeight > innerWidth;
+const momOf = []; D.m.forEach((m, k) => m[2].forEach((id, j) => (momOf[id] = [k, j])));
+const SH = D.s.map((_, i) => (i * 0.618034 + .05) % 1); // 競技ごとの色味
+// ---- 映像の代わりの板（夜の競技場と逆光の選手。uShot で画角が変わる。uWin は横の切り出し＝割れた帯） ----
+const CARD_V = `varying vec2 vUv; varying float vD; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position,1.); vD = -mv.z; gl_Position = projectionMatrix * mv; }`;
+const CARD_F = `precision highp float; varying vec2 vUv; varying float vD;
+uniform float uOp, uTime, uHue, uSeed, uShot, uDim, uHi; uniform vec2 uWin, uSize;
+vec3 hsv(float h, float s, float v){ vec3 k = clamp(abs(mod(h*6.+vec3(0.,4.,2.),6.)-3.)-1.,0.,1.); return v*mix(vec3(1.),k,s); }
+float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
+float cap(vec2 p, vec2 a, vec2 b, float r){ vec2 pa = p-a, ba = b-a; float h = clamp(dot(pa,ba)/dot(ba,ba),0.,1.); return length(pa-ba*h)-r; }
+float figure(vec2 p, float pose, float t){ float lift = .5+.5*sin(t*1.7); vec2 hip = vec2(0.), neck = vec2(.01,.25), head = vec2(.02,.33+.01*lift);
+  float d = cap(p, hip, neck+vec2(0.,-.03), .085); d = min(d, length(p-head)-.058); d = min(d, cap(p, neck+vec2(-.07,-.04), neck+vec2(.07,-.04), .05));
+  d = min(d, cap(p, hip+vec2(-.04,0.), vec2(-.09,-.32), .05)); d = min(d, cap(p, hip+vec2(.04,0.), vec2(.1,-.32), .05));
+  vec2 sl = neck+vec2(-.08,-.04), sr = neck+vec2(.08,-.04);
+  vec2 hl = pose < .5 ? vec2(-.16,.5+.03*lift) : pose < 1.5 ? vec2(-.12,.02) : vec2(-.2,.38+.02*lift);
+  vec2 hr = pose < .5 ? vec2(.17,.52+.03*lift) : pose < 1.5 ? vec2(.1,.5+.04*lift) : vec2(.21,.4+.02*lift);
+  vec2 el = mix(sl,hl,.5)+vec2(-.03,-.01), er = mix(sr,hr,.5)+vec2(.03,-.01);
+  d = min(d, min(cap(p,sl,el,.042), cap(p,el,hl,.036))); d = min(d, min(cap(p,sr,er,.042), cap(p,er,hr,.036))); return d; }
+vec3 shot(vec2 uv, float t){ float sh = uShot + uSeed; float z = 1. + 1.1*(.5+.5*sin(sh*1.9)); vec2 off = vec2(.2*sin(sh*2.3), .1*cos(sh*1.7)-.02); off.x += .02*sin(t*.2);
+  vec2 q = (uv-.5)/z + .5 + off, p = vec2(q.x*1.7778, q.y); vec3 base = hsv(uHue, .62, 1.);
+  vec3 col = mix(base*.06, vec3(.01,.012,.02), smoothstep(.55,1.05,q.y)) + base*.12*smoothstep(.7,1.,q.y);
+  float band = smoothstep(.40,.45,q.y)*smoothstep(.82,.74,q.y); float cr = noise(p*vec2(38.,26.))*.7 + noise(p*vec2(90.,70.))*.3;
+  col += band*(vec3(.03)+base*.14)*(.3+.9*cr)*(.75+.25*sin(q.x*7.+t*.6));
+  vec2 fg = p*vec2(70.,50.); col += step(.985, hash(floor(fg)+floor(t*3.)))*smoothstep(.45,.1,length(fract(fg)-.5))*band*vec3(1.,.9,.75)*.9;
+  for (int i = 0; i < 4; i++) { float fi = float(i); vec2 c = vec2((.12+.25*fi+.04*sin(fi*3.+uSeed))*1.7778, .9+.02*sin(fi*5.)); float d = length(p-c); col += vec3(1.,.93,.8)*(smoothstep(.03,.0,d)*1.4 + .05/(1.+d*d*40.)); }
+  float fd = smoothstep(.44,.40,q.y); float st = .5+.5*sign(sin(((q.x-.5)/(.75-q.y))*18.)); col = mix(col, hsv(uHue+.02,.55,.34)*(.75+.25*st)*(.55+.9*q.y), fd);
+  float pose = floor(mod(sh*1.7,3.)), fx = .5+.2*sin(sh*1.3); vec2 fp = (p - vec2(fx*1.7778,.2))/.62; float lean = .12*sin(sh*2.7); fp = mat2(cos(lean),-sin(lean),sin(lean),cos(lean))*fp;
+  float fdst = figure(fp, pose, t)*.62; col = mix(col, vec3(.006,.007,.01), smoothstep(.003,-.003,fdst)*.97); col += smoothstep(.007,0.,abs(fdst+.003))*smoothstep(-.2,.5,fp.y)*vec3(1.,.9,.72)*.4;
+  col += base*.07*exp(-length(p-vec2(fx*1.7778,.75))*2.5); col *= 1.-.35*pow(length(uv-.5)*1.25,2.); col += (hash(uv*900.+fract(t)*31.)-.5)*.04; return col; }
+void main(){ vec2 hs = uSize*.5, q = abs((vUv-.5)*uSize); float r = min(.3, min(hs.x,hs.y)*.4); float d = length(max(q-(hs-r),0.))-r;
+  float a = uOp*(1.-smoothstep(-.03,.03,d)); if (a < .002) discard;
+  vec3 c = shot(vec2(mix(uWin.x,uWin.y,vUv.x), vUv.y), uTime);
+  c += smoothstep(.06,0.,abs(d+.03))*(.06+uHi*.5)*mix(vec3(1.),vec3(.97,1.,.24),uHi);
+  gl_FragColor = vec4(c*uDim*a, a); }`;
+const geo = new THREE.PlaneGeometry(1, 1);
+function mkMesh(hue, seed) { const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ vertexShader: CARD_V, fragmentShader: CARD_F, transparent: true, depthWrite: false,
+  blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+  uniforms: { uOp: { value: 1 }, uTime: { value: seed * 3.1 }, uHue: { value: hue }, uSeed: { value: seed }, uShot: { value: 0 }, uDim: { value: 1 }, uHi: { value: 0 }, uWin: { value: new THREE.Vector2(0, 1) }, uSize: { value: new THREE.Vector2(1, 1) } } }));
+  scene.add(m); return m; }
+// ---- 世界: 競技ごとの領域（球の上）に、熱の数の帯に割れた瞬間が浮かぶ ----
+const RAD = 120, terr = D.s.map((_, i) => { const n = D.s.length, y = 1 - (i + .5) / n * 2, r = Math.sqrt(1 - y * y), a = i * 2.39996; return V(Math.cos(a) * r, y * .75, Math.sin(a) * r).normalize().multiplyScalar(RAD); });
+const MW = 9, MH = MW * 9 / 16, GAP = .14;
+const moms = D.m.map((m, k) => { const s = m[1], same = D.m.filter((x) => x[1] === s), idx = same.indexOf(m), T = terr[s], nrm = T.clone().normalize();
+  const u = V(0, 1, 0).cross(nrm).normalize(), v = nrm.clone().cross(u).normalize(); const rr = 9.5 * Math.sqrt(idx), aa = idx * 2.39996;
+  return { k, s, pos: T.clone().addScaledVector(u, Math.cos(aa) * rr * 1.25).addScaledVector(v, Math.sin(aa) * rr * .8).addScaledVector(nrm, Math.sin(idx * 1.7) * 3) }; });
+const strips = D.c.map((c, id) => { const [k, j] = momOf[id], n = D.m[k][2].length, sw = (MW - GAP * (n - 1)) / n;
+  const mesh = mkMesh(SH[D.m[k][1]], k * 1.37 + .3); mesh.material.uniforms.uWin.value.set(j / n, (j + 1) / n);
+  return { id, k, j, n, mesh, home: { x: -MW / 2 + sw / 2 + j * (sw + GAP), w: sw, h: MH }, st: null }; });
+// 領域の名前（空間の中に付く）
+const terrEls = D.s.map((s) => { const e = document.createElement("div"); e.className = "lbl terr"; e.textContent = s; document.getElementById("labels").appendChild(e); return e; });
+// ---- カメラと状態 ----
+const cr = V(0, 0, 0), cu = V(0, 0, 0), cf = V(0, 0, 0);
+let yaw = 0.4, pitch = 0.12, dist = 205, camC = V(0, 0, 300), lookC = V(0, 0, 0), camT = V(0, 0, 200), lookT = V(0, 0, 0), now = 0;
+let st = { k: "world" }, slots = [], prevSlots = [], facets = [];
+const ui = { labels: document.getElementById("labels"), dock: document.getElementById("dock"), close: document.getElementById("close"), count: document.getElementById("count"), cap: document.getElementById("cap") };
+const nC = D.c.length; let nL = 0; D.c.forEach((c) => Object.values(c[4]).forEach((l) => (nL += l.length)));
+const countWorld = () => (ui.count.innerHTML = `<b>${D.m.length}</b> 瞬間 → <b>${nC}</b> の熱 · <b>${D.s.length}</b> 競技`);
+const DIMHUE = [.13, .58, .95, .02, .75, .3, .48, .85];
+// 持った熱の舞台: その熱の瞬間の外側に舞台を出し、カメラは外から見る
+function stageBasis(id) { const M = moms[momOf[id][0]].pos, out = M.clone().normalize(); const S0 = M.clone().addScaledVector(out, 14);
+  const f = out.clone().negate(), r = f.clone().cross(V(0, 1, 0)).normalize(), u = r.clone().cross(f).normalize(); return { S0, out, r, u }; }
+function layout() { // 中心＋響き合う6つの置き場所（画面の座標系で）。縦画面は中心を上、6つを下に2列
+  if (portrait()) return { center: [0, 9.5, 1], sl: [[-4.35, -1.5], [4.35, -1.5], [-4.35, -8.6], [4.35, -8.6], [-4.35, -15.7], [4.35, -15.7]].map(([x, y]) => [x, y, .46]), dist: 44 };
+  return { center: [0, 2.2, 1.05], sl: [[-19.5, 6.5], [-19.5, -.5], [-19.5, -7.5], [19.5, 6.5], [19.5, -.5], [19.5, -7.5]].map(([x, y]) => [x, y, .4]), dist: 40 }; }
+const toWorld = (B, x, y, z = 0) => B.S0.clone().addScaledVector(B.r, x).addScaledVector(B.u, y).addScaledVector(B.out, z);
+function hold(id, d) { const c = D.c[id]; facets = Object.keys(c[4]).map(Number); if (d === undefined || !facets.includes(d)) d = facets[0];
+  prevSlots = slots; const B = stageBasis(id), L = layout(); const partners = d === undefined ? [] : c[4][d].slice(0, 6);
+  slots = [{ id, at: toWorld(B, L.center[0], L.center[1], 2), s: L.center[2], role: "center" }, ...partners.map((pid, i) => ({ id: pid, at: toWorld(B, L.sl[i][0], L.sl[i][1], -1 - (i % 3) * .6), s: L.sl[i][2], role: "p", i }))];
+  // 前の舞台にいて、今回もいる熱は動き続ける。いなくなる熱は自分の瞬間へ帰る
+  for (const s of strips) s.st = null; slots.forEach((sl, n) => { const s = strips[sl.id]; s.st = { ...sl, t0: now + (sl.role === "center" ? 0 : .25 + n * .09), from: s.mesh.position.clone(), fromS: s.mesh.scale.clone(), win0: s.mesh.material.uniforms.uWin.value.clone() }; });
+  for (const p of prevSlots) { const s = strips[p.id]; if (!s.st) s.back = { t0: now, from: s.mesh.position.clone(), fromS: s.mesh.scale.clone(), win0: s.mesh.material.uniforms.uWin.value.clone() }; }
+  const look = toWorld(B, 0, portrait() ? -3 : 0); camT.copy(look).addScaledVector(B.out, L.dist); lookT.copy(look);
+  st = { k: "hold", id, d }; ui.close.hidden = false; renderDock(); }
+function world() { prevSlots = slots; slots = []; for (const p of prevSlots) { const s = strips[p.id]; s.st = null; s.back = { t0: now, from: s.mesh.position.clone(), fromS: s.mesh.scale.clone(), win0: s.mesh.material.uniforms.uWin.value.clone() }; }
+  st = { k: "world" }; ui.close.hidden = true; dist = 205; renderDock(); countWorld(); }
+function renderDock() { ui.cap.innerHTML = "";
+  if (st.k === "world") { ui.dock.innerHTML = `<div class="hint">77本のハイライトを、熱の数だけ割ってあります。<br>どれか一つの熱に触れてください</div>`; return; }
+  if (st.k === "hold") { const c = D.c[st.id];
+    ui.dock.innerHTML = `<div class="facets">${facets.map((d) => `<button class="facet ${d === st.d ? "on" : ""}" data-d="${d}">${c[3][d]}</button>`).join("")}</div><div class="row"><button class="pill" data-act="play">▶ この熱で通して観る</button></div>`;
+    const tot = facets.reduce((s, d) => s + c[4][d].length, 0), sports = new Set(c[4][st.d].map((i) => D.m[momOf[i][0]][1])).size;
+    ui.count.innerHTML = `${nC} の熱を照らし合わせ · <b>${sports}</b> 競技から <b>${c[4][st.d].length}</b>`; } }
+ui.dock.addEventListener("click", (e) => { const f = e.target.closest("[data-d]"); if (f && st.k === "hold") { hold(st.id, +f.dataset.d); return; }
+  const a = e.target.closest("[data-act]")?.dataset.act; if (a === "play") play(); if (a === "again") hold(st.id, st.d); });
+ui.close.onclick = () => { if (st.k === "play") { clearTimeout(playTimer); hold(st.id, st.d); } else world(); };
+// 通して観る: カメラが舞台の熱を順に画面いっぱいで捉える（本番は各熱の4秒がつながる）。最後にシェア
+let playTimer = 0;
+function play() { const seq = slots.slice(); let i = 0; st = { ...st, k: "play" }; ui.dock.innerHTML = "";
+  const c0 = D.c[seq[0].id];
+  const show = () => { if (i >= seq.length) { share(c0[3][st.d]); return; } const sl = seq[i], s = strips[sl.id], c = D.c[sl.id], m = D.m[momOf[sl.id][0]];
+    const f = cam.getWorldDirection(V(0, 0, 0)), tFill = Math.tan((cam.fov * Math.PI) / 360), w = 16 * sl.s * MW / 16 * (16 / 9) ; const h = MW * sl.s * 9 / 16 * (16 / 9) / 2;
+    const dd = portrait() ? (MW * sl.s * 1.7778 / 2) / (tFill * cam.aspect) : (MW * sl.s * 1.7778 * 9 / 16 / 2) / tFill;
+    camT.copy(sl.at).addScaledVector(f, -dd); lookT.copy(sl.at);
+    ui.cap.innerHTML = `<div class="k fade">${D.s[m[1]]}　${String(i + 1).padStart(2, "0")} / ${String(seq.length).padStart(2, "0")}</div><h2>${[...c[3][st.d]].map((ch, n) => `<span class="ch" style="animation-delay:${n * 26}ms">${ch}</span>`).join("")}</h2><p class="fade" style="animation-delay:.4s">${c[0]} — ${m[0]}</p>`;
+    i++; playTimer = setTimeout(show, 2600); };
+  show(); }
+function share(name) { const B = stageBasis(st.id), L = layout(); const look = toWorld(B, 0, portrait() ? -3 : 0); camT.copy(look).addScaledVector(B.out, L.dist * 1.15); lookT.copy(look); ui.cap.innerHTML = "";
+  const el = document.createElement("div"); el.className = "card"; el.innerHTML = `<div class="k">あなたが編んだダイジェスト</div><h3>「${name}」の熱</h3><p>${new Set(slots.map((s) => D.m[momOf[s.id][0]][1])).size} 競技 · ${slots.length} の瞬間。リンクを送ると、開いた人の画面でこの順に流れます（モックでは送りません）</p><div class="row"><button class="ghost" data-x="0">閉じる</button><button class="pill" data-x="1">リンクをコピー</button></div>`;
+  document.body.appendChild(el); el.onclick = (e) => { if (e.target.closest("[data-x]")) { el.remove(); hold(st.id, st.d); } }; }
+// ---- 操作: ドラッグで回す、ホイール/ピンチで寄る、タップで熱を持つ ----
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); const pts = new Map(); let down = null, pinch0 = 0;
+function pick(x, y) { ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1); ray.setFromCamera(ndc, cam);
+  const list = st.k === "hold" ? slots.map((s) => strips[s.id].mesh) : strips.map((s) => s.mesh); const h = ray.intersectObjects(list, false)[0]; return h ? strips.find((s) => s.mesh === h.object) : null; }
+cv.addEventListener("pointerdown", (e) => { pts.set(e.pointerId, [e.clientX, e.clientY]); if (pts.size === 1) down = [e.clientX, e.clientY, yaw, pitch, false]; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch0 = Math.hypot(a[0] - b[0], a[1] - b[1]); down = null; } });
+cv.addEventListener("pointermove", (e) => { if (!pts.has(e.pointerId)) return; pts.set(e.pointerId, [e.clientX, e.clientY]);
+  if (pts.size === 2 && st.k === "world") { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); dist = Math.max(70, Math.min(260, dist * pinch0 / d)); pinch0 = d; return; }
+  if (down && st.k === "world") { const dx = e.clientX - down[0], dy = e.clientY - down[1]; if (Math.abs(dx) + Math.abs(dy) > 6) down[4] = true; yaw = down[2] - dx * .005; pitch = Math.max(-1.1, Math.min(1.1, down[3] + dy * .004)); } });
+const up = (e) => { pts.delete(e.pointerId); if (!down) return; const moved = down[4]; down = null; if (moved) return; const s = pick(e.clientX, e.clientY); if (!s) return;
+  if (st.k === "world") hold(s.id); else if (st.k === "hold" && s.id !== st.id) { const keep = D.c[s.id][4][st.d] ? st.d : undefined; hold(s.id, keep); } };
+cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", (e) => { pts.delete(e.pointerId); down = null; });
+addEventListener("wheel", (e) => { e.preventDefault(); if (st.k === "world") dist = Math.max(70, Math.min(260, dist * Math.exp(e.deltaY * .001))); }, { passive: false });
+addEventListener("keydown", (e) => { if (e.key === "Escape" && !ui.close.hidden) ui.close.click(); });
+// ---- 文字（空間の位置を画面へ） ----
+const lblPool = []; const prj = V(0, 0, 0);
+function labelAt(i) { if (!lblPool[i]) { const e = document.createElement("div"); e.className = "lbl"; ui.labels.appendChild(e); lblPool[i] = e; } return lblPool[i]; }
+function place(el, p, dx = 0, dy = 0) { prj.copy(p).project(cam); const vis = prj.z < 1 && Math.abs(prj.x) < 1.2 && Math.abs(prj.y) < 1.2; const x = (prj.x * .5 + .5) * innerWidth + dx, y = (-prj.y * .5 + .5) * innerHeight + dy;
+  el.style.transform = `translate(${x}px,${y}px)`; return vis; }
+// ---- 毎フレーム ----
+const ease = (k) => 1 - Math.pow(1 - k, 3), cl = (x) => Math.max(0, Math.min(1, x)); let last = 0, manual = false;
+function tick(t) { requestAnimationFrame(tick); const dt = Math.min(.1, Math.max(0, (t - (last || t)) / 1000)); last = t; if (!manual) update(dt); }
+function update(dt) { now += dt;
+  if (st.k === "world") { if (!down && !reduce) yaw += dt * .025; const p = V(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)); camT.copy(p.multiplyScalar(dist + RAD)); lookT.set(0, 0, 0); }
+  const kc = 1 - Math.exp(-dt / (st.k === "world" ? .5 : .65)); camC.lerp(camT, kc); lookC.lerp(lookT, kc); cam.position.copy(camC); cam.lookAt(lookC);
+  cam.matrixWorld.extractBasis(cr, cu, cf); const q = cam.quaternion;
+  const holding = st.k !== "world";
+  for (const s of strips) { const m = s.mesh, u = m.material.uniforms, M = moms[s.k].pos;
+    const homeP = M.clone().addScaledVector(cr, s.home.x), homeS = [s.home.w, s.home.h];
+    m.quaternion.copy(q);
+    if (s.st) { const k = ease(cl((now - s.st.t0) / (s.st.role === "center" ? .9 : 1.25))), W = MW * 1.7778 * s.st.s * (16 / 9) / 1.7778, H = W * 9 / 16;
+      m.position.lerpVectors(s.st.from, s.st.at, k); m.position.addScaledVector(cu, Math.sin(k * Math.PI) * (s.st.role === "center" ? 0 : 4));
+      m.scale.set(s.st.fromS.x + (W - s.st.fromS.x) * k, s.st.fromS.y + (H - s.st.fromS.y) * k, 1);
+      u.uWin.value.set(s.st.win0.x * (1 - k), s.st.win0.y + (1 - s.st.win0.y) * k); u.uShot.value = k * (1.1 + s.j * 2.9); u.uOp.value = 1; u.uDim.value = 1; u.uHi.value = s.st.role === "center" ? k : 0; u.uTime.value += dt;
+      m.renderOrder = 2; }
+    else if (s.back) { const k = ease(cl((now - s.back.t0) / 1)); m.position.lerpVectors(s.back.from, homeP, k); m.scale.set(s.back.fromS.x + (homeS[0] - s.back.fromS.x) * k, s.back.fromS.y + (homeS[1] - s.back.fromS.y) * k, 1);
+      u.uWin.value.set(s.back.win0.x + (s.j / s.n - s.back.win0.x) * k, s.back.win0.y + ((s.j + 1) / s.n - s.back.win0.y) * k); u.uShot.value *= 1 - k; u.uHi.value = 0; if (k >= 1) s.back = null; m.renderOrder = 1; }
+    else { m.position.copy(homeP); m.scale.set(homeS[0], homeS[1], 1); u.uTime.value += dt * .3; m.renderOrder = 0; u.uHi.value = 0; }
+    if (!s.st) { const tgt = holding ? .16 : 1; u.uDim.value += (tgt - u.uDim.value) * (1 - Math.exp(-dt / .4)); u.uOp.value += ((holding ? .5 : 1) - u.uOp.value) * (1 - Math.exp(-dt / .4)); }
+    u.uSize.value.set(m.scale.x, m.scale.y); }
+  // 文字
+  terrEls.forEach((e, i) => { const vis = place(e, terr[i].clone().add(V(0, 0, 0)).addScaledVector(terr[i].clone().normalize(), 6).addScaledVector(cu, 30), -20, 0); const d = cam.position.distanceTo(terr[i]);
+    e.style.opacity = !holding && vis ? String(Math.max(0, Math.min(1, (330 - d) / 140))) : "0"; });
+  let n = 0;
+  if (st.k === "hold") for (const sl of slots) { const s = strips[sl.id], c = D.c[sl.id], m = D.m[momOf[sl.id][0]], e = labelAt(n++), k = cl((now - s.st.t0 - .7) / .4);
+    const W = s.mesh.scale.x, H = s.mesh.scale.y; const p = s.mesh.position.clone().addScaledVector(cr, -W / 2).addScaledVector(cu, -H / 2 - .4);
+    const html = sl.role === "center" ? `<div class="sp">${D.s[m[1]]}</div><div class="ph">${c[0]}</div><div class="tt">${m[0]}</div>` : `<div class="sp">${D.s[m[1]]}</div><div class="ph">${c[3][st.d]}</div><div class="tt">${c[0]}</div>`;
+    if (e.dataset.h !== html) { e.dataset.h = html; e.innerHTML = html; } e.className = `lbl ${sl.role === "center" ? "center" : ""}`; const vis = place(e, p, 0, 6); e.style.opacity = vis ? String(k) : "0"; }
+  for (let i = n; i < lblPool.length; i++) lblPool[i].style.opacity = "0";
+  R.render(scene, cam); }
+const resize = () => { R.setSize(innerWidth, innerHeight, false); cam.aspect = innerWidth / innerHeight; cam.fov = portrait() ? 56 : 40; cam.updateProjectionMatrix(); if (st.k === "hold") hold(st.id, st.d); };
+addEventListener("resize", resize); resize(); world(); requestAnimationFrame(tick);
+window.__x = { st: () => st, hold, world, play, manual: (on) => { manual = on; }, adv: (sec) => { for (let k = 0; k < Math.round(sec * 30); k++) update(1 / 30); }, find: (t) => D.c.findIndex((c) => c[0] === t) };
+</script>
