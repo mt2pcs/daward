@@ -201,7 +201,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       anim: null | { pts: THREE.Vector3[]; t0: number; dur: number; to: number; back: boolean } };
     let tiles: Tile[] = [];
     const TILE_V = `uniform float uS, uBill; varying vec2 vUv; void main(){ vUv = uv; vec4 c = modelViewMatrix * vec4(0.,0.,0.,1.); vec4 bill = c + vec4(position.xy * uS, 0., 0.); vec4 wor = modelViewMatrix * vec4(position * uS, 1.); gl_Position = projectionMatrix * mix(wor, bill, uBill); }`;
-    const TILE_F = `precision highp float; varying vec2 vUv; uniform sampler2D uAt, uVid; uniform vec4 uRect; uniform float uUseVid, uDim, uFace, uHi, uOp, uGl, uFl, uT, uScan; uniform vec3 uRim;
+    const TILE_F = `precision highp float; varying vec2 vUv; uniform sampler2D uAt, uVid; uniform vec4 uRect; uniform float uUseVid, uDim, uFace, uHi, uOp, uGl, uFl, uT, uScan, uZm; uniform vec3 uRim; uniform vec4 uHole[8];
       vec3 tex(vec2 p){ p = clamp(p, .001, .999); return mix(texture2D(uAt, uRect.xy + p * uRect.zw).rgb, texture2D(uVid, p).rgb, uUseVid); }
       float h(float x){ return fract(sin(x) * 43758.5453); }
       void main(){ vec2 q = abs(vUv - .5) * vec2(16., 9.); vec2 b = vec2(8., 4.5) - .45; float d = length(max(q - b, 0.)) - .45; float a = (1. - smoothstep(-.05, .05, d)) * uOp; if (a < .003) discard;
@@ -213,6 +213,11 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
           float sh = .018 * uGl; c = vec3(tex(uv + vec2(sh, 0.)).r, tex(uv).g, tex(uv - vec2(sh, 0.)).b);
           c *= .85 + .3 * h(row + tt); }
         else c = tex(uv);
+        // 時を走るあいだ: 中心へ向かって流れるぶれ
+        if (uZm > .01) { vec3 acc = c; for (int i = 1; i < 7; i++) acc += tex((uv - .5) * (1. - float(i) * .03 * uZm) + .5); c = acc / 7.; }
+        // 熱を採った跡: その場所が暗く抜け、ゆっくり戻る
+        float hole = 0.; for (int j = 0; j < 8; j++) { vec4 hh = uHole[j]; float ag = uT - hh.z; if (ag > 0. && ag < 2.6) { vec2 dd = (vUv - hh.xy) * vec2(16., 9.) / 1.9; hole = max(hole, exp(-dot(dd, dd) * 1.6) * smoothstep(0., .5, ag) * (1. - smoothstep(1.1, 2.6, ag))); } }
+        c *= 1. - hole * .72;
         c = mix(c, vec3(1.), uFl);
         // 抜き取り: 光の帯が上から下へ映像を読み、読んだところに細かい格子が残る
         if (uScan >= 0.) { float y = 1. - uScan, band = smoothstep(.05, 0., abs(vUv.y - y)), done = step(y, vUv.y) * (1. - uScan * .7);
@@ -226,7 +231,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       const geo = new THREE.PlaneGeometry(1, 9 / 16), blank = new THREE.Texture();
       tiles = N.moments.map((mo, m) => { const id = mo.ctx[0], s = Math.floor(id / 256), k = id % 256;
         const mat = new THREE.ShaderMaterial({ vertexShader: TILE_V, fragmentShader: TILE_F, transparent: true, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
-          uniforms: { uAt: { value: atl[s] || blank }, uVid: { value: blank }, uRect: { value: new THREE.Vector4((k % 16) / 16, 1 - (Math.floor(k / 16) + 1) / 16, 1 / 16, 1 / 16) }, uUseVid: { value: 0 }, uDim: { value: 1 }, uFace: { value: 1 }, uHi: { value: 0 }, uOp: { value: 0 }, uS: { value: 16 }, uBill: { value: 0 }, uRim: { value: new THREE.Color("#f4f2ec") }, uGl: { value: 0 }, uFl: { value: 0 }, uT: { value: 0 }, uScan: { value: -1 } } });
+          uniforms: { uAt: { value: atl[s] || blank }, uVid: { value: blank }, uRect: { value: new THREE.Vector4((k % 16) / 16, 1 - (Math.floor(k / 16) + 1) / 16, 1 / 16, 1 / 16) }, uUseVid: { value: 0 }, uDim: { value: 1 }, uFace: { value: 1 }, uHi: { value: 0 }, uOp: { value: 0 }, uS: { value: 16 }, uBill: { value: 0 }, uRim: { value: new THREE.Color("#f4f2ec") }, uGl: { value: 0 }, uFl: { value: 0 }, uT: { value: 0 }, uScan: { value: -1 }, uZm: { value: 0 }, uHole: { value: Array.from({ length: 8 }, () => new THREE.Vector4(0, 0, 1e6, 0)) } } });
         const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(MP[m].tile); mesh.lookAt(MP[m].tile.clone().add(MP[m].n)); mesh.frustumCulled = false; scene.add(mesh);
         return { m, mesh, mat, scale: 16, goal: 16, dim: 1, dimG: 1, lift: 0, liftG: 0, vid: -1, pos: MP[m].tile.clone(), anim: null }; });
       // 根: 映像の下から、その1本の熱へ
@@ -278,54 +283,129 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       const show = () => { if (s!.tile === tile && mainTile !== tile) t.mat.uniforms.uVid.value = s!.tex; }; if (s.v.readyState >= 2) show(); else s.v.onloadeddata = show; }
     function stopOn(tile: number) { const t = tiles[tile]; if (!t || t.vid < 0) return; const s = slots[t.vid]; if (s.tile === tile) { s.v.pause(); s.v.muted = true; s.tile = -1; } t.vid = -1; }
     const playing = new Set<number>();
-    function setPlaying(list: { tile: number; src: string; sound?: boolean }[]) { const want = new Set(list.map((x) => x.tile)); playing.forEach((t) => { if (!want.has(t)) stopOn(t); }); playing.clear(); list.slice(0, slots.length).forEach((x) => { playing.add(x.tile); playOn(x.tile, x.src, x.sound); }); }
+    // 流すものを決める。ここに無いものは、どこで流し始めたものでも必ず止める（旅で音つきで流した映像が止まらずに重なっていた）
+    function setPlaying(list: { tile: number; src: string; sound?: boolean }[]) { const want = new Set(list.map((x) => x.tile)); slots.forEach((x) => { if (x.tile >= 0 && !want.has(x.tile)) stopOn(x.tile); else if (x.tile < 0 && !x.v.paused) { x.v.pause(); x.v.muted = true; } }); playing.clear(); list.slice(0, slots.length).forEach((x) => { playing.add(x.tile); playOn(x.tile, x.src, x.sound); }); }
     // 観ている1本（元の映像。熱の時刻はこの映像の時刻）
     const mainV = mkV(false); const mainTex = new THREE.VideoTexture(mainV); mainTex.colorSpace = THREE.SRGBColorSpace; let mainTile = -1, mainOk = false;
     mainV.addEventListener("loadeddata", () => { mainOk = true; });
-    let scrub: null | { from: number; to: number; t0: number; c: number; lastSeek: number } = null, flash = 0, glitch = 0;
+    let scrub: null | { from: number; to: number; t0: number; c: number; lastSeek: number; dur: number; wait: number } = null, flash = 0, glitch = 0;
+    // コマは seek が終わったところで1枚ずつ取る。最後（選んだ熱の時刻）のコマが取れたら着地する
+    mainV.addEventListener("seeked", () => { if (!scrub || now < scrub.t0) return; spawnGhost(DIMC[domDim(scrub.c)]); if (scrub.wait > 0) land(); });
+    function land() { if (!scrub) return; const c = scrub.c; scrub = null; glitch = 0; mainV.muted = false; mainV.playbackRate = reduce ? 1 : 0.5; mainV.play().catch(() => {}); afterScrub(c); }
 
     // ===== 段取り: 状態が変わるたびに番号を進め、古い予定は捨てる（戻った後に前の予定が走って崩れないように）=====
     let tok = 0; const queue: { at: number; fn: () => void; t: number }[] = [];
     const later = (sec: number, fn: () => void) => queue.push({ at: now + sec, fn, t: tok });
-    const go = (v: View) => { tok++; queue.length = 0; rollG = 0; if (fly) { fly = null; syncCam(); } setV(v); };
+    const go = (v: View) => { tok++; queue.length = 0; rollG = 0; if (fly) { fly = null; syncCam(); }
+      slots.forEach((x) => { if (!x.v.muted && x.tile >= 0) stopOn(x.tile); }); if (v.k !== "watch" && v.k !== "scrub") mainV.muted = true; mainV.playbackRate = 1; setV(v); };
     function runQueue() { for (let i = 0; i < queue.length; i++) { const q = queue[i]; if (q.t !== tok) { queue.splice(i--, 1); continue; } if (now >= q.at) { queue.splice(i--, 1); q.fn(); } } }
 
-    // ===== 映像から熱を抜き取る（観始めてすぐ。映像の小片が剥がれて飛び、熱の言葉に変わる）=====
-    const PATCH_F = `precision highp float; varying vec2 vUv; uniform sampler2D uVid, uAt; uniform vec4 uR, uRect; uniform float uUseVid, uOp, uGlow; uniform vec3 uC;
-      void main(){ vec2 q = abs(vUv - .5) * 2.; float e = max(q.x, q.y); float a = (1. - smoothstep(.9, 1., e)) * uOp; if (a < .003) discard;
-        vec2 p = uR.xy + vUv * uR.zw; vec3 c = mix(texture2D(uAt, uRect.xy + p * uRect.zw).rgb, texture2D(uVid, p).rgb, uUseVid);
-        c = c * (1. + uGlow * .6) + uC * smoothstep(.72, .98, e) * (.5 + uGlow * 1.5);
-        gl_FragColor = vec4(c * a, a); }`;
-    const patches = Array.from({ length: 8 }, () => { const mat = new THREE.ShaderMaterial({ vertexShader: `uniform float uS; varying vec2 vUv; void main(){ vUv = uv; vec4 c = modelViewMatrix * vec4(0.,0.,0.,1.); c.xy += position.xy * uS; gl_Position = projectionMatrix * c; }`, fragmentShader: PATCH_F,
-        transparent: true, depthTest: false, depthWrite: false, uniforms: { uVid: { value: mainTex }, uAt: { value: new THREE.Texture() }, uR: { value: new THREE.Vector4() }, uRect: { value: new THREE.Vector4() }, uUseVid: { value: 1 }, uOp: { value: 0 }, uGlow: { value: 0 }, uS: { value: 1 }, uC: { value: new THREE.Color() } } });
-      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); mesh.frustumCulled = false; mesh.renderOrder = 1800; mesh.visible = false; scene.add(mesh); return { mesh, mat }; });
+    // ===== 熱を採る（観始めてすぐ）=====
+    //   光の帯が映像を上から読み、読んだところが光の粒にほどける。帯が熱の場所を通ると、そこの粒が螺旋を描いて流れ出し、
+    //   言葉の場所でひとかたまりの滴になって、ふつふつと揺れ続ける。滴ができたところで言葉が一字ずつ滲み出る
+    const PGX = 128, PGY = 72, PN = PGX * PGY, pK = new Float32Array(PN), pUvA = new Float32Array(PN * 2), pRA = new Float32Array(PN * 3);
+    for (let y = 0; y < PGY; y++) for (let x = 0; x < PGX; x++) { const i = y * PGX + x; pUvA[i * 2] = (x + 0.5) / PGX; pUvA[i * 2 + 1] = (y + 0.5) / PGY; pRA[i * 3] = Math.random(); pRA[i * 3 + 1] = Math.random(); pRA[i * 3 + 2] = Math.random(); pK[i] = -1; }
+    const pGeo = new THREE.BufferGeometry(); pGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(PN * 3), 3)); pGeo.setAttribute("aUv", new THREE.BufferAttribute(pUvA, 2)); pGeo.setAttribute("aR", new THREE.BufferAttribute(pRA, 3)); pGeo.setAttribute("aK", new THREE.BufferAttribute(pK, 1));
+    const pMat = new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uVid: { value: mainTex }, uAt: { value: new THREE.Texture() }, uRect: { value: new THREE.Vector4() }, uUseVid: { value: 1 }, uC: { value: V() }, uRt: { value: V() }, uUp: { value: V() }, uBk: { value: V() }, uS: { value: 30 },
+        uScan: { value: -1 }, uRd: { value: 0 }, uT: { value: 0 }, uOp: { value: 0 }, uPx: { value: R.getPixelRatio() }, uSel: { value: -1 }, uSelT: { value: 0 },
+        uA: { value: Array.from({ length: 8 }, () => V()) }, uK0: { value: new Array(8).fill(1e6) }, uKC: { value: Array.from({ length: 8 }, () => new THREE.Color()) } },
+      vertexShader: `attribute vec2 aUv; attribute vec3 aR; attribute float aK;
+        uniform vec3 uC, uRt, uUp, uBk; uniform float uS, uScan, uRd, uT, uOp, uPx, uSel, uSelT; uniform vec3 uA[8]; uniform float uK0[8]; uniform vec3 uKC[8];
+        varying vec2 vUv; varying vec3 vCol; varying float vMix, vA;
+        void main(){ vUv = aUv;
+          vec3 base = uC + uRt * (aUv.x - .5) * uS + uUp * (aUv.y - .5) * uS * .5625;
+          float y0 = 1. - uScan, band = uScan < 0. ? 0. : exp(-pow((aUv.y - y0) / .022, 2.)), rd = uScan < 0. ? 0. : smoothstep(y0 - .01, y0 + .04, aUv.y) * uRd;
+          float tw = step(.8, fract(aR.y * 17. + uT * (.5 + aR.x)));
+          vec3 p = base + uBk * (band * (1.2 + aR.x * 2.6) + rd * (.2 + aR.x * .7));
+          float a = band * 1.15 + rd * (.05 + .32 * tw), sz = 1. + band * 1.6; vMix = 0.; vec3 kc = vec3(1.);
+          if (aK > -.5) { vec3 A = vec3(0.); float t0 = 1e6;
+            for (int j = 0; j < 8; j++) { if (abs(float(j) - aK) < .5) { A = uA[j]; t0 = uK0[j]; kc = uKC[j]; } }
+            float tt = (uT - t0 - aR.z * .55) / 1.25;
+            if (tt > 0.) { float q = min(tt, 1.), e = q * q * (3. - 2. * q);
+              vec3 ax = A - base; float L = length(ax); ax /= max(L, .001); vec3 n1 = normalize(cross(ax, uBk)), n2 = cross(ax, n1);
+              vec3 mid = mix(base, A, .5) + uBk * (5. + L * .18) + uUp * 2.5; float s1 = 1. - e; vec3 pf = base * s1 * s1 + mid * 2. * s1 * e + A * e * e;
+              float ang = aR.x * 6.2832 + e * 11. + uT * 1.4, rad = sin(3.1416 * e) * (.7 + aR.y * 2.4); pf += (n1 * cos(ang) + n2 * sin(ang)) * rad;
+              float ph = uT * (1.5 + aR.y) + aR.x * 40.;
+              vec3 drop = A + (n1 * sin(ph) + n2 * cos(ph * .8 + aR.z * 9.)) * (.5 + aR.z * 2.) * (1. + .3 * sin(uT * 3.1 + aR.y * 20.)) + uBk * (aR.y - .5) * 2.4;
+              float settle = smoothstep(.8, 1.3, tt); p = mix(pf, drop, settle); a = mix(1., .4, settle); sz = mix(2.1, 1.3, settle); vMix = smoothstep(.05, .6, tt);
+              if (uSel > -.5) {
+                if (abs(aK - uSel) < .5) { float b = clamp((uT - uSelT - aR.z * .3) / .55, 0., 1.), eb = b * b * b; vec3 bk = uC + uRt * (aUv.x - .5) * uS * .35 + uUp * (aUv.y - .5) * uS * .2 + uBk * 1.5;
+                  p = mix(p, bk, eb); a = mix(a, 1.3, b) * (1. - smoothstep(.85, 1., b)); sz *= 1. + b * 1.5; }
+                else a *= max(.12, 1. - (uT - uSelT) * 2.5); } } }
+          vCol = kc; vec4 mv = modelViewMatrix * vec4(p, 1.); gl_PointSize = uPx * sz * 150. / -mv.z; vA = a * uOp; gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `precision highp float; uniform sampler2D uVid, uAt; uniform vec4 uRect; uniform float uUseVid; varying vec2 vUv; varying vec3 vCol; varying float vMix, vA;
+        void main(){ float r = length(gl_PointCoord - .5) * 2.; float k = smoothstep(1., .12, r); if (k * vA < .004) discard;
+          vec3 v = mix(texture2D(uAt, uRect.xy + vUv * uRect.zw).rgb, texture2D(uVid, vUv).rgb, uUseVid);
+          vec3 c = mix(v * 1.35 + .07, vCol * 1.3 + v * .2, vMix); gl_FragColor = vec4(c * k * vA, k * vA); }` });
+    { const pp = new THREE.Points(pGeo, pMat); pp.frustumCulled = false; pp.renderOrder = 1700; scene.add(pp); }
+    const SCAN = 1.6; // 光の帯が映像を読み終えるまで
     // 位置は毎フレーム、いまのカメラの向きと板の大きさから決め直す（寄っている途中に始まっても、言葉が斜めにずれない）
-    type Ext = { m: number; t0: number; ids: number[]; uv: [number, number][]; col: number[]; row: number[]; rows: number; side: ("l" | "r" | "c")[]; shown: boolean[]; from: THREE.Vector3[]; to: THREE.Vector3[] };
+    type Ext = { m: number; t0: number; ids: number[]; rc: [number, number][]; k0: number[]; col: number[]; row: number[]; rows: number; side: ("l" | "r" | "c")[]; shown: boolean[]; from: THREE.Vector3[]; to: THREE.Vector3[] };
     let ext: Ext | null = null;
+    const domDim = (id: number) => N.ctx[id].w.indexOf(Math.max(...N.ctx[id].w));
     function startExtract(m: number) { const ids = N.moments[m].ctx.slice(0, 8), n = ids.length, pr = portrait(), rows = Math.ceil(n / 2), t = tiles[m];
-      ext = { m, t0: now, ids, uv: ids.map((_, j) => [0.18 + ((j * 0.37 + 0.11) % 1) * 0.64, 0.22 + ((j * 0.53 + 0.3) % 1) * 0.56]), col: ids.map((_, j) => j % 2), row: ids.map((_, j) => Math.floor(j / 2)), rows,
-        side: ids.map((_, j) => (pr ? "c" : j % 2 ? "r" : "l")), shown: ids.map(() => false), from: ids.map(() => V()), to: ids.map(() => V()) };
-      patches.forEach((p, j) => { p.mesh.visible = j < n; if (j >= n) return; const id = ids[j], [u, v] = ext!.uv[j];
-        p.mat.uniforms.uR.value.set(u - 0.08, v - 0.142, 0.16, 0.284); p.mat.uniforms.uC.value.set(DIMC[N.ctx[id].w.indexOf(Math.max(...N.ctx[id].w))]);
-        p.mat.uniforms.uUseVid.value = mainOk ? 1 : 0; p.mat.uniforms.uAt.value = t.mat.uniforms.uAt.value; p.mat.uniforms.uRect.value.copy(t.mat.uniforms.uRect.value as THREE.Vector4); }); }
-    function updateExtract() { if (!ext) { patches.forEach((p) => (p.mesh.visible = false)); return; }
+      // 熱ごとに映像のどこから採るか（散らす）。帯がそこを通ったときに流れ出す
+      const rc = ids.map((_, j) => [0.16 + ((j * 0.37 + 0.11) % 1) * 0.68, 0.2 + ((j * 0.53 + 0.3) % 1) * 0.6] as [number, number]);
+      for (let i = 0; i < PN; i++) { const u = pUvA[i * 2], v = pUvA[i * 2 + 1]; let bk = -1, bd = 1; rc.forEach(([cu, cv], j) => { const d = Math.hypot((u - cu) * 16, (v - cv) * 9) / 1.9; if (d < bd) { bd = d; bk = j; } }); pK[i] = bk; }
+      pGeo.attributes.aK.needsUpdate = true;
+      const t0 = now + 0.15, k0 = rc.map(([, cv]) => t0 + (1 - cv) * SCAN + 0.1);
+      ext = { m, t0, ids, rc, k0, col: ids.map((_, j) => j % 2), row: ids.map((_, j) => Math.floor(j / 2)), rows, side: ids.map((_, j) => (pr ? "c" : j % 2 ? "r" : "l")), shown: ids.map(() => false), from: ids.map(() => V()), to: ids.map(() => V()) };
+      const u = pMat.uniforms; u.uSel.value = -1; u.uAt.value = t.mat.uniforms.uAt.value; (u.uRect.value as THREE.Vector4).copy(t.mat.uniforms.uRect.value as THREE.Vector4);
+      for (let j = 0; j < 8; j++) { u.uK0.value[j] = j < n ? k0[j] : 1e6; (u.uKC.value[j] as THREE.Color).set(j < n ? DIMC[domDim(ids[j])] : "#ffffff"); (t.mat.uniforms.uHole.value[j] as THREE.Vector4).set(j < n ? rc[j][0] : 0, j < n ? rc[j][1] : 0, j < n ? k0[j] + 0.25 : 1e6, 0); } }
+    // すぐ選ばれたときは、まだ流れ出していない熱を今すぐ滴にする
+    function finishExtract() { if (!ext) return; const e = ext; e.k0 = e.k0.map((k) => Math.min(k, now - 2)); e.k0.forEach((k, j) => { pMat.uniforms.uK0.value[j] = k; (tiles[e.m].mat.uniforms.uHole.value[j] as THREE.Vector4).z = 1e6; }); e.shown = e.shown.map(() => true); }
+    function updateExtract(dt: number) { const u = pMat.uniforms, on = !!ext && (st.k === "watch" || st.k === "scrub");
+      u.uOp.value += ((on ? 1 : 0) - u.uOp.value) * Math.min(1, dt * 6); u.uT.value = now; u.uUseVid.value = mainOk ? 1 : 0;
+      if (!ext) { stems([]); return; }
       const e = ext, pr = portrait(), S = tiles[e.m].scale, C = MP[e.m].tile, right = V(1, 0, 0).applyQuaternion(cam.quaternion), up = V(0, 1, 0).applyQuaternion(cam.quaternion), toCam = cam.getWorldDirection(V()).negate();
+      u.uC.value.copy(C); u.uRt.value.copy(right); u.uUp.value.copy(up); u.uBk.value.copy(toCam); u.uS.value = S;
+      const sc = (now - e.t0) / SCAN; u.uScan.value = sc < 0 ? -1 : Math.min(1.3, sc); u.uRd.value = sc < 0 ? 0 : Math.max(0, Math.min(1, 1.6 - sc * 0.8));
       let lines: { a: THREE.Vector3; b: THREE.Vector3; d: number; k: number }[] = [];
-      e.ids.forEach((id, j) => { const [u, v] = e.uv[j], sg = e.col[j] ? 1 : -1;
-        e.from[j].copy(C).addScaledVector(right, (u - 0.5) * S).addScaledVector(up, (v - 0.5) * S * 9 / 16);
+      e.ids.forEach((id, j) => { const sg = e.col[j] ? 1 : -1, [cu, cv] = e.rc[j];
+        e.from[j].copy(C).addScaledVector(right, (cu - 0.5) * S).addScaledVector(up, (cv - 0.5) * S * 9 / 16);
         if (pr) e.to[j].copy(C).addScaledVector(right, sg * S * 0.25).addScaledVector(up, -(S * 9 / 32 + 4.5 + e.row[j] * 6));
         else e.to[j].copy(C).addScaledVector(right, sg * (S / 2 + 4)).addScaledVector(up, ((e.rows - 1) / 2 - e.row[j]) * (S * 9 / 16) / Math.max(e.rows - 1, 1) * 0.92);
-        const p = patches[j], t = (now - e.t0 - 0.35 - j * 0.16) / 1.0, uu = p.mat.uniforms, d = N.ctx[id].w.indexOf(Math.max(...N.ctx[id].w));
-        if (t < 0) { uu.uOp.value = 0; return; }
-        const k = Math.min(1, t), ek = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2, lift = Math.min(1, t / 0.25);
-        const a = e.from[j], b = e.to[j], mid = a.clone().lerp(b, 0.5).addScaledVector(up, 6).addScaledVector(toCam, 8), s = 1 - ek;
-        const pos = a.clone().multiplyScalar(s * s).add(mid.multiplyScalar(2 * s * ek)).add(b.clone().multiplyScalar(ek * ek));
-        p.mesh.position.copy(pos); const fade = t > 1 ? Math.max(0, 1 - (t - 1) * 3) : 1;
-        uu.uS.value = S * 0.16 * (t < 0.25 ? 0.4 + lift * 0.9 : 1.3 - ek * 1.1) * fade; uu.uOp.value = t > 1 ? fade : lift; uu.uGlow.value = 1 - ek * 0.6;
-        if (t > 0.92) e.shown[j] = true;
-        lines.push({ a: e.from[j], b: t > 1 ? b : pos, d, k: Math.min(1, t * 1.5) * (st.k === "watch" ? 0.9 : 0.4) }); });
-      if (st.k !== "watch" && st.k !== "scrub") lines = []; stems(lines);
-      if (now - e.t0 > 0.35 + e.ids.length * 0.16 + 1.4 && st.k === "watch" && !st.ready) setV({ ...st, ready: true }); }
+        (u.uA.value[j] as THREE.Vector3).copy(e.to[j]).addScaledVector(right, pr ? 0 : sg * -2.2);
+        const t = now - e.k0[j]; if (t > 1.45) e.shown[j] = true;
+        if (t > 1.2) lines.push({ a: e.from[j], b: e.to[j], d: domDim(id), k: Math.min(1, (t - 1.2) * 2) * (st.k === "watch" ? 0.55 : 0.2) }); });
+      if (!on || st.k === "scrub") lines = []; stems(lines);
+      if (e.shown.every(Boolean) && st.k === "watch" && !st.ready) setV({ ...st, ready: true }); }
+
+    // ===== 時を走る（熱を選んだとき）=====
+    //   選んだ熱の滴が映像へ戻る → 映像が沈み、その時刻へ走るあいだ、通った本物のコマがフィルムのように一列に並んで横へ激しく流れる
+    //   → 最後のコマ（選んだ熱の時刻）で止まり、それが映像いっぱいに広がる → 光と衝撃の輪 → その場面が少しゆっくり流れ出し、熱の名前が打ち込まれる
+    const GN = 24, ghostGeo = new THREE.PlaneGeometry(1, 9 / 16);
+    const BILL_V = `uniform float uS; varying vec2 vUv; void main(){ vUv = uv; vec4 c = modelViewMatrix * vec4(0.,0.,0.,1.); c.xy += position.xy * uS; gl_Position = projectionMatrix * c; }`;
+    const ghosts = Array.from({ length: GN }, () => { const gc = document.createElement("canvas"); gc.width = 320; gc.height = 180; const g2 = gc.getContext("2d"); const tex = new THREE.CanvasTexture(gc); tex.colorSpace = THREE.SRGBColorSpace;
+      const mat = new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false, uniforms: { uTex: { value: tex }, uS: { value: 30 }, uOp: { value: 0 }, uTint: { value: new THREE.Color() } }, vertexShader: BILL_V,
+        fragmentShader: `precision highp float; uniform sampler2D uTex; uniform float uOp; uniform vec3 uTint; varying vec2 vUv;
+          void main(){ vec2 q = abs(vUv - .5) * vec2(16., 9.); float d = length(max(q - vec2(7.6, 4.1), 0.)) - .4; float a = (1. - smoothstep(-.05, .05, d)) * uOp; if (a < .003) discard;
+            vec3 c = texture2D(uTex, vUv).rgb * 1.08 + vec3(1.) * smoothstep(.3, 0., abs(d + .15)) * .85; gl_FragColor = vec4(c, a); }` });
+      const mesh = new THREE.Mesh(ghostGeo, mat); mesh.frustumCulled = false; mesh.renderOrder = 1900; mesh.visible = false; scene.add(mesh);
+      return { g2, tex, mat, mesh, t0: -1, k: 0 }; });
+    let ghostI = 0, stripN = 0, stripHead = 0, landT = -1;
+    function spawnGhost(tint: string) { if (mainTile < 0 || mainV.readyState < 2) return; const g = ghosts[ghostI++ % GN]; try { g.g2?.drawImage(mainV, 0, 0, 320, 180); } catch { return; }
+      g.tex.needsUpdate = true; g.t0 = now; g.k = stripN++; g.mesh.visible = true; (g.mat.uniforms.uTint.value as THREE.Color).set(tint); }
+    function clearStrip() { ghosts.forEach((g) => { g.t0 = -1; g.mesh.visible = false; }); stripN = 0; stripHead = 0; landT = -1; }
+    // 衝撃の輪（2重）
+    const rings = [0, 1].map(() => { const mat = new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uS: { value: 1 }, uOp: { value: 0 }, uC: { value: new THREE.Color() } }, vertexShader: BILL_V,
+        fragmentShader: `precision highp float; uniform float uOp; uniform vec3 uC; varying vec2 vUv; void main(){ float d = length(vUv - .5) * 2.; float k = smoothstep(.07, 0., abs(d - .9)) + smoothstep(.5, 0., abs(d - .9)) * .25; if (d > 1.) discard; gl_FragColor = vec4((uC + .35) * k * uOp, k * uOp); }` });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), mat); mesh.frustumCulled = false; mesh.renderOrder = 1950; mesh.visible = false; scene.add(mesh); return { mat, mesh }; });
+    let ringT = -10, zoom = 0, shake = 0;
+    function updateRush(dt: number) { const toCam = cam.getWorldDirection(V()).negate(), right = V(1, 0, 0).applyQuaternion(cam.quaternion), up = V(0, 1, 0).applyQuaternion(cam.quaternion);
+      const C = mainTile >= 0 ? MP[mainTile].tile : null, S = mainTile >= 0 ? tiles[mainTile].scale : 30, dc = C ? cam.position.distanceTo(C) : 60;
+      // フィルム: 新しいコマが右から入り、列ごと左へ跳ぶ。真ん中が今のコマ。止まったら最後のコマが映像いっぱいに広がる
+      stripHead += (Math.max(0, stripN - 1) - stripHead) * Math.min(1, dt * 14); const lt = landT > 0 ? (now - landT) / 0.45 : -1, w = S * (portrait() ? 0.62 : 0.48), sp = w * 1.08;
+      ghosts.forEach((g) => { if (g.t0 < 0) return; if (!C) { g.t0 = -1; g.mesh.visible = false; return; }
+        const rel = g.k - stripHead, last = g.k === stripN - 1, cen = Math.max(0, 1 - Math.abs(rel)), arr = Math.min(1, (now - g.t0) / 0.12);
+        let x = rel * sp, z = dc * 0.2 - rel * rel * 3.2, sc = w * (1 + cen * 0.3), op = Math.max(0, 1 - Math.abs(rel) * 0.2) * arr;
+        if (lt > 0) { const e = Math.min(1, lt); if (last) { x *= 1 - e; z *= 1 - e; sc = sc + (S - sc) * e; op = 1 - Math.max(0, (lt - 0.7) / 0.5); } else { x *= 1 + e * 1.5; op *= 1 - e; } }
+        if (op <= 0.003 || Math.abs(rel) > 6) { g.mesh.visible = false; if (lt > 1.2 || Math.abs(rel) > 6) g.t0 = -1; return; } g.mesh.visible = true;
+        g.mesh.position.copy(C).addScaledVector(right, x).addScaledVector(toCam, z).addScaledVector(up, Math.sin(rel * 1.3 + g.k) * 0.4 * (1 - Math.min(1, Math.max(0, lt))));
+        g.mat.uniforms.uS.value = sc; g.mat.uniforms.uOp.value = op; g.mesh.renderOrder = 1900 - Math.round(Math.abs(rel) * 10); });
+      rings.forEach((r, k) => { const age = (now - ringT - k * 0.14) / 0.85; r.mesh.visible = !!C && age > 0 && age < 1; if (!r.mesh.visible || !C) return;
+        r.mesh.position.copy(C).addScaledVector(toCam, 2); r.mat.uniforms.uS.value = S * (0.75 + Math.pow(age, 0.6) * (2.6 + k * 0.8)); r.mat.uniforms.uOp.value = Math.pow(1 - age, 2) * 1.2; }); }
 
     // ===== 動き =====
     const other = (n: number, c: number) => (N.links[n][0] === c ? N.links[n][1] : N.links[n][0]);
@@ -358,15 +438,16 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       frameTile(m);
       const waitReady = () => { if (mainOk || now - t0w > 2.5) { startExtract(m); if (then) later(1.0, then); } else later(0.15, waitReady); }; const t0w = now; later(reduce ? 0.3 : 1.1, waitReady); }
     const fov0 = () => (portrait() ? 60 : 50); // 飛んでいる間は画角が広がるので、距離はいつも基準の画角で決める
-    function frameTile(m: number) { const n = MP[m].n, S = 30, f = portrait() ? 0.94 : 0.5, tn = Math.tan((fov0() * Math.PI) / 360);
+    function frameTile(m: number, fill?: number) { const n = MP[m].n, S = 30, f = fill ?? (portrait() ? 0.94 : 0.5), tn = Math.tan((fov0() * Math.PI) / 360);
       camG.yaw = Math.atan2(n.x, n.z); camG.pitch = Math.max(-1, Math.min(1, Math.asin(n.y))); camG.dist = S / (f * 2 * tn * (portrait() ? innerWidth / innerHeight : Math.min(1.9, innerWidth / innerHeight))); tgtG.copy(MP[m].tile); }
-    // 熱を選ぶ: 本物のコマを通ってその時刻へ → 光 → その場面を流す → 引いて全体が鼓動し「熱狂接続中」→ 繋がった熱が光る → 旅
+    // 熱を選ぶ: 選んだ熱の滴が映像へ戻り、映像が寄って、本物のコマが剥がれて飛びながらその時刻へ走る（約2.4秒）→ 光と衝撃 → その場面が流れ、熱の名前が打ち込まれる → 熱狂接続中
     function heat(c: number) { const m = momOf[c];
       if (mainTile !== m || (st.k !== "watch" && st.k !== "scrub")) { watch(m, () => heat(c)); return; }
-      if (st.k === "watch" && !st.ready && ext) ext.shown = ext.shown.map(() => true);
-      go({ k: "scrub", m, c }); tiles.forEach((t) => { t.dimG = t.m === m ? 1 : 0.3; t.goal = t.m === m ? 30 : 16; }); frameTile(m);
-      mainV.pause(); scrub = { from: mainV.currentTime, to: Math.max(0, N.ctx[c].t - 1.2), t0: now, c, lastSeek: 0 }; }
-    function afterScrub(c: number) { flash = 1; glitch = 0.6; hooks.current.slam?.(c); later(reduce ? 0.5 : 3.0, () => connect(c)); }
+      if (st.k === "scrub") return;
+      finishExtract(); go({ k: "scrub", m, c }); pMat.uniforms.uSel.value = ext ? ext.ids.indexOf(c) : -1; pMat.uniforms.uSelT.value = now;
+      tiles.forEach((t) => { t.dimG = t.m === m ? 0.35 : 0.12; t.goal = t.m === m ? 30 : 16; }); frameTile(m, portrait() ? 1 : 0.64);
+      mainV.pause(); clearStrip(); scrub = { from: mainV.currentTime, to: Math.max(0, N.ctx[c].t - 0.7), t0: now + (reduce ? 0.1 : 0.55), c, lastSeek: 0, dur: reduce ? 0.4 : 1.9, wait: -1 }; }
+    function afterScrub(c: number) { if (mainTile >= 0) { tiles[mainTile].dimG = 1; tiles[mainTile].dim = 1; } flash = 1.25; shake = 1.5; ringT = now; landT = now; hooks.current.slam?.(c); later(1.3, () => { mainV.playbackRate = 1; }); later(reduce ? 0.6 : 3.8, () => connect(c)); }
     // 熱狂接続中: カメラが引いて全体が映り、心臓のように鼓動する。選んだ熱から照合の波が全体へ広がる
     let beatAmp = 0, beatG = 0, waveA = 0, waveR = 0, waveC = V();
     function connect(seed: number, q?: string, given?: Item[], nm?: string) {
@@ -451,8 +532,8 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
     function drawText() { used = 0; rects = [];
       const up = upV();
       // 抜き取った熱の言葉（観ているとき）
-      if (ext && (st.k === "watch" || st.k === "scrub")) { const sel = st.k === "scrub" ? st.c : -1; ext.ids.forEach((id, j) => { if (!ext!.shown[j]) return; const c = N.ctx[id], d = c.w.indexOf(Math.max(...c.w));
-        txt(`hw ${sel === id ? "on" : sel >= 0 ? "off" : ""}`, `<span style="--c:${DIMC[d]}">${c.title}</span>`, ext!.to[j], { pri: 3, side: ext!.side[j], data: st.k === "watch" ? `h:${id}` : "" }); }); }
+      if (ext && (st.k === "watch" || (st.k === "scrub" && now - pMat.uniforms.uSelT.value < 0.6))) { const sel = st.k === "scrub" ? st.c : -1; ext.ids.forEach((id, j) => { if (!ext!.shown[j] || (sel >= 0 && sel !== id)) return; const c = N.ctx[id], d = c.w.indexOf(Math.max(...c.w));
+        txt(`hw ${sel === id ? "on" : sel >= 0 ? "off" : ""}`, `<span style="--c:${DIMC[d]}">${Array.from(c.title).map((ch, q) => `<i style="animation-delay:${180 + q * 55}ms">${ch}</i>`).join("")}</span>`, ext!.to[j], { pri: 3, side: ext!.side[j], data: st.k === "watch" ? `h:${id}` : "" }); }); }
       // 全体図: 集めた熱の映像の上に、その熱の名前
       if (st.k === "map") st.items.forEach((it) => { const c = N.ctx[it.id], m = momOf[it.id], t = tiles[m];
         txt("ht", `<b>${N.moments[m].sport}</b><span style="--c:${DIMC[it.d]}">${c.title}</span>`, t.mesh.position.clone().addScaledVector(up, t.scale * 0.2813 + 5), { pri: 2, side: "c", data: `w:${it.id}` }); });
@@ -509,35 +590,39 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
       else { const f0 = portrait() ? 60 : 50; if (Math.abs(cam.fov - f0) > 0.02) { cam.fov += (f0 - cam.fov) * Math.min(1, dt * 5); cam.updateProjectionMatrix(); }
         cam0.yaw += (camG.yaw - cam0.yaw) * k; cam0.pitch += (camG.pitch - cam0.pitch) * k; cam0.dist += (camG.dist - cam0.dist) * k; tgtC.lerp(tgtG, k);
         const pw = st.k === "watch" || st.k === "scrub" || st.k === "trip" ? 0.03 : 0.1, yw = cam0.yaw - parC.x * pw, pt = Math.max(-1.3, Math.min(1.3, cam0.pitch + parC.y * pw * 0.6));
-        cam.position.set(Math.sin(yw) * Math.cos(pt), Math.sin(pt), Math.cos(yw) * Math.cos(pt)).multiplyScalar(cam0.dist).add(tgtC); roll += (rollG - roll) * k; cam.up.set(0, 1, 0); cam.lookAt(tgtC); if (Math.abs(roll) > 1e-4) cam.rotateZ(roll); }
+        cam.position.set(Math.sin(yw) * Math.cos(pt), Math.sin(pt), Math.cos(yw) * Math.cos(pt)).multiplyScalar(cam0.dist).add(tgtC); roll += (rollG - roll) * k; cam.up.set(0, 1, 0); cam.lookAt(tgtC); if (Math.abs(roll) > 1e-4) cam.rotateZ(roll); if (shake > 0.01) cam.position.add(tmp.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(shake * 0.8)); }
       { const w = R.domElement.width / R.getPixelRatio(), h = R.domElement.height / R.getPixelRatio(), pr = portrait();
         const ox = pr ? 0 : st.k === "free" || st.k === "search" ? -0.13 : 0, oy = st.k === "free" || st.k === "search" ? (pr ? -0.05 : 0) : st.k === "watch" || st.k === "scrub" ? (pr ? 0.2 : 0.02) : st.k === "map" ? (pr ? 0.12 : 0.09) : st.k === "trip" && st.i >= 0 ? (pr ? 0.05 : 0.08) : 0;
         view.x += (ox - view.x) * k; view.y += (oy - view.y) * k; cam.setViewOffset(w, h, view.x * w, view.y * h, w, h); }
       fiberMat.uniforms.uNear.value = cam.position.length(); fiberMat.uniforms.uDen.value = Math.max(0.45, Math.min(1.2, Math.sqrt((Math.min(innerWidth, innerHeight * 1.8) / 1280) * (290 / Math.max(60, cam.position.distanceTo(tgtC))))));
       if (fat) (fat.geometry as LineSegmentsGeometry).instanceCount = Math.min(fatN, Math.ceil(fatN * Math.min(1, (now - fatT0) / fatDur)));
-      // 時刻を走る（本物のコマを seek で飛び飛びに見せる）
-      if (scrub && mainTile >= 0) { const p = Math.min(1, (now - scrub.t0) / (reduce ? 0.3 : 0.85)), e = p * p * (3 - 2 * p);
-        if (mainOk && !mainV.seeking && now - scrub.lastSeek > 0.06) { scrub.lastSeek = now; try { mainV.currentTime = Math.max(0, scrub.from + (scrub.to - scrub.from) * e + (Math.random() - 0.5) * 0.4 * (1 - p)); } catch { /* まだ読めていない */ } }
-        glitch = Math.max(glitch, Math.min(1, 0.25 + p * 0.9));
-        if (p >= 1) { const c = scrub.c; try { mainV.currentTime = scrub.to; } catch { /* */ } mainV.muted = false; mainV.play().catch(() => {}); scrub = null; afterScrub(c); } }
-      glitch = Math.max(0, glitch - dt * (scrub ? 0 : 2.2)); flash = Math.max(0, flash - dt * 2.8);
+      // 時を走る（本物のコマを seek で飛び飛びに。山なりに激しくなり、着く直前に静まる）
+      if (scrub && mainTile >= 0) { const sc0 = scrub, p = Math.max(0, Math.min(1, (now - sc0.t0) / sc0.dur));
+        if (now >= sc0.t0) { const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2, pk = Math.sin(Math.PI * p);
+          if (sc0.wait < 0 && mainOk && !mainV.seeking && now - sc0.lastSeek > 0.045) { sc0.lastSeek = now; try { mainV.currentTime = Math.max(0, sc0.from + (sc0.to - sc0.from) * e + (Math.random() - 0.5) * 0.6 * pk); } catch { /* まだ読めていない */ } }
+          glitch = 0.1 + 0.9 * pk; zoom = pk; shake = Math.max(shake, 0.25 + pk * 0.8); }
+        if (p >= 1 && sc0.wait < 0) { sc0.wait = now; try { mainV.currentTime = sc0.to; } catch { land(); } }
+        else if (sc0.wait > 0 && now - sc0.wait > 0.5) land(); }
+      else { glitch = Math.max(0, glitch - dt * 2.4); zoom = Math.max(0, zoom - dt * 3); }
+      flash = Math.max(0, flash - dt * 1.7); shake = Math.max(0, shake - dt * 2.2);
+      updateRush(dt);
       wordMat.uniforms.uOp.value += (wordOpG - wordMat.uniforms.uOp.value) * Math.min(1, dt * 3); wordMat.uniforms.uT.value = now;
       // 板
       const cp = cam.position;
       tiles.forEach((t) => { const u = t.mat.uniforms; t.dim += (t.dimG - t.dim) * k; t.lift += (t.liftG - t.lift) * Math.min(1, dt * 2.2);
         t.scale += (t.goal - t.scale) * k; const home = MP[t.m].tile; t.mesh.position.copy(home).addScaledVector(MP[t.m].n, t.lift * 8).lerp(cp, t.lift * (portrait() ? 0.32 : 0.42));
-        const isMain = t.m === mainTile; if (isMain && scrub) t.mesh.position.add(tmp.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.9 * glitch)); const onTrip = st.k === "trip" && st.i >= 0 && momOf[st.items[st.i]?.id] === t.m;
+        const isMain = t.m === mainTile; const onTrip = st.k === "trip" && st.i >= 0 && momOf[st.items[st.i]?.id] === t.m;
         u.uS.value = t.scale * (1 + hb * 0.05); u.uDim.value = t.dim * (1 + hb * 0.25); u.uBill.value += ((t.lift > 0.3 || isMain || onTrip ? 1 : 0) - u.uBill.value) * Math.min(1, dt * 3);
         const face = MP[t.m].n.dot(tmp.copy(cp).sub(t.mesh.position).normalize()); u.uFace.value = Math.max(0, Math.min(1, face * 1.6 + 0.4));
         u.uOp.value = Math.min(1, ie * 1.4) * (t.lift > 0.5 || isMain || onTrip ? 1 : face < 0.05 ? 0.35 : 0.45 + 0.55 * Math.min(1, face * 1.6 + 0.2));
         if (!isMain && (st.k === "free" || st.k === "watch")) u.uHi.value = hoverM === t.m ? 1 : 0;
         const vOn = isMain && !(st.k === "trip" && st.i >= 0) ? (mainOk ? 1 : 0) : t.vid >= 0 && slots[t.vid].tile === t.m && slots[t.vid].v.readyState >= 2 ? 1 : 0; u.uUseVid.value += (vOn - u.uUseVid.value) * Math.min(1, dt * 4);
-        u.uGl.value = isMain ? glitch : 0; u.uFl.value = isMain ? flash : 0; u.uT.value = now;
-        if (isMain && ext && st.k === "watch") { const sc = (now - ext.t0) / 1.3; u.uScan.value = sc > 0 && sc < 1 ? sc : -1; } else u.uScan.value = -1;
+        u.uGl.value = isMain ? glitch : 0; u.uFl.value = isMain ? Math.min(1, flash) : 0; u.uZm.value = isMain ? zoom : 0; u.uT.value = now;
+        if (isMain && ext && st.k === "watch") { const sc = (now - ext.t0) / SCAN; u.uScan.value = sc > 0 && sc < 1 ? sc : -1; } else u.uScan.value = -1;
         t.mesh.renderOrder = onTrip ? 1600 : isMain ? 1500 : face < 0.05 && t.lift < 0.5 ? -10 : 10 + Math.round(1000 - cp.distanceTo(t.mesh.position)); });
       if (st.k === "free" && now - liveAt > 3 && intro > 0.9) { liveAt = now; const cand = tiles.map((t) => { prj.copy(t.mesh.position).project(cam); const face = MP[t.m].n.dot(tmp.copy(cp).sub(t.mesh.position).normalize()); return { t, s: face - Math.hypot(prj.x, prj.y) * 0.8 }; }).sort((a, b) => b.s - a.s).slice(0, portrait() ? 2 : 3);
         setPlaying(cand.map(({ t }) => ({ tile: t.m, src: clipOf(N.moments[t.m].ctx[0]) }))); }
-      updateExtract();
+      updateExtract(dt);
       drawText();
       if (draw) render(); }
     function render() { R.setRenderTarget(fibRT); R.setClearColor(0x000000, 0); R.clear(); R.render(fibScene, cam); R.setRenderTarget(null); R.setClearColor(0x020306, 1); R.render(scene, cam); }
@@ -565,14 +650,14 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
 
     api.current = { watch: (m) => watch(m), heat, search: (q) => { search(q); }, back, next: () => { if (st.k === "trip" && st.i >= 0 && !fly) { const s = st; go({ ...s }); hop(s.i + 1); } }, skip: () => { if (st.k === "trip") { fly = null; toMap(); } },
       replay: () => { if (st.k === "map") { const s = st; connect(s.seed, s.q, s.items, gn); } } };
-    (window as unknown as { __bw: object }).__bw = { st: () => st, watch, heat, search, back, next: () => api.current?.next(), skip: () => api.current?.skip(), replay: () => api.current?.replay(), manual: (on: boolean) => { manual = on; }, adv: (s: number) => { const n = Math.max(1, Math.round(s * 30)); for (let i = 0; i < n; i++) update(1 / 30, i === n - 1); }, find: (t: string) => N.ctx.findIndex((c) => c.title === t), momOf: (c: number) => momOf[c], queue: () => queue.length };
+    (window as unknown as { __bw: object }).__bw = { st: () => st, watch, heat, search, back, next: () => api.current?.next(), skip: () => api.current?.skip(), replay: () => api.current?.replay(), manual: (on: boolean) => { manual = on; }, adv: (s: number) => { const n = Math.max(1, Math.round(s * 30)); for (let i = 0; i < n; i++) update(1 / 30, i === n - 1); }, find: (t: string) => N.ctx.findIndex((c) => c.title === t), dbg: () => ({ stripN, head: stripHead, vis: ghosts.filter((g) => g.mesh.visible).map((g) => [g.k, +g.mat.uniforms.uOp.value.toFixed(2), +g.mat.uniforms.uS.value.toFixed(1)]), rs: mainV.readyState, seeking: mainV.seeking, scrub }), momOf: (c: number) => momOf[c], queue: () => queue.length };
     return () => { alive = false; cancelAnimationFrame(raf); removeEventListener("resize", resize); tx.removeEventListener("click", onTx); pool.forEach((e) => e.remove()); document.removeEventListener("visibilitychange", vis); slots.forEach((s) => { s.v.pause(); s.v.src = ""; }); mainV.pause(); mainV.src = ""; R.dispose(); el.removeChild(R.domElement); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ===== 画面の文字と操作 =====
   useEffect(() => { hooks.current.view = (v) => setView(v); hooks.current.slam = (c) => setSlam({ c, key: Date.now() }); hooks.current.name = (n) => setGname(n); });
-  useEffect(() => { if (!slam) return; const t = setTimeout(() => setSlam(null), 2600); return () => clearTimeout(t); }, [slam]);
+  useEffect(() => { if (!slam) return; const t = setTimeout(() => setSlam(null), 3700); return () => clearTimeout(t); }, [slam]);
   // 接続中の数（照らし合わせた熱が数え上がる）
   const [scan, setScan] = useState(0);
   const scanning = view.k === "search" || (view.k === "trip" && view.i === -2);
@@ -608,7 +693,7 @@ export default function BrainWorld({ media, shared }: { media: MediaMap; shared?
         </div>
       )}
       {N && watching >= 0 && (() => { const m = N.moments[watching]; return <div className="bw-who" key={watching}><b>{m.sport}</b><span>{m.title}</span></div>; })()}
-      {N && slam && <div className="bw-slam" key={slam.key}><span>{N.ctx[slam.c].title}</span></div>}
+      {N && slam && (() => { const c = N.ctx[slam.c], d = c.w.indexOf(Math.max(...c.w)); return <div className="bw-slam" key={slam.key} style={{ ["--c" as string]: DIMC[d] }}><h2>{Array.from(c.title).map((ch, i) => <i key={i} style={{ animationDelay: `${i * 45}ms` }}>{ch}</i>)}</h2><span className="bar" /><p>{c.line}</p></div>; })()}
       {N && ((view.k === "trip" && view.i < 0 && !view.mv) || view.k === "search") && (
         <div className={`bw-conn ${view.k === "trip" && view.i === -1 ? "done" : ""}`}>
           <div className="s">{view.k === "trip" && view.seed >= 0 ? N.ctx[view.seed].title : `「${view.q}」`}</div>
@@ -651,11 +736,13 @@ const CSS = `
 .bw-t.wd{font-size:clamp(18px,2vw,26px);font-weight:900;letter-spacing:.04em;text-shadow:0 0 24px rgba(0,0,0,.9),0 0 2px rgba(0,0,0,.9)}
 /* 抜き取った熱の言葉: じわっと滲み出て、押せる */
 .bw-t.hw{cursor:pointer}
-.bw-t.hw span{animation:bwseep 1.1s cubic-bezier(.2,.8,.2,1) both;display:inline-block;font-size:15px;font-weight:900;letter-spacing:.02em;padding:8px 14px;border-radius:999px;background:rgba(6,8,13,.86);border:1px solid color-mix(in srgb,var(--c) 70%,transparent);box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 24px color-mix(in srgb,var(--c) 25%,transparent);transition:background .2s,color .2s,transform .2s}
+.bw-t.hw span{animation:bwdrop .9s cubic-bezier(.2,.9,.25,1.15) both;display:inline-block;font-size:15px;font-weight:900;letter-spacing:.02em;padding:8px 14px;border-radius:999px;background:rgba(6,8,13,.86);border:1px solid color-mix(in srgb,var(--c) 70%,transparent);box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 24px color-mix(in srgb,var(--c) 25%,transparent);transition:background .2s,color .2s,transform .2s}
 .bw-t.hw:hover span{background:var(--c);color:#0a0a0a}
 .bw-t.hw.on span{background:var(--c);color:#0a0a0a}
 .bw-t.hw.off span{opacity:.25!important}
-@keyframes bwseep{0%{filter:blur(14px);transform:scale(1.3);opacity:0}40%{opacity:1}100%{filter:none;transform:none;opacity:1}}
+.bw-t.hw span i{font-style:normal;display:inline-block;animation:bwch .6s cubic-bezier(.2,.8,.2,1) both}
+@keyframes bwdrop{0%{transform:scale(.15);opacity:0;filter:blur(12px)}50%{opacity:1;filter:none}70%{transform:scale(1.07)}100%{transform:none;opacity:1}}
+@keyframes bwch{0%{opacity:0;transform:translateY(.55em) scale(1.6);filter:blur(6px)}100%{opacity:1;transform:none;filter:none}}
 .bw-top{position:absolute;left:0;right:0;top:0;z-index:8;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:calc(env(safe-area-inset-top,0px) + 18px) max(20px,env(safe-area-inset-right,0px)) 0 max(20px,env(safe-area-inset-left,0px));pointer-events:none}
 .bw-top>*{pointer-events:auto}
 .bw-mark{font-size:11px;font-weight:900;letter-spacing:.32em;white-space:nowrap}.bw-mark em{font-style:normal;color:#f7ff3c}
@@ -675,8 +762,15 @@ const CSS = `
 .bw-who b{display:block;font-size:10px;font-weight:900;letter-spacing:.22em;color:#f7ff3c}.bw-who span{display:block;margin-top:4px;font-size:16px;font-weight:900;text-shadow:0 1px 12px rgba(0,0,0,.9)}
 .pill{flex:none;font-family:inherit;font-size:14px;font-weight:900;color:#0a0a0a;background:#f7ff3c;border:0;border-radius:999px;padding:13px 20px;cursor:pointer;box-shadow:0 8px 30px rgba(247,255,60,.18)}
 .ghost{flex:none;font-family:inherit;font-size:13px;font-weight:700;color:#f4f2ec;background:rgba(2,3,6,.85);border:1px solid rgba(244,242,236,.25);border-radius:999px;padding:12px 16px;cursor:pointer}
-.bw-slam{position:absolute;left:0;right:0;top:calc(50% - 4vh);z-index:7;display:flex;justify-content:center;pointer-events:none}
-.bw-slam span{font-size:clamp(30px,4.6vw,64px);font-weight:900;letter-spacing:.02em;text-shadow:0 4px 30px rgba(0,0,0,.85);animation:bwslam 2.6s cubic-bezier(.2,.9,.2,1) both;white-space:nowrap}
+/* 熱の名前が打ち込まれる（衝撃のあと） */
+.bw-slam{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 8vh);z-index:7;display:flex;flex-direction:column;align-items:center;pointer-events:none;text-shadow:0 4px 30px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.9);animation:bwout 3.7s linear both;padding:0 20px}
+.bw-slam h2{margin:0;font-size:clamp(34px,5.6vw,80px);font-weight:900;letter-spacing:.02em;line-height:1.1;text-align:center}
+.bw-slam h2 i{font-style:normal;display:inline-block;animation:bwslamch .55s cubic-bezier(.2,1.4,.3,1) both}
+.bw-slam .bar{display:block;height:4px;width:min(440px,60vw);background:var(--c);margin-top:12px;transform-origin:center;animation:bwbar .7s .35s cubic-bezier(.2,.8,.2,1) both;box-shadow:0 0 24px var(--c)}
+.bw-slam p{margin:12px 0 0;max-width:640px;text-align:center;font-size:clamp(13px,1.3vw,17px);font-weight:700;line-height:1.6;color:rgba(244,242,236,.92);animation:bwf .6s .75s ease both}
+@keyframes bwslamch{0%{opacity:0;transform:scale(2.8) translateY(-.15em);filter:blur(12px)}55%{opacity:1;filter:none}100%{opacity:1;transform:none}}
+@keyframes bwbar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes bwout{0%,86%{opacity:1}100%{opacity:0}}
 @keyframes bwslam{0%{opacity:0;transform:scale(1.9);filter:blur(14px)}9%{opacity:1;transform:scale(.97);filter:none}14%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(1)}}
 /* 熱狂接続中 */
 .bw-conn{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 9vh);z-index:7;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none;animation:bwf .6s ease both;text-shadow:0 2px 20px rgba(0,0,0,.9)}
@@ -713,7 +807,7 @@ const CSS = `
   .bw-intro{left:16px;right:16px;width:auto;top:calc(env(safe-area-inset-top,0px) + 54px)}.bw-intro .l{font-size:20px;margin-bottom:12px;white-space:normal}
   .bw-who{left:16px;top:calc(env(safe-area-inset-top,0px) + 52px)}.bw-who span{font-size:14px}
   .bw-t.hw span{font-size:13px;padding:7px 11px}.bw-t.ht span{font-size:11.5px}.bw-t.lobe{font-size:10px}
-  .bw-slam{top:calc(env(safe-area-inset-top,0px) + 24vh)}.bw-slam span{font-size:26px;white-space:normal;text-align:center;padding:0 20px}
+  .bw-slam{bottom:calc(env(safe-area-inset-bottom,0px) + 14vh)}.bw-slam h2{font-size:30px}.bw-slam p{font-size:13px}
   .bw-stop .bar{top:calc(env(safe-area-inset-top,0px) + 56px)}.bw-stop .skip{top:calc(env(safe-area-inset-top,0px) + 70px)}.bw-stop h3{font-size:26px}
   .bw-map{flex-direction:column;align-items:stretch;gap:12px;width:calc(100% - 20px);bottom:calc(env(safe-area-inset-bottom,0px) + 10px)}.bw-map .row{justify-content:stretch}.bw-map .row .pill{flex:1}
 }
