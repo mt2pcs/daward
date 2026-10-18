@@ -29,8 +29,8 @@ for (const m of N.moments) {
     for (const [y, s] of nb.get(id) || []) { const q = N.moments[mi[N.ctx[y].no]].p, v = [q[0] - o[0], q[1] - o[1], q[2] - o[2]], L = Math.hypot(...v) + 0.01; for (let k = 0; k < 3; k++) d[k] += (v[k] / L) * s; }
     // 同じ細胞体の突起どうしが重ならないよう、黄金角の方向を混ぜる
     const a = j * 2.39996 + rnd(), z = 1 - (2 * (j + 0.5)) / n, r = Math.sqrt(1 - z * z), g = [Math.cos(a) * r, z, Math.sin(a) * r];
-    let L = Math.hypot(...d); const k0 = L > 0 ? 0.65 : 0; d = d.map((v, k) => (L > 0 ? (v / L) * k0 : 0) + g[k] * (1 - k0)); L = Math.hypot(...d);
-    const len = 13 + 6 * rnd();
+    let L = Math.hypot(...d); const k0 = L > 0 ? 0.35 : 0; d = d.map((v, k) => (L > 0 ? (v / L) * k0 : 0) + g[k] * (1 - k0)); L = Math.hypot(...d);
+    const len = 16 + 7 * rnd();
     c.p = d.map((v, k) => +(o[k] + (v / L) * len).toFixed(2));
   });
 }

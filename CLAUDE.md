@@ -81,15 +81,14 @@ Next.js 14（App Router, TS）。本番は Cloud Run `e-mooments-burst`（`/`＝
   時期の切替は `phase()`（`VOTE_PHASE`）。支給ブランド素材は `public/brand/`。
 - **投票サイト** `/moments`（TOP・詳細・確認・完了）、API `/api/v26/vote`・`/api/v26/state`。1日1回・端末ベース（Cookie）。ストアはインメモリ（Firestore 差し替え前提）。
   票数は出さず heat（相対値）だけ。データ `data/moments2026.json`（`scripts/build_moments2026.mjs`）。
-- **体験** `/experience`（2026-10-18・判定待ち）: `components/BurstWorld.tsx`。10/16 の方向案を仮説として実装（ユーザーの「作業を開始して」を受けて）。
-  炸裂の空間（SpaceStream と同じロゴ色の直線の破片が奥の一点から手前へ流れ続ける）の中を、76の瞬間が映像の破片として奥から放射しながら流れてくる →
-  押すと前に来て、その瞬間のかけら（人×その1秒、名前＝state）が輪に噴き出す → かけらを押すとそれが中心（新しい消失点）、繋がるかけらが光線（色＝繋がりの種類、
-  近さ＝rate）に乗って噴き出し、その先が外側、残り全部は奥で小さく回る。前のかけらから渡った時は繋がりの一文（links の why）を下に出す。
-  繋がりが6未満のかけらは埋め込みの近いかけら（別の瞬間）で補う（灰色の光線・一文なし）。中心を押す/「この1秒を観る」で大きく音つき再生。
-  言葉は奥の一点に立ち（読む間は全部が吸い込まれる）、答えるかけらが噴き出す（`/api/lab/net/word`）。投票サイト詳細に「熱狂の中を回遊する！ この瞬間から」→ `?no=`。
-  スマホは中心を小さく、周りは6つで上下に1つずつ（横並びの名前が重なったため）。旧版（切り口エンジン＋腕）は `/lab/cut`。
-  検証 `scripts/lab/burst_world_test.mjs W H tag`（OUT・CLIPS＝c/<i>.webm, m/<key>.webm, atlas0/1.jpg・WORD・NO）。
-  未対応: 熱（投票）を切り口の上に出す、2つの言葉の両方に答えたかけら、映像の無い24本、実機（iPhone の mp4）。
+- **体験** `/experience`（2026-10-18 夜・判定待ち）: `components/NeuralWorld.tsx`「熱狂の神経系」。瞬間＝細胞体、熱狂の文脈＝突起の先の細胞、響き合い＝線維（7,564本すべて描く）。
+  細胞体を押す→カメラが飛び込み目の前でその瞬間が流れる→映像が楔に割れて文脈の細胞へ飛ぶ（分解）→文脈を押す→カメラが引き、実際の繋がりを幅優先で信号が伝わり線維が次元の色に変わる、
+  探索の実数（照らし合わせた文脈・通った線維・響き合った文脈）を数え上げる→響き合った瞬間が金の線維で結ばれ名前が付く→線維を辿って1つずつ飛び、各文脈の4秒が音つきで流れる（ダイジェスト）
+  →最後に引いてシェア（X・LINE・コピー、リンク `/d/<code>`、OGP 画像 `/d/<code>/og`）。言葉は空間の中心に生まれ同じ探索。ドラッグ/ピンチ/ホイールで自由に旅する。
+  データ: `scripts/ctx/contexts.mjs`（1本→熱狂の文脈5〜8＋8次元、映像＋シート＋material.json）→ `data/ctx/contexts.json`（100本・523文脈）→ `net.mjs`（映像のある77本・402文脈の
+  8次元埋め込みと繋がり、`public/ctx/net.json`・`emb.bin`）→ `layout.mjs`（配置）→ `clips.mjs`＋`atlas.py`（文脈ごとの4秒 640px、バケット `ctx/c/<id>.*`・`ctx/atlas*.jpg`）。
+  API `app/api/ctx/digest`（種の文脈 or 言葉→8次元→全文脈を照らし合わせ→上位20から gemini が6〜8選び、並べ、名前と一文）。検証 `scripts/lab/neural_test.mjs W H tag`。
+  却下された BurstWorld は `/lab/burst`、切り口エンジン版は `/lab/cut`。
 - **体験の素材（再利用できるもの）**:
   - `data/net/layers.json`（76瞬間→327出来事→488人（かけら・その1秒）→1374要素）、`links.json`（要素どうしの繋がり、rate 0〜3）、`world.json`（体験用にまとめたもの）、
     `names.json`（かけらを中心にした塊の名前）、`emb.bin`（かけらの埋め込み）。生成は `scripts/net/*.mjs`。

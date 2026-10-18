@@ -49,8 +49,8 @@ uniform sampler2D uMap; uniform float uOp; uniform float uHas; uniform float uA0
 void main(){ vec2 q = vUv - 0.5;
   if (uWedge > 0.5) { float a = atan(q.y * 0.5625, q.x); float d = mod(a - uA0 + 12.566370, 6.283185); if (d > uA1 - uA0) discard; }
   float e = smoothstep(0.0, 0.015, vUv.x) * smoothstep(1.0, 0.985, vUv.x) * smoothstep(0.0, 0.026, vUv.y) * smoothstep(1.0, 0.974, vUv.y);
-  vec3 c = uHas > 0.5 ? texture2D(uMap, vUv).rgb : vec3(0.05);
-  float a = uOp * e; gl_FragColor = vec4(c * a, a); }`;
+  vec3 c = texture2D(uMap, vUv).rgb;
+  float a = uOp * e * uHas; gl_FragColor = vec4(c * a, a); }`;
 // 線維: 冷たい灰青の絹。信号が通ると、通ったところから響き合いの次元の色へ変わる（発光ではなく色と不透明度だけ）
 const FIBER_VERT = `attribute float aU; attribute float aStart; attribute float aStr; attribute float aDim; attribute float aRev; attribute float aKeep;
 uniform float uTime; uniform float uFade; uniform float uBase; uniform vec3 uCol[8]; uniform vec3 uCold; uniform float uSpeed;
@@ -121,7 +121,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
 
     // ---- 線維 ----
     let fiber: THREE.LineSegments | null = null, fiberMat: THREE.ShaderMaterial | null = null, aStart: THREE.BufferAttribute, aRev: THREE.BufferAttribute, aKeep: THREE.BufferAttribute;
-    const fiberUniforms = () => ({ uTime: { value: 0 }, uFade: { value: 0 }, uBase: { value: 0.07 }, uSpeed: { value: 1.25 }, uCol: { value: DIM_COLOR.map((c) => new THREE.Color(c)) }, uCold: { value: new THREE.Color(COLD) } });
+    const fiberUniforms = () => ({ uTime: { value: 0 }, uFade: { value: 0 }, uBase: { value: 0.12 }, uSpeed: { value: 1.25 }, uCol: { value: DIM_COLOR.map((c) => new THREE.Color(c)) }, uCold: { value: new THREE.Color(COLD) } });
     const curve = (A: THREE.Vector3, B: THREE.Vector3, pull = 0.45) => { const M = A.clone().add(B).multiplyScalar(0.5 * pull); return (u: number) => new THREE.Vector3().copy(A).multiplyScalar((1 - u) * (1 - u)).addScaledVector(M, 2 * u * (1 - u)).addScaledVector(B, u * u); };
     function buildFibers() {
       const L = N.links.length, nv = L * SEG * 2, pos = new Float32Array(nv * 3), u = new Float32Array(nv), st = new Float32Array(nv).fill(1e6), str = new Float32Array(nv), dim = new Float32Array(nv), rev = new Float32Array(nv), keep = new Float32Array(nv);
@@ -215,8 +215,8 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
     const clearLater = () => { timers.forEach(clearTimeout); timers = []; };
     let digest: Digest | null = null, di = 0, pausedNow = false, wordPoint: THREE.Vector3 | null = null;
     const momIdx = (no: string) => N.moments.findIndex((m) => m.no === no);
-    const focusTips = (ids: number[] | null, dimOthers = true) => { const set = new Set(ids || []);
-      for (const t of tips) { const on = set.has(t.id); t.gs = on ? 3.4 : t.size; t.gop = !ids ? 1 : on ? 1 : dimOthers ? 0.35 : 1; t.grim = on ? 1 : 0; }
+    const focusTips = (ids: number[] | null, dimOthers = true, big = 3.4) => { const set = new Set(ids || []);
+      for (const t of tips) { const on = set.has(t.id); t.gs = on ? big : t.size; t.gop = !ids ? 1 : on ? 1 : dimOthers ? 0.35 : 1; t.grim = on ? 1 : 0; }
       for (const s of somas) { s.gop = !ids ? 1 : dimOthers ? 0.45 : 1; s.gs = s.size; s.grim = 0; } };
     function go(s: Stage) {
       clearLater(); st = s; stageRef.current = s; setStage(s); setHover(null); wedges.forEach((w) => scene.remove(w.mesh)); wedges = [];
@@ -224,10 +224,10 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       if (s.k !== "digest" && s.k !== "end") { pausedNow = false; setPaused(false); }
       if (s.k === "overview") {
         resetFibers(); lightDend([], 0); if (path) path.visible = false; wordPoint = null; scr.gop = 0; stopScreen(); playCells([]); focusTips(null);
-        fly([0, 0, 0], portrait() ? 470 : 360, { tau: 1.4 }); auto = 0.03; lbls = []; setHud({});
+        fly([0, 0, 0], portrait() ? 400 : 290, { tau: 1.4 }); auto = 0.03; lbls = []; setHud({});
       } else if (s.k === "moment") {
         const m = N.moments[s.m], soma = somas[s.m]; resetFibers(); if (path) path.visible = false; wordPoint = null; auto = 0.012;
-        focusTips(m.ctx, true); soma.gop = 1; soma.gs = soma.size * 1.25; soma.grim = 1;
+        focusTips(m.ctx, true, 4.2); soma.gop = 1; soma.gs = soma.size * 1.25; soma.grim = 1;
         fly(m.p, portrait() ? 62 : 46, { yaw: facing(m.p), pitch: 0.12, tau: 0.9 }); sfx.whoosh?.(1); getCrowd().swell(0.35);
         lbls = []; setHud({ title: m.title, sub: m.sport });
         // 目の前でその瞬間が流れる → 楔に割れて、文脈の細胞へ飛ぶ（分解）
@@ -326,7 +326,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       const setStill = (c: Cell, i: number) => { const s = Math.floor(i / 256), k = i % 256; c.still = atl[s]; c.rect = new THREE.Vector4((k % 16) / 16, 1 - (Math.floor(k / 16) + 1) / 16, 1 / 16, 1 / 16); showStill(c); };
       tips.forEach((t) => setStill(t, t.id)); somas.forEach((s, k) => setStill(s, N.moments[k].ctx[0]));
       setNet(N); setStats({ m: N.moments.length, c: N.ctx.length, l: N.links.length });
-      C.d = G.d = portrait() ? 900 : 700; go({ k: "overview" });
+      C.d = G.d = portrait() ? 560 : 430; go({ k: "overview" });
       if (shared) later(1800, async () => { // シェアされたダイジェスト: 一文を作り直して、そのまま旅を始める
         try { const r = await fetch("/api/ctx/digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: shared.i, ...(shared.s !== undefined && shared.s >= 0 ? { seed: shared.s } : { q: shared.q }) }) });
           const d = (await r.json()) as Digest; if (!d.items?.length) return; const dd = { ...d, name: shared.n || d.name, seed: shared.s, q: shared.q };
@@ -436,12 +436,13 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       )}
       {stage.k !== "overview" && (hud.big || hud.title) && (
         <div className={`nw-hud${stage.k === "digest" ? " dg" : ""}`} key={(hud.big || "") + (hud.title || "")}>
-          {hud.big && <div className="nw-big">{hud.big}</div>}
+          {hud.big && stage.k !== "digest" && <div className="nw-big">{hud.big}</div>}
           {hud.title && <div className="nw-title">{hud.title}</div>}
           {hud.line && <div className="nw-line">{hud.line}</div>}
           {hud.sub && <div className="nw-sub">{hud.sub}</div>}
         </div>
       )}
+      {stage.k === "digest" && hud.big && <div className="nw-dname">{hud.big}<small>{stage.i + 1} / {stage.d.items.length}</small></div>}
       {stage.k === "explore" && hud.counter && <Counter c={hud.counter} />}
       {hover && <div className="nw-hv" style={{ left: Math.min(hover.x + 16, (typeof window !== "undefined" ? innerWidth : 1280) - 320), top: hover.y + 16 }}><div className="t">{hover.t}</div>{hover.s && <div className="s">{hover.s}</div>}</div>}
       {d && (
@@ -519,7 +520,7 @@ const CSS = `
 .nw-line{font-size:clamp(13px,1.4vw,16px);margin:6px auto 0;max-width:640px;line-height:1.55;text-shadow:0 0 10px #000,0 0 3px #000}
 .nw-sub{font-size:12px;color:rgba(255,255,255,.65);margin:6px auto 0;max-width:640px;line-height:1.5;text-shadow:0 0 8px #000}
 .nw-hud.dg{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 132px)}
-.nw-hud.dg .nw-big{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 50px);font-size:clamp(22px,3vw,36px)}
+.nw-dname{position:absolute;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 46px);text-align:center;font-size:clamp(20px,2.8vw,34px);font-weight:900;pointer-events:none;text-shadow:0 2px 18px #000,0 0 4px #000;z-index:3;padding:0 16px}.nw-dname small{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.6);margin-top:2px}
 .nw-count{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 90px);display:flex;gap:28px;pointer-events:none;z-index:3;white-space:nowrap}
 .nw-count div{display:flex;flex-direction:column;align-items:center}.nw-count b{font-size:clamp(22px,3.2vw,40px);font-weight:900;font-variant-numeric:tabular-nums;line-height:1}.nw-count span{font-size:11px;color:rgba(255,255,255,.65);margin-top:4px}
 .nw-lb{position:absolute;left:0;top:0;text-align:center;white-space:nowrap;text-shadow:0 0 8px #000,0 0 3px #000,0 0 14px #000;transition:opacity .5s;will-change:transform}
@@ -539,7 +540,8 @@ const CSS = `
 .nw-ctl{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;gap:8px;z-index:4;white-space:nowrap}
 .nw-ctl button{background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:12px;padding:9px 14px;cursor:pointer}
 .nw-ctl .sh{background:#ffff00;color:#000;border-color:#ffff00;font-weight:800}
-.nw-end{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);text-align:center;z-index:5;background:rgba(0,0,0,.55);padding:22px 26px;border:1px solid rgba(255,255,255,.15);width:min(520px,calc(100% - 32px));animation:nwIn 1s .6s ease both}
+.nw-end{position:absolute;left:0;right:0;top:50%;margin:-120px auto 0;text-align:center;z-index:5;background:rgba(0,0,0,.6);padding:22px 26px;border:1px solid rgba(255,255,255,.15);width:min(520px,calc(100% - 32px));box-sizing:border-box;animation:nwFade 1s .6s ease both}
+@keyframes nwFade{from{opacity:0}to{opacity:1}}
 .nw-end .k{font-size:12px;color:rgba(255,255,255,.7);letter-spacing:.1em}.nw-end .n{font-size:clamp(28px,5vw,46px);font-weight:900;margin:6px 0}.nw-end .m{font-size:13px;color:rgba(255,255,255,.8)}
 .nw-end .b{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
 .nw-end .b>*{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:13px;padding:10px 16px;cursor:pointer;text-decoration:none;font-weight:700}
