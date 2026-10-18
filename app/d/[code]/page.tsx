@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import NeuralWorld from "@/components/NeuralWorld";
+import HeatViewer from "@/components/HeatViewer";
 import moments from "@/data/moments2026.json";
 import net from "@/data/ctx/net.json";
 import { decodeShare } from "@/lib/ctx/share";
@@ -20,5 +20,5 @@ export function generateMetadata({ params }: { params: { code: string } }): Meta
 export default function SharedDigest({ params }: { params: { code: string } }) {
   const list = (Array.isArray(moments) ? moments : Object.values(moments)) as { no: string; clips?: { webm?: string; loop?: string }[] }[];
   const media = Object.fromEntries(list.map((m) => [m.no, { webm: m.clips?.[0]?.webm, loop: m.clips?.[0]?.loop }]));
-  return <NeuralWorld media={media} shared={decode(params.code) || undefined} />;
+  return <HeatViewer media={media} shared={decode(params.code) || undefined} />;
 }
