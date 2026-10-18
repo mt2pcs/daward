@@ -178,7 +178,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
     type Wedge = { mesh: THREE.Mesh; to: THREE.Vector3; dir: number; t0: number };
     let wedges: Wedge[] = [];
     const screenXf = (frac: number) => { const D = 7, h = 2 * Math.tan((cam.fov * Math.PI) / 360) * D, w = Math.min(h * cam.aspect * frac, h * 0.92 / 0.5625);
-      const p = new THREE.Vector3(0, portrait() ? h * 0.06 : h * 0.03, -D).applyQuaternion(cam.quaternion).add(cam.position); return { p, w }; };
+      const p = new THREE.Vector3(0, portrait() ? h * 0.06 : h * 0.07, -D).applyQuaternion(cam.quaternion).add(cam.position); return { p, w }; };
 
     // ---- 映像 ----
     type Slot = { v: HTMLVideoElement; tex: THREE.VideoTexture; owner: Cell | "screen" | null };
@@ -306,7 +306,7 @@ export default function NeuralWorld({ media, startNo, shared }: { media: MediaMa
       const c = N.ctx[it.id], t = tips[it.id], mo = N.moments[momIdx(c.no)];
       lightChain(i, now); focusTips(digest.items.map((x) => x.id), true); t.gs = 4.2;
       fly(t.p, portrait() ? 26 : 20, { yaw: facing(t.p.toArray()), pitch: 0.1, tau: 0.8 }); auto = 0.01; sfx.whoosh?.(0.7);
-      scr.from = t.p.clone(); scr.k = 0; scr.frac = portrait() ? 0.94 : 0.6; scr.gop = 0;
+      scr.from = t.p.clone(); scr.k = 0; scr.frac = portrait() ? 0.94 : 0.5; scr.gop = 0;
       lbls = [];
       setHud({ big: digest.name, title: c.title, line: it.line, sub: `${mo.sport}　${mo.title}` });
       later(700, () => { playScreen(`${BASE}/ctx/c/${it.id}.${ext}`, false, true); scr.gop = 1; getCrowd().swell(0.3); });
@@ -540,7 +540,7 @@ const CSS = `
 .nw-ctl{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;gap:8px;z-index:4;white-space:nowrap}
 .nw-ctl button{background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.4);color:#fff;font-size:12px;padding:9px 14px;cursor:pointer}
 .nw-ctl .sh{background:#ffff00;color:#000;border-color:#ffff00;font-weight:800}
-.nw-end{position:absolute;left:0;right:0;top:50%;margin:-120px auto 0;text-align:center;z-index:5;background:rgba(0,0,0,.6);padding:22px 26px;border:1px solid rgba(255,255,255,.15);width:min(520px,calc(100% - 32px));box-sizing:border-box;animation:nwFade 1s .6s ease both}
+.nw-end{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);margin:0 auto;text-align:center;z-index:5;background:rgba(0,0,0,.6);padding:22px 26px;border:1px solid rgba(255,255,255,.15);width:min(520px,calc(100% - 32px));box-sizing:border-box;animation:nwFade 1s .6s ease both}
 @keyframes nwFade{from{opacity:0}to{opacity:1}}
 .nw-end .k{font-size:12px;color:rgba(255,255,255,.7);letter-spacing:.1em}.nw-end .n{font-size:clamp(28px,5vw,46px);font-weight:900;margin:6px 0}.nw-end .m{font-size:13px;color:rgba(255,255,255,.8)}
 .nw-end .b{display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap}
